@@ -45,6 +45,7 @@ public final class Library {
         JSONArray online=state.optJSONArray("online");if(online!=null)for(int n=0;n<online.length();n++)result.add(new JSONObject(online.getJSONObject(n).toString()).put("type","online"));
         JSONObject entries=state.optJSONObject("entries");
         if(entries!=null)for(JSONObject book:result){JSONObject entry=entries.optJSONObject(key(book));if(entry!=null){if(entry.has("title"))book.put("title",entry.getString("title"));book.put("folder",entry.optString("folder"));}}
+        JSONArray saved=state.optJSONArray("bookOrder");if(saved!=null){ArrayList<String> available=new ArrayList<>(),order=new ArrayList<>();HashMap<String,JSONObject> byKey=new HashMap<>();for(JSONObject book:result){String key=key(book);available.add(key);byKey.put(key,book);}for(int n=0;n<saved.length();n++)order.add(saved.optString(n));result.clear();for(String key:ShelfOrder.restore(available,order))result.add(byKey.get(key));}
         return result;
     }
     public List<JSONObject> folders() throws Exception {synchronized(LOCK){JSONObject state=read();migrateOnlineFolders(state);JSONArray folders=state.optJSONArray("folders");ArrayList<JSONObject> result=new ArrayList<>();if(folders!=null)for(int n=0;n<folders.length();n++)result.add(folders.getJSONObject(n));return result;}}
@@ -111,17 +112,33 @@ public final class Library {
         if(sibling<0)return false;
         JSONObject a=folders.getJSONObject(index),b=folders.getJSONObject(sibling);folders.put(index,b);folders.put(sibling,a);write(state);return true;
     }}
-    /** Moves a folder before another folder; used by long-press drag ordering. */
-    public boolean reorderFolder(String sourceId,String targetId) throws Exception {synchronized(LOCK){
+    /** Moves a folder before or after another folder among the same siblings. */
+    public boolean reorderFolder(String sourceId,String targetId) throws Exception {return reorderFolder(sourceId,targetId,false);}
+    public boolean reorderFolder(String sourceId,String targetId,boolean after) throws Exception {synchronized(LOCK){
         if(sourceId.equals(targetId))return false;
         JSONObject state=read();JSONArray folders=array(state,"folders");JSONObject source=null,target=null;
         for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(sourceId.equals(f.optString("id")))source=f;if(targetId.equals(f.optString("id")))target=f;}
         if(source==null||target==null)return false;
-        String parent=target.optString("parent");
-        for(int guard=0;guard<folders.length()&&!parent.isEmpty();guard++){String cursor=parent;JSONObject f=null;for(int n=0;n<folders.length();n++)if(cursor.equals(folders.getJSONObject(n).optString("id"))){f=folders.getJSONObject(n);break;}if(f==null)break;if(sourceId.equals(f.optString("id")))throw new IOException("不能把书籍夹移动到自己的子夹中");parent=f.optString("parent");}
-        source.put("parent",target.optString("parent"));
-        JSONArray next=new JSONArray();for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(sourceId.equals(f.optString("id")))continue;if(targetId.equals(f.optString("id")))next.put(source);next.put(f);}
+        if(!source.optString("parent").equals(target.optString("parent")))return false;
+        JSONArray next=new JSONArray();for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(sourceId.equals(f.optString("id")))continue;if(targetId.equals(f.optString("id"))&&!after)next.put(source);next.put(f);if(targetId.equals(f.optString("id"))&&after)next.put(source);}
         state.put("folders",next);write(state);return true;
+    }}
+    public boolean reorderBook(String sourceKey,String targetKey,boolean after) throws Exception {synchronized(LOCK){
+        if(sourceKey.equals(targetKey))return false;
+        List<JSONObject> all=books();JSONObject source=null,target=null;for(JSONObject book:all){if(sourceKey.equals(key(book)))source=book;if(targetKey.equals(key(book)))target=book;}
+        if(source==null||target==null||!folder(source).equals(folder(target)))return false;
+        ArrayList<String> siblings=new ArrayList<>();for(JSONObject book:all)if(folder(source).equals(folder(book)))siblings.add(key(book));
+        List<String> ordered=ShelfOrder.insert(siblings,sourceKey,targetKey,after);JSONArray saved=new JSONArray();int n=0;for(JSONObject book:all)saved.put(folder(source).equals(folder(book))?ordered.get(n++):key(book));
+        JSONObject state=read();state.put("bookOrder",saved);write(state);return true;
+    }}
+    /** One metadata transaction creates the folder and assigns exactly its two books. */
+    public String mergeBooks(String sourceKey,String targetKey,String parent) throws Exception {synchronized(LOCK){
+        List<JSONObject> all=books();ArrayList<String> siblings=new ArrayList<>();for(JSONObject book:all)if(parent.equals(folder(book)))siblings.add(key(book));
+        List<String> members=ShelfOrder.mergeMembers(siblings,sourceKey,targetKey);
+        JSONObject state=read();String id=UUID.randomUUID().toString();array(state,"folders").put(new JSONObject().put("id",id).put("title","新建书夹").put("parent",parent));
+        for(String key:members)entry(state,key).put("folder",id);
+        JSONArray saved=new JSONArray();int n=0;for(JSONObject book:all){String key=key(book);saved.put(members.contains(key)?members.get(n++):key);}state.put("bookOrder",saved);
+        write(state);return id;
     }}
     public void move(String key,String folderId) throws Exception {synchronized(LOCK){JSONObject state=read();if(!folderId.isEmpty()){boolean found=false;JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(folderId.equals(folders.getJSONObject(n).optString("id")))found=true;if(!found)throw new IOException("书籍夹不存在");}entry(state,key).put("folder",folderId);write(state);}}
     public void deleteFolder(String id) throws Exception {synchronized(LOCK){JSONObject state=read();JSONArray old=array(state,"folders"),next=new JSONArray();for(int n=0;n<old.length();n++)if(!id.equals(old.getJSONObject(n).optString("id")))next.put(old.getJSONObject(n));state.put("folders",next);for(int n=0;n<next.length();n++)if(id.equals(next.getJSONObject(n).optString("parent")))next.getJSONObject(n).put("parent","");JSONObject entries=state.optJSONObject("entries");if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject entry=entries.optJSONObject(keys.next());if(entry!=null&&id.equals(entry.optString("folder")))entry.remove("folder");}}write(state);}}

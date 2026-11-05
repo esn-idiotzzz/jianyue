@@ -29,6 +29,7 @@ import kotlin.time.Instant
  * Search and reading bridge for the Chinese Mihon sources bundled with the app.
  */
 object OnlineRepository {
+    internal const val SEARCH_PARALLELISM = 16
     data class SearchSummary(val total: Int, val succeeded: Int, val failed: Int)
 
     data class Item(
@@ -77,7 +78,7 @@ object OnlineRepository {
         onItem: (Item) -> Unit,
     ): SearchSummary {
         onProgress("正在搜索 ${sources.size} 个中文图源…")
-        val semaphore = Semaphore(8)
+        val semaphore = Semaphore(SEARCH_PARALLELISM)
         val done = AtomicInteger(0)
         val succeeded = AtomicInteger(0)
         val seen = Collections.synchronizedSet(HashSet<String>())

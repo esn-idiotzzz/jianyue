@@ -46,7 +46,7 @@ public final class MainActivity extends Activity {
     private TextView title,taskTitle,taskInfo,taskAction,start;
     private Ui.Icon plus,back,eye,more;
     private NavItem downloadNav,localNav,onlineNav,repositoryNav;
-    private boolean jmHistory=false;
+    private boolean jmHistory=false,historyLoaded=false;
     private TextView repoHint;
     private ProgressBar progress;
     private EditText input,searchInput;
@@ -61,6 +61,18 @@ public final class MainActivity extends Activity {
     private String rowsSnapshot="",draft="",searchDraft="",taskId="",folderId="";
     private JSONObject pendingShare;
     private JSONObject draggingBook;
+    private final ArrayList<JSONObject> dragRows=new ArrayList<>();
+    private JSONObject dragTarget;
+    private int dragZone=ShelfOrder.NONE;
+    private Bitmap dragCover;
+    private final HashMap<String,Integer> dragPreviewPositions=new HashMap<>();
+    private float dragPointerX,dragPointerY;
+    private final Runnable shelfAutoScroll=new Runnable(){public void run(){
+        if(draggingBook==null||grid==null||!resumed)return;
+        int edge=u.dp(56),direction=dragPointerY<edge?-1:dragPointerY>grid.getHeight()-edge?1:0;
+        if(direction==0||!grid.canScrollVertically(direction))return;
+        grid.smoothScrollBy(direction*u.dp(18),50);previewShelfDrag(dragPointerX,dragPointerY);handler.postDelayed(this,50);
+    }};
     private boolean dragMoved,taskShown;
     private float dragX,dragY;
     private ValueAnimator actionAnimator;
@@ -123,8 +135,31 @@ public final class MainActivity extends Activity {
     }
     private void buildShelf(){
         FrameLayout frame=new FrameLayout(this);grid=new GridView(this);grid.setId(1005);grid.setNumColumns(Math.max(3,Math.min(6,getResources().getConfiguration().screenWidthDp/120)));grid.setHorizontalSpacing(u.dp(12));grid.setVerticalSpacing(u.dp(18));grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);grid.setPadding(u.dp(20),u.dp(6),u.dp(20),u.dp(88));grid.setClipToPadding(false);grid.setSelector(android.R.color.transparent);shelfAdapter=new ShelfAdapter();grid.setAdapter(shelfAdapter);frame.addView(grid,new FrameLayout.LayoutParams(-1,-1));
-        emptyShelf=u.text(tab==2?"暂无浏览记录":"书架还空着",15,u.muted,false);emptyShelf.setGravity(Gravity.CENTER);frame.addView(emptyShelf,new FrameLayout.LayoutParams(-1,-1));emptyShelf.setOnClickListener(v->{if(tab==1)importMenu();});content.addView(frame,new LinearLayout.LayoutParams(-1,0,1));
-        grid.setOnDragListener((v,e)->{if(draggingBook==null)return false;if(e.getAction()==DragEvent.ACTION_DROP)return false;if(e.getAction()==DragEvent.ACTION_DRAG_LOCATION){if(dragX<0){dragX=e.getX();dragY=e.getY();}else if(Math.hypot(e.getX()-dragX,e.getY()-dragY)>u.dp(12))dragMoved=true;}if(e.getAction()==DragEvent.ACTION_DRAG_ENDED){JSONObject item=draggingBook;draggingBook=null;if(item!=null&&!e.getResult()&&!dragMoved&&resumed&&!isDestroyed()){if(item.optBoolean("book_folder"))manageFolder(item);else manageBook(item);}}return true;});
+        emptyShelf=u.text(tab==2?"暂无浏览记录":"书架还空着",15,u.muted,false);emptyShelf.setVisibility(tab==2?View.GONE:View.VISIBLE);emptyShelf.setGravity(Gravity.CENTER);frame.addView(emptyShelf,new FrameLayout.LayoutParams(-1,-1));emptyShelf.setOnClickListener(v->{if(tab==1)importMenu();});content.addView(frame,new LinearLayout.LayoutParams(-1,0,1));
+        grid.setClipChildren(false);
+        grid.setOnDragListener((v,e)->{
+            if(draggingBook==null)return false;
+            switch(e.getAction()){
+                case DragEvent.ACTION_DRAG_LOCATION:
+                    if(Math.hypot(e.getX()-dragX,e.getY()-dragY)>u.dp(12))dragMoved=true;
+                    dragPointerX=e.getX();dragPointerY=e.getY();previewShelfDrag(dragPointerX,dragPointerY);handler.removeCallbacks(shelfAutoScroll);handler.post(shelfAutoScroll);return true;
+                case DragEvent.ACTION_DRAG_EXITED:handler.removeCallbacks(shelfAutoScroll);clearShelfPreview();return true;
+                case DragEvent.ACTION_DROP:
+                    previewShelfDrag(e.getX(),e.getY());
+                    if(dragTarget==null||dragZone==ShelfOrder.NONE||operation)return false;
+                    dragMoved=true;drop(dragTarget,draggingBook,dragZone);return true;
+                case DragEvent.ACTION_DRAG_ENDED:
+                    handler.removeCallbacks(shelfAutoScroll);
+                    JSONObject item=draggingBook;boolean menu=!e.getResult()&&!dragMoved;
+                    if(!e.getResult()){clearShelfPreview();for(int n=0;n<grid.getChildCount();n++)grid.getChildAt(n).setAlpha(1f);}
+                    else{dragTarget=null;dragZone=ShelfOrder.NONE;rowsSnapshot="";}
+                    draggingBook=null;dragRows.clear();dragCover=null;dragPreviewPositions.clear();
+                    refresh(true);
+                    if(menu&&item!=null&&resumed&&!isDestroyed()){if(item.optBoolean("book_folder"))manageFolder(item);else manageBook(item);}
+                    return true;
+                default:return true;
+            }
+        });
     }
     private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return "本地书架";}
     private void leaveFolder(){String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");folderId=parent;buildTab();}
@@ -153,6 +188,7 @@ public final class MainActivity extends Activity {
         startActivity(new Intent(this,OnlineSearchActivity.class).putExtra("query",query));
     }
     private void buildOnline(){
+        historyLoaded=false;
         LinearLayout heading=u.row();heading.setPadding(u.dp(20),0,u.dp(20),u.dp(10));heading.addView(u.text("在线漫画",16,u.ink,true),new LinearLayout.LayoutParams(0,u.dp(42),1));
         TextView jm=u.button("JM漫画",jmHistory),web=u.button("全网漫画",!jmHistory);jm.setTextSize(12);web.setTextSize(12);
         heading.addView(jm,new LinearLayout.LayoutParams(u.dp(78),u.dp(36)));heading.addView(web,new LinearLayout.LayoutParams(u.dp(88),u.dp(36)));
@@ -196,9 +232,10 @@ public final class MainActivity extends Activity {
                     if(isDestroyed()||generation!=refreshGeneration)return;
                     // This generation owns the latch even if the JM/全网 tab changed while it ran.
                     reading=false;
+                    if(draggingBook!=null)return;
                     // A slower JM/全网 read must never replace the list of the tab now on screen.
                     if(jm!=jmHistory||!resumed)return;
-                    books.clear();books.addAll(result);libraryBooks.clear();libraryBooks.addAll(local);bookFolders.clear();bookFolders.addAll(folders);onlineBooks.clear();onlineBooks.addAll(online);render();
+                    books.clear();books.addAll(result);libraryBooks.clear();libraryBooks.addAll(local);bookFolders.clear();bookFolders.addAll(folders);onlineBooks.clear();onlineBooks.addAll(online);historyLoaded=true;render();
                 });
             }catch(Exception e){
                 runOnUiThread(()->{if(generation==refreshGeneration)reading=false;});
@@ -207,14 +244,15 @@ public final class MainActivity extends Activity {
     }
     private void render(){
         if(tab==3)return;
-        if(tab==2){rows.clear();rows.addAll(onlineBooks);String snap=new JSONArray(rows).toString();if(!snap.equals(rowsSnapshot)){rowsSnapshot=snap;if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}if(emptyShelf!=null)emptyShelf.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);return;}
-        rows.clear();if(tab==0){for(JSONObject b:libraryBooks)if("download".equals(b.optString("type")))rows.add(b);if(rows.isEmpty())rows.add(empty());}
+        if(tab==2){rows.clear();rows.addAll(onlineBooks);String snap=new JSONArray(rows).toString();if(!snap.equals(rowsSnapshot)){rowsSnapshot=snap;if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}paintHistoryEmpty();return;}
+        rows.clear();if(tab==0){for(JSONObject b:libraryBooks)if("download".equals(b.optString("type")))rows.add(b);rows.sort((a,b)->Long.compare(b.optLong("updated"),a.optLong("updated")));if(rows.isEmpty())rows.add(empty());}
         else{for(JSONObject f:bookFolders)if(folderId.equals(f.optString("parent"))){try{JSONObject row=new JSONObject(f.toString());row.put("book_folder",true);rows.add(row);}catch(Exception ignored){}}for(JSONObject b:libraryBooks)if(folderId.equals(b.optString("folder")))rows.add(b);title.setText(folderTitle());if(emptyShelf!=null)emptyShelf.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);}
         JSONArray visible=new JSONArray();for(JSONObject b:rows)visible.put(new JSONArray().put(b.optString("key")).put(b.optString("id")).put(b.optString("title")).put(b.optString("folder")).put(b.optInt("done")).put(b.optString("uri")).put(b.optBoolean("empty")).put(b.optBoolean("book_folder")));
         if(tab==1)for(JSONObject member:libraryBooks)visible.put(new JSONArray().put(member.optString("key")).put(member.optString("folder")));
         String snapshot=visible.toString()+revealed;if(!snapshot.equals(rowsSnapshot)){rowsSnapshot=snapshot;if(adapter!=null)adapter.notifyDataSetChanged();if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}updateTask();
     }
     private JSONObject empty(){JSONObject b=new JSONObject();try{b.put("empty",true);}catch(Exception ignored){}return b;}
+    private void paintHistoryEmpty(){if(emptyShelf!=null)emptyShelf.setVisibility(historyLoaded&&onlineBooks.isEmpty()?View.VISIBLE:View.GONE);}
     private void updateTask(){
         if(taskCard==null)return;boolean running=DownloadService.running;if(running)taskId=DownloadService.activeId;
         text(start,running?"任务下载中":"开始下载");JSONObject current=null;for(JSONObject b:books){if(!taskId.isEmpty()&&b.optString("id").equals(taskId)){current=b;break;}}
@@ -338,21 +376,66 @@ public final class MainActivity extends Activity {
     private void importMenu(){new AlertDialog.Builder(this).setTitle("添加到书架").setItems(new String[]{"导入漫画压缩包","导入图片文件夹","创建书籍夹"},(d,n)->{if(n==0){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivityForResult(i,43);}else if(n==1){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,41);}else nameDialog("创建书籍夹","",name->mutate(()->library.createFolder(name,folderId)));}).show();}
     private JSONArray folders(){try{return new JSONArray(prefs.getString("folders","[]"));}catch(Exception e){return new JSONArray();}}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();if(request==43){toast("正在导入漫画…");mutate(()->library.importComic(uri));return;}if(request!=41)return;try{getContentResolver().takePersistableUriPermission(uri,data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION);JSONArray all=folders();for(int n=0;n<all.length();n++)if(all.getJSONObject(n).optString("uri").equals(uri.toString())){toast("已添加此文件夹");return;}String name=android.provider.DocumentsContract.getTreeDocumentId(uri);int slash=name.lastIndexOf('/');if(slash>=0)name=name.substring(slash+1);all.put(new JSONObject().put("uri",uri.toString()).put("title",name).put("local",true));prefs.edit().putString("folders",all.toString()).apply();refresh();}catch(Exception e){toast("未获得文件夹读取权限，请重新选择");}}
-    private void drop(JSONObject target,JSONObject source){
+    private static String shelfKey(JSONObject book){return book.optBoolean("book_folder")?"folder:"+book.optString("id"):Library.key(book);}
+    private void previewShelfDrag(float x,float y){
+        ShelfTile hovered=null;
+        // Deliberately ignore translations: insertion animations must not change hit testing.
+        for(int n=0;n<grid.getChildCount();n++){
+            View child=grid.getChildAt(n);
+            if(child instanceof ShelfTile&&x>=child.getLeft()-grid.getHorizontalSpacing()/2f&&x<=child.getRight()+grid.getHorizontalSpacing()/2f&&y>=child.getTop()-grid.getVerticalSpacing()/2f&&y<=child.getBottom()+grid.getVerticalSpacing()/2f){hovered=(ShelfTile)child;break;}
+        }
+        JSONObject target=hovered==null?null:hovered.book;
+        int zone=target==null||shelfKey(target).equals(shelfKey(draggingBook))?ShelfOrder.NONE:ShelfOrder.zone(Math.max(0,Math.min(hovered.getWidth(),x-hovered.getLeft())),hovered.getWidth(),draggingBook.optBoolean("book_folder"),target.optBoolean("book_folder"));
+        if(zone==ShelfOrder.NONE)target=null;
+        if(zone==dragZone&&(target==null?dragTarget==null:dragTarget!=null&&shelfKey(target).equals(shelfKey(dragTarget))))return;
+        clearShelfPreview();
+        if(zone==ShelfOrder.NONE)return;
+        dragTarget=target;dragZone=zone;dragMoved=true;
+        if(zone==ShelfOrder.BEFORE||zone==ShelfOrder.AFTER){
+            ArrayList<String> order=new ArrayList<>();for(JSONObject book:dragRows)order.add(shelfKey(book));
+            List<String> next=ShelfOrder.insert(order,shelfKey(draggingBook),shelfKey(target),zone==ShelfOrder.AFTER);
+            for(int n=0;n<next.size();n++)dragPreviewPositions.put(next.get(n),n);
+            for(int n=0;n<grid.getChildCount();n++){
+                View child=grid.getChildAt(n);if(!(child instanceof ShelfTile))continue;
+                Integer position=dragPreviewPositions.get(shelfKey(((ShelfTile)child).book));if(position==null)continue;
+                Point slot=shelfSlot(position);child.animate().cancel();child.animate().translationX(slot.x-child.getLeft()).translationY(slot.y-child.getTop()).scaleX(1).scaleY(1).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
+            }
+        }else if(zone==ShelfOrder.MERGE)hovered.showFolderPreview();
+        else{hovered.setForeground(dragOutline());hovered.animate().scaleX(.96f).scaleY(.96f).setDuration(160).start();}
+    }
+    private Point shelfSlot(int position){
+        int childIndex=position-grid.getFirstVisiblePosition();
+        if(childIndex>=0&&childIndex<grid.getChildCount()){View child=grid.getChildAt(childIndex);return new Point(child.getLeft(),child.getTop());}
+        View first=grid.getChildAt(0);int columns=grid.getNumColumns(),rowHeight=first.getHeight()+grid.getVerticalSpacing();
+        if(grid.getChildCount()>columns)rowHeight=grid.getChildAt(columns).getTop()-first.getTop();
+        return new Point(grid.getPaddingLeft()+(position%columns)*(first.getWidth()+grid.getHorizontalSpacing()),first.getTop()+(position/columns-grid.getFirstVisiblePosition()/columns)*rowHeight);
+    }
+    private GradientDrawable dragOutline(){GradientDrawable border=u.shape(Color.TRANSPARENT,16);border.setStroke(u.dp(2),Ui.BLUE);return border;}
+    private void clearShelfPreview(){
+        dragTarget=null;dragZone=ShelfOrder.NONE;dragPreviewPositions.clear();
+        if(grid==null)return;
+        for(int n=0;n<grid.getChildCount();n++){
+            View child=grid.getChildAt(n);child.animate().cancel();child.setForeground(null);
+            if(child instanceof ShelfTile)((ShelfTile)child).clearFolderPreview();
+            child.animate().translationX(0).translationY(0).scaleX(1).scaleY(1).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
+        }
+    }
+    private Bitmap snapshotFace(View view){Bitmap image=Bitmap.createBitmap(Math.max(1,view.getWidth()),Math.max(1,view.getHeight()),Bitmap.Config.ARGB_8888);view.draw(new Canvas(image));return image;}
+    private void drop(JSONObject target,JSONObject source,int zone){
         if(source==null||target==null||Library.key(source).equals(Library.key(target)))return;
         if(source.optBoolean("book_folder")){
-            if(target.optBoolean("book_folder"))mutate(()->library.reorderFolder(source.optString("id"),target.optString("id")));
-            else toast("书籍夹只能拖到另一个书籍夹上排序");
+            if(target.optBoolean("book_folder"))mutate(()->library.reorderFolder(source.optString("id"),target.optString("id"),zone==ShelfOrder.AFTER));
             return;
         }
-        if(target.optBoolean("book_folder")){mutate(()->library.move(Library.key(source),target.optString("id")));return;}
-        nameDialog("创建书籍夹","",name->mutate(()->{String id=library.createFolder(name,folderId);library.move(Library.key(target),id);library.move(Library.key(source),id);}));
+        if(zone==ShelfOrder.INTO){mutate(()->library.move(Library.key(source),target.optString("id")));return;}
+        if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
+        mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
     private void settings(){
         new AlertDialog.Builder(this).setItems(new String[]{"关于"},(d,n)->license()).show();
     }
 
-    private void license(){new AlertDialog.Builder(this).setTitle("JM 简阅 3.3.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL},(d,n)->{if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){new AlertDialog.Builder(this).setTitle("JM 简阅 3.4.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL},(d,n)->{if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);new AlertDialog.Builder(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     @Override protected void onResume(){super.onResume();resumed=true;handler.post(poll);if(appUpdate!=null)appUpdate.onResume();}
@@ -402,11 +485,17 @@ public final class MainActivity extends Activity {
         public View getView(int p,View old,ViewGroup parent){ShelfTile tile=old instanceof ShelfTile?(ShelfTile)old:new ShelfTile();tile.bind(rows.get(p));return tile;}
     }
     private final class ShelfTile extends LinearLayout {
-        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private final int width,height;private int touchX,touchY;
-        ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);int columns=grid.getNumColumns();width=(getResources().getDisplayMetrics().widthPixels-u.dp(40)-u.dp(12)*(columns-1))/columns;height=(int)(width*1.40f);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,9);name=u.text("",13,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setLineSpacing(u.dp(2),1);name.setPadding(u.dp(1),0,u.dp(1),0);addView(name,new LinearLayout.LayoutParams(-1,Math.max(u.dp(38),name.getLineHeight()*2+u.dp(2))));info=u.text("",10,u.muted,false);info.setMaxLines(2);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setLineSpacing(u.dp(1),1);info.setPadding(u.dp(1),u.dp(4),u.dp(1),0);info.setVisibility(View.GONE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){touchX=(int)e.getX();touchY=(int)e.getY();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{if(tab==2){manageBook(book);return true;}draggingBook=book;dragMoved=false;dragX=dragY=-1;v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);boolean started=v.startDragAndDrop(ClipData.newPlainText("book",Library.key(book)),new TileShadow(v,touchX,touchY),book,0);if(!started){draggingBook=null;if(book.optBoolean("book_folder"))manageFolder(book);else manageBook(book);}else v.setAlpha(0f);return true;});
-            setOnDragListener((v,e)->{if(!(e.getLocalState() instanceof JSONObject))return false;JSONObject source=(JSONObject)e.getLocalState();boolean same=Library.key(source).equals(Library.key(book));switch(e.getAction()){case DragEvent.ACTION_DRAG_STARTED:if(same)v.setAlpha(0f);return true;case DragEvent.ACTION_DRAG_ENTERED:if(!same){v.setAlpha(.58f);dragMoved=true;}return true;case DragEvent.ACTION_DRAG_EXITED:v.setAlpha(same?0f:1f);return true;case DragEvent.ACTION_DROP:v.setAlpha(1);if(same)return false;dragMoved=true;drop(book,source);return true;case DragEvent.ACTION_DRAG_ENDED:v.setAlpha(1);return true;default:return true;}});
+        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private final int width,height;private int touchX,touchY;private View folderPreview;
+        ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);int columns=grid.getNumColumns();width=(getResources().getDisplayMetrics().widthPixels-u.dp(40)-u.dp(12)*(columns-1))/columns;height=(int)(width*1.40f);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,9);name=u.text("",13,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setLineSpacing(u.dp(2),1);name.setPadding(u.dp(1),0,u.dp(1),0);addView(name,new LinearLayout.LayoutParams(-1,Math.max(u.dp(38),name.getLineHeight()*2+u.dp(2))));info=u.text("",10,u.muted,false);info.setMaxLines(2);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setLineSpacing(u.dp(1),1);info.setPadding(u.dp(1),u.dp(4),u.dp(1),0);info.setVisibility(View.GONE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){touchX=(int)e.getX();touchY=(int)e.getY();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{if(tab==2){manageBook(book);return true;}if(operation){toast("请等待当前操作完成");return true;}draggingBook=book;dragRows.clear();dragRows.addAll(rows);dragTarget=null;dragZone=ShelfOrder.NONE;dragCover=snapshotFace(face);dragMoved=false;dragX=v.getLeft()+touchX;dragY=v.getTop()+touchY;v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);boolean started=v.startDragAndDrop(ClipData.newPlainText("book",Library.key(book)),new TileShadow(v,touchX,touchY),book,0);if(!started){draggingBook=null;dragRows.clear();dragCover=null;if(book.optBoolean("book_folder"))manageFolder(book);else manageBook(book);}else v.setAlpha(0f);return true;});
         }
-        void bind(JSONObject b){book=b;setAlpha(draggingBook!=null&&Library.key(draggingBook).equals(Library.key(b))?0f:1f);name.setText(b.optString("title","未命名"));setContentDescription(b.optString("title"));String detail=onlineDetail(b);info.setText(detail);info.setVisibility(detail.isEmpty()?View.GONE:View.VISIBLE);String identity=b.optBoolean("book_folder")?"folder:"+b.optString("id"):b.optString("key");if(b.optBoolean("book_folder")){for(JSONObject member:libraryBooks)if(b.optString("id").equals(member.optString("folder")))identity+="/"+member.optString("key");}else if(b.has("sourceId"))identity+="|"+b.optString("thumbnail");if(!identity.equals(faceKey)){faceKey=identity;face.removeAllViews();face.addView(b.optBoolean("book_folder")?folderCover(b,width,height):cover(b,true),new FrameLayout.LayoutParams(-1,-1));}else retryMissingCovers(face);}
+        void bind(JSONObject b){boolean rebound=book==null||!shelfKey(book).equals(shelfKey(b));if(draggingBook==null||rebound){animate().cancel();setTranslationX(0);setTranslationY(0);setScaleX(1);setScaleY(1);setForeground(null);clearFolderPreview();}book=b;setAlpha(draggingBook!=null&&Library.key(draggingBook).equals(Library.key(b))?0f:1f);name.setText(b.optString("title","未命名"));setContentDescription(b.optString("title"));String detail=onlineDetail(b);info.setText(detail);info.setVisibility(detail.isEmpty()?View.GONE:View.VISIBLE);String identity=b.optBoolean("book_folder")?"folder:"+b.optString("id"):b.optString("key");if(b.optBoolean("book_folder")){for(JSONObject member:libraryBooks)if(b.optString("id").equals(member.optString("folder")))identity+="/"+member.optString("key");}else if(b.has("sourceId"))identity+="|"+b.optString("thumbnail");if(!identity.equals(faceKey)){faceKey=identity;face.removeAllViews();face.addView(b.optBoolean("book_folder")?folderCover(b,width,height):cover(b,true),new FrameLayout.LayoutParams(-1,-1));}else retryMissingCovers(face);if(rebound&&draggingBook!=null){String bound=shelfKey(b);post(()->{Integer position=dragPreviewPositions.get(bound);if(draggingBook!=null&&bound.equals(shelfKey(book))&&position!=null){Point slot=shelfSlot(position);animate().cancel();setTranslationX(slot.x-getLeft());setTranslationY(slot.y-getTop());}});}}
+        void clearFolderPreview(){if(folderPreview!=null){face.removeView(folderPreview);folderPreview=null;if(book!=null)name.setText(book.optString("title","未命名"));}}
+        void showFolderPreview(){
+            Bitmap target=snapshotFace(face);FrameLayout preview=new FrameLayout(MainActivity.this);preview.setBackground(u.shape(u.dark?0xff252b39:0xffe8edf8,16));preview.setClipToOutline(true);
+            LinearLayout collage=u.column();collage.setPadding(u.dp(8),u.dp(8),u.dp(8),u.dp(8));
+            for(int row=0;row<2;row++){LinearLayout line=u.row();for(int col=0;col<2;col++){View cell;if(row==0){ImageView image=new ImageView(MainActivity.this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setImageBitmap(col==0?target:dragCover);cell=image;}else{cell=new View(MainActivity.this);cell.setBackground(u.shape(u.dark?0xff30394b:0xffd9e1f1,6));}LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-1,1);cp.setMargins(u.dp(2),u.dp(2),u.dp(2),u.dp(2));line.addView(cell,cp);}collage.addView(line,new LinearLayout.LayoutParams(-1,0,1));}
+            preview.addView(collage,new FrameLayout.LayoutParams(-1,-1));preview.setForeground(dragOutline());TextView count=u.text("2",10,Color.WHITE,true);count.setGravity(Gravity.CENTER);count.setBackground(u.shape(Ui.BLUE,8));FrameLayout.LayoutParams badge=new FrameLayout.LayoutParams(u.dp(24),u.dp(20),Gravity.RIGHT|Gravity.BOTTOM);badge.setMargins(0,0,u.dp(8),u.dp(8));preview.addView(count,badge);folderPreview=preview;face.addView(preview,new FrameLayout.LayoutParams(-1,-1));name.setText("新建书夹");
+        }
     }
     private void retryMissingCovers(View view){if(view instanceof ImageView){ImageView image=(ImageView)view;if(image.getDrawable()==null&&image.getTag() instanceof JSONObject){JSONObject b=(JSONObject)image.getTag();if(!b.has("sourceId")||(OnlineHistory.isJm(b)&&!b.optString("thumbnail").isEmpty()))covers.load(image,b);}}else if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int n=0;n<group.getChildCount();n++)retryMissingCovers(group.getChildAt(n));}}
     private static final class TileShadow extends View.DragShadowBuilder {

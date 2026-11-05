@@ -177,4 +177,40 @@ class OnlineSearchTest {
         verify(exactly = 1) { working.getFilterList() }
         coVerify(exactly = 1) { working.getSearchManga(1, "海贼王", any()) }
     }
+
+    @Test
+    fun `eight slow sources do not hold the next fast source behind their timeouts`() = runTest {
+        val slow = (1L..8L).map { source(it) }
+        slow.forEach { source -> coEvery { source.getSearchManga(any(), any(), any()) } coAnswers { awaitCancellation() } }
+        val fast = source(9)
+        coEvery { fast.getSearchManga(any(), any(), any()) } returns MangasPage(listOf(manga("快源结果", "/fast")), false)
+        val items = mutableListOf<OnlineRepository.Item>()
+        val pending = async { OnlineRepository.searchSources(slow + fast, "漫画", {}, items::add) }
+
+        runCurrent()
+
+        assertFalse(pending.isCompleted)
+        assertEquals(listOf("快源结果"), items.map { it.title })
+        advanceUntilIdle()
+        assertEquals(OnlineRepository.SearchSummary(9, 1, 8), pending.await())
+    }
+
+    @Test
+    fun `source search concurrency remains bounded`() = runTest {
+        val sources = (1L..32L).map { source(it) }
+        var active = 0
+        var peak = 0
+        sources.forEach { source ->
+            coEvery { source.getSearchManga(any(), any(), any()) } coAnswers {
+                active++; peak = maxOf(peak, active)
+                try { delay(1_000); MangasPage(emptyList(), false) } finally { active-- }
+            }
+        }
+        val pending = async { OnlineRepository.searchSources(sources, "漫画", {}, {}) }
+        runCurrent()
+        assertEquals(16, active)
+        advanceUntilIdle()
+        assertEquals(16, peak)
+        assertEquals(OnlineRepository.SearchSummary(32, 32, 0), pending.await())
+    }
 }

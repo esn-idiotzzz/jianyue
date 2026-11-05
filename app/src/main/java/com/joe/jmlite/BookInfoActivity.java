@@ -32,7 +32,7 @@ public final class BookInfoActivity extends Activity {
     private String key;
     private boolean favorite,onlineJm;
     private Ui.Icon heart;
-    private TextView nameView,heartLabel,pages;
+    private TextView nameView,heartLabel,pages,downloadButton;
     private ImageView coverImage;
     private FrameLayout heartButton;
 
@@ -82,9 +82,9 @@ public final class BookInfoActivity extends Activity {
         restart.setOnClickListener(v->read(true));
         if(onlineJm){
             u.space(content,12);
-            TextView download=u.button("下载到书架",false);
-            content.addView(download,new LinearLayout.LayoutParams(-1,u.dp(52)));
-            download.setOnClickListener(v->downloadToShelf());
+            downloadButton=u.button("下载到书架",false);downloadButton.setEnabled(false);
+            content.addView(downloadButton,new LinearLayout.LayoutParams(-1,u.dp(52)));
+            downloadButton.setOnClickListener(v->downloadToShelf());
         }
 
         scroll.addView(content,new ScrollView.LayoutParams(-1,-2));
@@ -96,7 +96,7 @@ public final class BookInfoActivity extends Activity {
         refreshFavorite();
     }
 
-    @Override protected void onResume(){super.onResume();refreshFavorite();if(onlineJm)refreshOnlineRecord();}
+    @Override protected void onResume(){super.onResume();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
     @Override protected void onDestroy(){disk.shutdownNow();covers.close();super.onDestroy();}
 
     private static String plate(JSONObject b){
@@ -181,16 +181,47 @@ public final class BookInfoActivity extends Activity {
         });
     }
 
+    private void paintDownloadButton(boolean exists){
+        downloadButton.setText(exists?"已存在于书架":"下载到书架");
+        downloadButton.setEnabled(!exists);downloadButton.setAlpha(exists?.55f:1f);
+    }
+
+    private boolean localDownloadExists(String id) throws Exception {
+        JSONObject local=new Store(this).read(id);
+        // Library.books() only exposes completed JM downloads, independently of their folder.
+        return local!=null&&"complete".equals(local.optString("status"));
+    }
+
+    private void refreshDownloadButton(){
+        if(downloadButton==null||disk.isShutdown())return;
+        downloadButton.setEnabled(false);
+        disk.execute(()->{
+            try{
+                boolean exists=localDownloadExists(JmApi.parseId(onlineId(book)));
+                runOnUiThread(()->{if(!isDestroyed())paintDownloadButton(exists);});
+            }catch(Exception e){runOnUiThread(()->{if(!isDestroyed()){paintDownloadButton(false);Toast.makeText(this,"无法读取书架，请重试",Toast.LENGTH_SHORT).show();}});}
+        });
+    }
+
     private void downloadToShelf(){
         if(DownloadService.running){Toast.makeText(this,"请先暂停当前任务",Toast.LENGTH_SHORT).show();return;}
         final String id;
         try{id=JmApi.parseId(onlineId(book));}catch(Exception e){Toast.makeText(this,"编号无效",Toast.LENGTH_SHORT).show();return;}
-        try{
-            startForegroundService(new Intent(this,DownloadService.class).setAction(DownloadService.ACTION_START).putExtra("id",id));
-            Toast.makeText(this,"已开始下载到书架",Toast.LENGTH_SHORT).show();
-        }catch(RuntimeException e){
-            Toast.makeText(this,"无法启动下载，请重试",Toast.LENGTH_SHORT).show();
-        }
+        downloadButton.setEnabled(false);
+        disk.execute(()->{
+            try{
+                boolean exists=localDownloadExists(id);
+                runOnUiThread(()->{
+                    if(isDestroyed())return;
+                    paintDownloadButton(exists);if(exists)return;
+                    if(DownloadService.running){Toast.makeText(this,"请先暂停当前任务",Toast.LENGTH_SHORT).show();return;}
+                    try{
+                        startForegroundService(new Intent(this,DownloadService.class).setAction(DownloadService.ACTION_START).putExtra("id",id));
+                        Toast.makeText(this,"已开始下载到书架",Toast.LENGTH_SHORT).show();
+                    }catch(RuntimeException e){Toast.makeText(this,"无法启动下载，请重试",Toast.LENGTH_SHORT).show();}
+                });
+            }catch(Exception e){runOnUiThread(()->{if(!isDestroyed()){paintDownloadButton(false);Toast.makeText(this,"无法读取书架，请重试",Toast.LENGTH_SHORT).show();}});}
+        });
     }
 
     private void read(boolean fromStart){

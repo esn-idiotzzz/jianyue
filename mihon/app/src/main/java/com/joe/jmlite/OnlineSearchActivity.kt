@@ -39,6 +39,7 @@ class OnlineSearchActivity : Activity() {
     private var searchJob: kotlinx.coroutines.Job? = null
     private var generation = 0
     private var completionSummary: OnlineRepository.SearchSummary? = null
+    private var refreshScheduled = false
     private val scores = HashMap<String,Int>()
     private val checked = HashSet<String>()
     private val sourceMode by lazy { intent.hasExtra("sourceId") || intent.hasExtra("sourcePackage") }
@@ -208,6 +209,8 @@ class OnlineSearchActivity : Activity() {
             .hideSoftInputFromWindow(queryInput.windowToken, 0)
         searching = true
         completionSummary=null
+        grid.removeCallbacks(refreshTask)
+        refreshScheduled=false
         scores.clear()
         results.clear()
         adapter.notifyDataSetChanged()
@@ -236,7 +239,11 @@ class OnlineSearchActivity : Activity() {
                         }
                     },
                 )
+                if(token!=generation || isFinishing || isDestroyed)return@launch
                 completionSummary=summary
+                grid.removeCallbacks(refreshTask)
+                refreshScheduled=false
+                adapter.notifyDataSetChanged()
                 status.text = if (summary.succeeded == 0) {
                     "本次 ${summary.total} 个图源均未能完成搜索，请检查网络后重试"
                 } else {
@@ -246,10 +253,11 @@ class OnlineSearchActivity : Activity() {
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 return@launch
             } catch (error: Throwable) {
+                if(token!=generation || isFinishing || isDestroyed)return@launch
                 status.text = "搜索失败：${error.message ?: error.javaClass.simpleName}"
                 Toast.makeText(this@OnlineSearchActivity, status.text, Toast.LENGTH_LONG).show()
             } finally {
-                searching = false
+                if(token==generation)searching = false
             }
         }
     }
@@ -259,7 +267,7 @@ class OnlineSearchActivity : Activity() {
         if(reset){
             searchJob?.cancel();generation++;currentPage=0;hasNext=true
             activeQuery=queryInput.text.toString().trim();completionSummary=null
-            results.clear();scores.clear();itemKeys.clear();grid.removeCallbacks(refreshTask)
+            results.clear();scores.clear();itemKeys.clear();grid.removeCallbacks(refreshTask);refreshScheduled=false
             adapter.notifyDataSetChanged()
         }
         val token=generation
@@ -289,8 +297,8 @@ class OnlineSearchActivity : Activity() {
         }
     }
     override fun onBackPressed(){if(searchExpanded)toggleSearch?.invoke(false) else super.onBackPressed()}
-    private val refreshTask=Runnable { adapter.notifyDataSetChanged();completionSummary?.let{if(it.succeeded>0)status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}"} }
-    private fun refreshResults(){ grid.removeCallbacks(refreshTask);grid.postDelayed(refreshTask,80) }
+    private val refreshTask=Runnable { refreshScheduled=false;adapter.notifyDataSetChanged();completionSummary?.let{if(it.succeeded>0)status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}"} }
+    private fun refreshResults(){ if(!refreshScheduled){refreshScheduled=true;grid.postDelayed(refreshTask,80)} }
     override fun onResume(){super.onResume();if(::adapter.isInitialized){results.removeAll{ChapterAvailability.empty(this,it.sourceId,it.url)};adapter.notifyDataSetChanged()}}
     override fun onDestroy() {
         grid.removeCallbacks(refreshTask)
