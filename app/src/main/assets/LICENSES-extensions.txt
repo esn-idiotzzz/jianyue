@@ -1,0 +1,421 @@
+Bundled Chinese Mihon sources
+=============================
+
+Publisher: Keiyoushi and the individual extension contributors.
+Published APK repository: https://github.com/keiyoushi/extensions
+Source repository: https://github.com/keiyoushi/extensions-source
+Source repository license: Apache License 2.0 (full upstream text below).
+License source: https://github.com/keiyoushi/extensions-source/blob/de743aed846da53e00c45ab26ee0e77f7bb4355b/LICENSE
+
+The 95 APK files in assets/exts are the original, unmodified, signed APKs
+published by Keiyoushi. They contain 106 Chinese-language sources. An extension
+containing multiple languages is bundled as a whole; JianYue only searches its
+Chinese sources. These APKs are copied to the app-private extension directory
+and loaded through the Mihon source API without opening the Mihon main screen.
+Original embedded copyright and third-party notices are retained within the APKs.
+Third-party components remain subject to their respective licenses.
+
+Index snapshot: https://github.com/keiyoushi/extensions/raw/repo/index.pb
+Index SHA-256: b5e80cfa847e3995367468429bba5edefaea76fe3f7f30188bb16df12dd2b3cf
+Publisher certificate SHA-256: 9add655a78e96c4ec7a53ef89dccb557cb5d767489fac5e785d671a5a75d4da2
+APK content hashes, versions, download URLs and Chinese source IDs are listed
+in assets/bundled-sources.json. The original index.pb snapshot is preserved
+with the build verification records; its exact hash is recorded above.
+
+Bundled extension packages (package / version / official APK URL):
+
+eu.kanade.tachiyomi.extension.all.akuma / 1.6.11
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.akuma-v1.6.11.apk
+eu.kanade.tachiyomi.extension.all.asmhentai / 1.6.14
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.asmhentai-v1.6.14.apk
+eu.kanade.tachiyomi.extension.all.comicfury / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.comicfury-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.dragonballmultiverse / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.dragonballmultiverse-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.globalcomix / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.globalcomix-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.hdoujin / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hdoujin-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.hentai3 / 1.6.7
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hentai3-v1.6.7.apk
+eu.kanade.tachiyomi.extension.all.hentaifox / 1.6.21
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hentaifox-v1.6.21.apk
+eu.kanade.tachiyomi.extension.all.hentaihand / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hentaihand-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.kagane / 1.6.41
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.kagane-v1.6.41.apk
+eu.kanade.tachiyomi.extension.all.koharu / 1.6.4
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.koharu-v1.6.4.apk
+eu.kanade.tachiyomi.extension.all.luscious / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.luscious-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.mangaball / 1.6.6
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangaball-v1.6.6.apk
+eu.kanade.tachiyomi.extension.all.mangadex / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangadex-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.mangamillion / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangamillion-v1.6.3.apk
+eu.kanade.tachiyomi.extension.all.mangatoon / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangatoon-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.myreadingmanga / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.myreadingmanga-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.namicomi / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.namicomi-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.nhentaicom / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.nhentaicom-v1.6.3.apk
+eu.kanade.tachiyomi.extension.all.nhentaito / 1.6.11
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.nhentaito-v1.6.11.apk
+eu.kanade.tachiyomi.extension.all.nhentaixxx / 1.6.12
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.nhentaixxx-v1.6.12.apk
+eu.kanade.tachiyomi.extension.all.pandachaika / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.pandachaika-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.pixiv / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.pixiv-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.pornpics / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.pornpics-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.saymanhwa / 1.6.4
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.saymanhwa-v1.6.4.apk
+eu.kanade.tachiyomi.extension.all.simplyhentai / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.simplyhentai-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.swarm / 1.6.0
+  https://github.com/keiyoushi/extensions/releases/download/6296017/tachiyomi-all.swarm-v1.6.0.apk
+eu.kanade.tachiyomi.extension.all.toomics / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.toomics-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.toonlook / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.toonlook-v1.6.2.apk
+eu.kanade.tachiyomi.extension.all.webtoons / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.webtoons-v1.6.3.apk
+eu.kanade.tachiyomi.extension.all.xcomic / 1.6.11
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.xcomic-v1.6.11.apk
+eu.kanade.tachiyomi.extension.all.xkcd / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.xkcd-v1.6.1.apk
+eu.kanade.tachiyomi.extension.all.yaoime / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.yaoime-v1.6.3.apk
+eu.kanade.tachiyomi.extension.all.yellownote / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.yellownote-v1.6.1.apk
+eu.kanade.tachiyomi.extension.en.cmanhua / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-en.cmanhua-v1.6.1.apk
+eu.kanade.tachiyomi.extension.en.mangadotnet / 1.6.29
+  https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-en.mangadotnet-v1.6.29.apk
+eu.kanade.tachiyomi.extension.zh.bakamh / 1.6.72
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.bakamh-v1.6.72.apk
+eu.kanade.tachiyomi.extension.zh.baozimanhua / 1.6.33
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.baozimanhua-v1.6.33.apk
+eu.kanade.tachiyomi.extension.zh.baozimhorg / 1.6.39
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.baozimhorg-v1.6.39.apk
+eu.kanade.tachiyomi.extension.zh.bh3 / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.bh3-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.bilimanga / 1.6.15
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.bilimanga-v1.6.15.apk
+eu.kanade.tachiyomi.extension.zh.boylove / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.boylove-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.cartoon18 / 1.6.6
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.cartoon18-v1.6.6.apk
+eu.kanade.tachiyomi.extension.zh.comicabc / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.comicabc-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.creativecomic / 1.6.4
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.creativecomic-v1.6.4.apk
+eu.kanade.tachiyomi.extension.zh.dm5 / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.dm5-v1.6.3.apk
+eu.kanade.tachiyomi.extension.zh.dongmanmanhua / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.dongmanmanhua-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.dumanwu / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.dumanwu-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.eighteenmanhua / 1.6.4
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.eighteenmanhua-v1.6.4.apk
+eu.kanade.tachiyomi.extension.zh.favcomic / 1.6.5
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.favcomic-v1.6.5.apk
+eu.kanade.tachiyomi.extension.zh.guazimanhua / 1.6.7
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.guazimanhua-v1.6.7.apk
+eu.kanade.tachiyomi.extension.zh.hanabimanga / 1.6.6
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hanabimanga-v1.6.6.apk
+eu.kanade.tachiyomi.extension.zh.hanime1 / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hanime1-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.hanman18 / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hanman18-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.hcomic / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hcomic-v1.6.3.apk
+eu.kanade.tachiyomi.extension.zh.hentaiclub / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hentaiclub-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.hikarinagi / 1.6.5
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hikarinagi-v1.6.5.apk
+eu.kanade.tachiyomi.extension.zh.ikanmh / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.ikanmh-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.ikmmh / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.ikmmh-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.iqiyi / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.iqiyi-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.jcomic / 1.6.4
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.jcomic-v1.6.4.apk
+eu.kanade.tachiyomi.extension.zh.jinmantiantang / 1.6.64
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.jinmantiantang-v1.6.64.apk
+eu.kanade.tachiyomi.extension.zh.jiuermanhua / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.jiuermanhua-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.komiic / 1.6.11
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.komiic-v1.6.11.apk
+eu.kanade.tachiyomi.extension.zh.kuaikanmanhua / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.kuaikanmanhua-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.mangabz / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mangabz-v1.6.3.apk
+eu.kanade.tachiyomi.extension.zh.mangaxiaosi / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mangaxiaosi-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.manhuadui / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuadui-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.manhuagui / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuagui-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.manhuaren / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuaren-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.manhuashe / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuashe-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.manhuawu / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuawu-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.manwa / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manwa-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.manwamanhua / 1.6.0
+  https://github.com/keiyoushi/extensions/releases/download/ee661f5/tachiyomi-zh.manwamanhua-v1.6.0.apk
+eu.kanade.tachiyomi.extension.zh.mh1234 / 1.6.6
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mh1234-v1.6.6.apk
+eu.kanade.tachiyomi.extension.zh.mh160 / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mh160-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.miaoqu / 1.6.3
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.miaoqu-v1.6.3.apk
+eu.kanade.tachiyomi.extension.zh.mycomic / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mycomic-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.nnhanman / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.nnhanman-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.noyacg / 1.6.8
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.noyacg-v1.6.8.apk
+eu.kanade.tachiyomi.extension.zh.picacomic / 1.6.14
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.picacomic-v1.6.14.apk
+eu.kanade.tachiyomi.extension.zh.roumanwu / 1.6.25
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.roumanwu-v1.6.25.apk
+eu.kanade.tachiyomi.extension.zh.rumanhua / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.rumanhua-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.sixmh / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.sixmh-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.tencentcomics / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.tencentcomics-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.terrahistoricus / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.terrahistoricus-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.tongli / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.tongli-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.toptoon / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.toptoon-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.utifa / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.utifa-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.vomic / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.vomic-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.wnacg / 1.6.6
+  https://github.com/keiyoushi/extensions/releases/download/6296017/tachiyomi-zh.wnacg-v1.6.6.apk
+eu.kanade.tachiyomi.extension.zh.xipimanhua / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.xipimanhua-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.zaimanhua / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.zaimanhua-v1.6.2.apk
+eu.kanade.tachiyomi.extension.zh.zazhimi / 1.6.1
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.zazhimi-v1.6.1.apk
+eu.kanade.tachiyomi.extension.zh.zerobyw / 1.6.2
+  https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.zerobyw-v1.6.2.apk
+
+Full upstream Apache License 2.0
+================================
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "{}"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright {yyyy} {name of copyright owner}
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.

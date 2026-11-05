@@ -1,0 +1,23 @@
+# Local tools, credentials, and generated output
+/toolchain/
+/signing/
+**/build/
+**/.gradle/
+**/.kotlin/
+**/local.properties
+**/keystore.properties
+*.jks
+*.keystore
+password.txt
+/mihon/app/google-services.json
+/tests/jvm-runner/results.log
+
+# App binaries belong in Releases; bundled source extensions remain build inputs.
+*.apk
+*.aab
+*.zip
+!/app/src/main/assets/exts/*.apk
+
+.idea/
+*.iml
+.DS_Store

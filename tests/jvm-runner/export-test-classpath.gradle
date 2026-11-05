@@ -1,0 +1,24 @@
+import org.gradle.api.tasks.testing.Test
+
+// Run with -Dorg.gradle.isolated-projects=false --no-configuration-cache.
+// This exports the real AGP test runtime without starting test workers.
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.findProject(':app')
+    if (app == null) return
+    def unitTest = app.tasks.named('testDebugUnitTest', Test).get()
+    def runtime = app.files(unitTest.testClassesDirs, unitTest.classpath)
+    app.tasks.register('exportJianyueTestClasspath') {
+        inputs.files(runtime)
+        def output = app.layout.buildDirectory.file('jianyue-test-runtime.args')
+        outputs.file(output)
+        doLast {
+            def target = output.get().asFile
+            target.parentFile.mkdirs()
+            def classpath = runtime.files.collect {
+                it.absolutePath.replace(File.separatorChar, '/' as char)
+            }.join(File.pathSeparator)
+            target.setText('-cp\n"' + classpath + '"\n', 'UTF-8')
+            println "Exported unit-test runtime to ${target}"
+        }
+    }
+}

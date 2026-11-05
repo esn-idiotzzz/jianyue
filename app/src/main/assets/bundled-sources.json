@@ -1,0 +1,1873 @@
+{
+  "schemaVersion": 1,
+  "snapshotDate": "2026-11-05",
+  "indexUrl": "https://github.com/keiyoushi/extensions/raw/repo/index.pb",
+  "indexSha256": "b5e80cfa847e3995367468429bba5edefaea76fe3f7f30188bb16df12dd2b3cf",
+  "signingKey": "9add655a78e96c4ec7a53ef89dccb557cb5d767489fac5e785d671a5a75d4da2",
+  "sourceCodeUrl": "https://github.com/keiyoushi/extensions-source",
+  "selection": "Every extension containing at least one source whose language starts with zh; runtime exposes only Chinese sources.",
+  "extensionCount": 95,
+  "chineseSourceCount": 106,
+  "extensions": [
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.akuma",
+      "name": "Akuma",
+      "versionCode": 106011,
+      "versionName": "1.6.11",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.akuma-v1.6.11.apk",
+      "sources": [
+        {
+          "id": "7558912456429140642",
+          "name": "Akuma",
+          "language": "zh"
+        }
+      ],
+      "sha256": "fae264d94ad29840218a6949354586868b50775317a344099c1f09f76485149c",
+      "size": 48319,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.akuma.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.asmhentai",
+      "name": "AsmHentai",
+      "versionCode": 106014,
+      "versionName": "1.6.14",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.asmhentai-v1.6.14.apk",
+      "sources": [
+        {
+          "id": "2819783147032745073",
+          "name": "AsmHentai",
+          "language": "zh"
+        }
+      ],
+      "sha256": "eb5339b8eb91c2f0e6d4b997e830e0345f1ea7d45d1fcd13e160f8135173a7fa",
+      "size": 70167,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.asmhentai.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.comicfury",
+      "name": "Comic Fury",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.comicfury-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "6187036261988654925",
+          "name": "Comic Fury",
+          "language": "zh"
+        }
+      ],
+      "sha256": "9bfa3f07e2f6722dd642f0acfde5e89c130ed89fcd6d8a571f9be2ecf09620b5",
+      "size": 52883,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.comicfury.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.dragonballmultiverse",
+      "name": "Dragon Ball Multiverse",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.dragonballmultiverse-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "4903395296014438593",
+          "name": "Dragon Ball Multiverse",
+          "language": "zh"
+        }
+      ],
+      "sha256": "65a2c7de5c5532cbe31c05b591af6cad633297d2c504c8c390cdea806ad8f8e8",
+      "size": 144675,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.dragonballmultiverse.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.globalcomix",
+      "name": "GlobalComix",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.globalcomix-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "7151191693036508367",
+          "name": "GlobalComix",
+          "language": "zh-Hans"
+        }
+      ],
+      "sha256": "663b913fea1c411d439cbc5a059c56449488011b4aae4d919b78445a5e21dec5",
+      "size": 66967,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.globalcomix.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.hdoujin",
+      "name": "HDoujin",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hdoujin-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "2603728112834757616",
+          "name": "HDoujin",
+          "language": "zh"
+        }
+      ],
+      "sha256": "90190963fae6ff8fdc165fabfd1f22f1ab2fcce43274228aad3cb1ac412d43e4",
+      "size": 59479,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.hdoujin.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.hentai3",
+      "name": "3Hentai",
+      "versionCode": 106007,
+      "versionName": "1.6.7",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hentai3-v1.6.7.apk",
+      "sources": [
+        {
+          "id": "6260479722543828095",
+          "name": "3Hentai",
+          "language": "zh"
+        }
+      ],
+      "sha256": "43d2b4b19e19f92fd5180f995f7fbaafbb4dae49cff4718ce8f7e86bd8644ea7",
+      "size": 50159,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.hentai3.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.hentaifox",
+      "name": "HentaiFox",
+      "versionCode": 106021,
+      "versionName": "1.6.21",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hentaifox-v1.6.21.apk",
+      "sources": [
+        {
+          "id": "3252050349835097844",
+          "name": "HentaiFox",
+          "language": "zh"
+        }
+      ],
+      "sha256": "9e2a5a318e9998ffa00819f7eb1d33734bee552348793720149834599e54daeb",
+      "size": 82591,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.hentaifox.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.hentaihand",
+      "name": "HentaiHand",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.hentaihand-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "866133291730804205",
+          "name": "HentaiHand",
+          "language": "zh"
+        }
+      ],
+      "sha256": "1258b82f62ed91a3733b4ec36317b4eb3393ae0223c1de50e19b44f4b237b7c5",
+      "size": 57691,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.hentaihand.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.kagane",
+      "name": "Kagane",
+      "versionCode": 106041,
+      "versionName": "1.6.41",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.kagane-v1.6.41.apk",
+      "sources": [
+        {
+          "id": "538178062602483073",
+          "name": "Kagane",
+          "language": "zh"
+        }
+      ],
+      "sha256": "25001a86b7f56bf28ac03d28e97235f046364ff053063d9cf4e895b53c278c8b",
+      "size": 102191,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.kagane.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.koharu",
+      "name": "SchaleNetwork",
+      "versionCode": 106004,
+      "versionName": "1.6.4",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.koharu-v1.6.4.apk",
+      "sources": [
+        {
+          "id": "8839994618804276749",
+          "name": "SchaleNetwork",
+          "language": "zh"
+        }
+      ],
+      "sha256": "cc2cd4af0b486a58cf019692637a625280c2f6a60c1a777fe77030540b6b87e8",
+      "size": 70987,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.koharu.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.luscious",
+      "name": "Luscious",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.luscious-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "5200417794129414472",
+          "name": "Luscious",
+          "language": "zh"
+        }
+      ],
+      "sha256": "911bbc50160d2c7a7cfba45c228f7dd70ff5bba6f01599b4aab16f2316c8d932",
+      "size": 79435,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.luscious.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.mangaball",
+      "name": "Manga Ball",
+      "versionCode": 106006,
+      "versionName": "1.6.6",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangaball-v1.6.6.apk",
+      "sources": [
+        {
+          "id": "1555837267200004397",
+          "name": "Manga Ball",
+          "language": "zh"
+        }
+      ],
+      "sha256": "b001c882fafe1382152d3413864830999b188c5be3253e6152bf3ee2b3bb5724",
+      "size": 92471,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.mangaball.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.mangadex",
+      "name": "MangaDex",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangadex-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "5148895169070562838",
+          "name": "MangaDex",
+          "language": "zh-Hans"
+        },
+        {
+          "id": "1493666528525752601",
+          "name": "MangaDex",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "f07f5dc1a49536bd8028662c9ede9f53718b3af797a7102c698fa90ada82778a",
+      "size": 105926,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.mangadex.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.mangamillion",
+      "name": "Manga Million",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangamillion-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "5892305961700928875",
+          "name": "Manga Million",
+          "language": "zh-TW"
+        },
+        {
+          "id": "1593100200301948195",
+          "name": "Manga Million",
+          "language": "zh-CN"
+        },
+        {
+          "id": "4931345632004567033",
+          "name": "Manga Million",
+          "language": "zh-HK"
+        }
+      ],
+      "sha256": "00bb8499b98c3760506fe78e72a0732a5d3ed177c614e11394dad88fa0883080",
+      "size": 76651,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.mangamillion.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.mangatoon",
+      "name": "MangaToon (Limited)",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.mangatoon-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "5676233752760414531",
+          "name": "MangaToon (Limited)",
+          "language": "zh"
+        }
+      ],
+      "sha256": "a2676a7f698b046f342a36d96163878a731b7bc96e6fde2ab51dd10b719c2e7f",
+      "size": 62683,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.mangatoon.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.myreadingmanga",
+      "name": "MyReadingManga",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.myreadingmanga-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "8339625080404115366",
+          "name": "MyReadingManga",
+          "language": "zh"
+        }
+      ],
+      "sha256": "bb3417651e4829d1587f57e20b476f44f13a5b29092d628acd3e986214333864",
+      "size": 51983,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.myreadingmanga.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.namicomi",
+      "name": "NamiComi",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.namicomi-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "1163192659786040070",
+          "name": "NamiComi",
+          "language": "zh-Hans"
+        },
+        {
+          "id": "7859611418350123856",
+          "name": "NamiComi",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "207389865e7689abcbac4fcffc1728b39d829c9ae27e67c4103dc6b966f45c95",
+      "size": 80843,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.namicomi.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.nhentaicom",
+      "name": "nHentai.com (unoriginal)",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.nhentaicom-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "8504927104562262528",
+          "name": "nHentai.com (unoriginal)",
+          "language": "zh"
+        }
+      ],
+      "sha256": "416ba54b9676212849771c52fc215d0f9b32cbeb0d102e7b93a6f22d3946ecb1",
+      "size": 76819,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.nhentaicom.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.nhentaito",
+      "name": "NHentai.to",
+      "versionCode": 106011,
+      "versionName": "1.6.11",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.nhentaito-v1.6.11.apk",
+      "sources": [
+        {
+          "id": "79691962210322609",
+          "name": "NHentai.to",
+          "language": "zh"
+        }
+      ],
+      "sha256": "540bfdb4dd118707c05394e7953daee461bacdc056f697846eaba16ebf21cf90",
+      "size": 55447,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.nhentaito.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.nhentaixxx",
+      "name": "NHentai.xxx",
+      "versionCode": 106012,
+      "versionName": "1.6.12",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.nhentaixxx-v1.6.12.apk",
+      "sources": [
+        {
+          "id": "560822675588930101",
+          "name": "NHentai.xxx",
+          "language": "zh"
+        }
+      ],
+      "sha256": "09ffc20dd2e95dfde8d18aef8e542aa1c0755b69bb934c93567b13bb764ddd03",
+      "size": 58559,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.nhentaixxx.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.pandachaika",
+      "name": "PandaChaika",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.pandachaika-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "7139811400769884559",
+          "name": "PandaChaika",
+          "language": "zh"
+        }
+      ],
+      "sha256": "36e51f96b7a729d0b4d9c5b22d0addc38fdaec5146484ba9afb62a8da8078ecf",
+      "size": 70759,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.pandachaika.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.pixiv",
+      "name": "Pixiv",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.pixiv-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "6934645150441404855",
+          "name": "Pixiv",
+          "language": "zh"
+        },
+        {
+          "id": "7732030561788182970",
+          "name": "Pixiv",
+          "language": "zh-tw"
+        }
+      ],
+      "sha256": "c80c9c10e2db48db421c77bf726d71f75c83516606a9d51e99e0325c034ff04b",
+      "size": 70443,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.pixiv.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.pornpics",
+      "name": "PornPics",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.pornpics-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "7079014519404224786",
+          "name": "PornPics",
+          "language": "zh"
+        }
+      ],
+      "sha256": "357ff2de2984458b4281a66de0c666fff84622e4a4f5815a36ca9a9244018fb6",
+      "size": 61463,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.pornpics.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.saymanhwa",
+      "name": "SayManhwa",
+      "versionCode": 106004,
+      "versionName": "1.6.4",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.saymanhwa-v1.6.4.apk",
+      "sources": [
+        {
+          "id": "6326978194357900073",
+          "name": "SayManhwa",
+          "language": "zh-Hans"
+        },
+        {
+          "id": "9161706686520081002",
+          "name": "SayManhwa",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "0b49cc725ab28f3c4e956f64c9a695873e3e7ee9b5d34d2eead7e9d23240afb8",
+      "size": 60751,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.saymanhwa.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.simplyhentai",
+      "name": "Simply Hentai",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.simplyhentai-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "6411097384584116028",
+          "name": "Simply Hentai",
+          "language": "zh"
+        }
+      ],
+      "sha256": "3d3f2d9e9c93f3fe71d7444885dda3e4e55ce060e1c828ede86fa0bc51037132",
+      "size": 58495,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.simplyhentai.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.swarm",
+      "name": "Swarm",
+      "versionCode": 106000,
+      "versionName": "1.6.0",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/6296017/tachiyomi-all.swarm-v1.6.0.apk",
+      "sources": [
+        {
+          "id": "4054994833878525767",
+          "name": "Swarm",
+          "language": "zh"
+        }
+      ],
+      "sha256": "8452ab20f853c0470712bbf1813ab320123ad336f9684056443948f203a518f9",
+      "size": 97435,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.swarm.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.toomics",
+      "name": "Toomics",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.toomics-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "2191753978421234924",
+          "name": "Toomics (Only free chapters)",
+          "language": "zh-Hans"
+        },
+        {
+          "id": "371640888113435809",
+          "name": "Toomics (Only free chapters)",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "ecbe0e9591b95e1a1ce619a4f891bb1a7cb34de88f20e42040ade410608f92cb",
+      "size": 59363,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.toomics.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.toonlook",
+      "name": "ToonLook",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.toonlook-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "5303680762449162883",
+          "name": "ToonLook",
+          "language": "zh"
+        }
+      ],
+      "sha256": "12baca44a5e1d224bd3a58ff785771205d33f8b003eb22a8a801ff226b5c9aea",
+      "size": 97399,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.toonlook.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.webtoons",
+      "name": "Webtoons.com",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.webtoons-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "2959982438613576472",
+          "name": "Webtoons.com",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "eba717df77137d9911668833b2b0331e8c5b8259325e8f65d6c874596eedb820",
+      "size": 70599,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.webtoons.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.xcomic",
+      "name": "XCOMIC",
+      "versionCode": 106011,
+      "versionName": "1.6.11",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.xcomic-v1.6.11.apk",
+      "sources": [
+        {
+          "id": "2745995474917358674",
+          "name": "XCOMIC",
+          "language": "zh"
+        },
+        {
+          "id": "7613068814739763778",
+          "name": "XCOMIC",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "199f052c040130b8425d1264a2f19da98ce9ea8fe4d8b4ae9623fd2268b3b737",
+      "size": 111735,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.xcomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.xkcd",
+      "name": "xkcd",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.xkcd-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "8162821425156695837",
+          "name": "xkcd",
+          "language": "zh"
+        }
+      ],
+      "sha256": "fd239c36fd457e591775e2514d91ec020f62f02cfb0e5d506677735d3ca47afb",
+      "size": 90845,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.xkcd.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.yaoime",
+      "name": "Yaoi.me",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.yaoime-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "5795748004620209296",
+          "name": "Yaoi.me",
+          "language": "zh"
+        }
+      ],
+      "sha256": "b3162b7e8ba713ba876b4e99f3d1074a1d96932f52657385f6c0dfd8984c54eb",
+      "size": 67415,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.yaoime.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.all.yellownote",
+      "name": "YellowNote",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-all.yellownote-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "170542391855030753",
+          "name": "小黄书",
+          "language": "zh-Hans"
+        },
+        {
+          "id": "4899554363948814001",
+          "name": "小黄书",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "0fcd9c4aa22b9cef5ab7a8ba19f0f897ce155b3531afc847c0d13465b1420101",
+      "size": 61633,
+      "asset": "exts/eu.kanade.tachiyomi.extension.all.yellownote.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.en.cmanhua",
+      "name": "CManhua",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-en.cmanhua-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "7460126106933105633",
+          "name": "CManhua",
+          "language": "zh"
+        }
+      ],
+      "sha256": "b7863879d1f94d19ec3dd7192459429f02950caf640c2537b6101afb2cd4c25b",
+      "size": 63623,
+      "asset": "exts/eu.kanade.tachiyomi.extension.en.cmanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.en.mangadotnet",
+      "name": "MangaDot",
+      "versionCode": 106029,
+      "versionName": "1.6.29",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-0/tachiyomi-en.mangadotnet-v1.6.29.apk",
+      "sources": [
+        {
+          "id": "4593442970144109426",
+          "name": "MangaDot",
+          "language": "zh"
+        },
+        {
+          "id": "2076066796458496830",
+          "name": "MangaDot",
+          "language": "zh-Hant"
+        },
+        {
+          "id": "7865090004429530491",
+          "name": "MangaDot",
+          "language": "zh-tw"
+        }
+      ],
+      "sha256": "def5e96fe40cd33912f0fbde61edfa705851dce344640b9991db2e1639035bcd",
+      "size": 160579,
+      "asset": "exts/eu.kanade.tachiyomi.extension.en.mangadotnet.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.bakamh",
+      "name": "Baka Manhua",
+      "versionCode": 106072,
+      "versionName": "1.6.72",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.bakamh-v1.6.72.apk",
+      "sources": [
+        {
+          "id": "3712194609356981776",
+          "name": "巴卡漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "c8e265ce303dd6910f3189aaa934e100f4827558adf10636a183116e298429dc",
+      "size": 76358,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.bakamh.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.baozimanhua",
+      "name": "Baozi Manhua",
+      "versionCode": 106033,
+      "versionName": "1.6.33",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.baozimanhua-v1.6.33.apk",
+      "sources": [
+        {
+          "id": "5724751873601868259",
+          "name": "包子漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "e0a5a178877aad12273c135ca22fe2a3699b560ed42073c84a27efef36af52a8",
+      "size": 125095,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.baozimanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.baozimhorg",
+      "name": "GoDa",
+      "versionCode": 106039,
+      "versionName": "1.6.39",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.baozimhorg-v1.6.39.apk",
+      "sources": [
+        {
+          "id": "774030471139699415",
+          "name": "GoDa漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "42424e7069da9eb6690905eaed1396b3a2745f9f65e23efd7bbecc580dacd3ea",
+      "size": 55323,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.baozimhorg.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.bh3",
+      "name": "BH3",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.bh3-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "5943234929466346733",
+          "name": "《崩坏3》IP站",
+          "language": "zh"
+        }
+      ],
+      "sha256": "87f5aeb2f4e34b9b46fcca2dda638da2a8fd0a919d41f4805c7807b2e87fbb22",
+      "size": 50479,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.bh3.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.bilimanga",
+      "name": "BiliManga",
+      "versionCode": 106015,
+      "versionName": "1.6.15",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.bilimanga-v1.6.15.apk",
+      "sources": [
+        {
+          "id": "7289707411592168382",
+          "name": "嗶哩漫畫",
+          "language": "zh"
+        }
+      ],
+      "sha256": "1aa9c59d9d238ac5aeb25d16f98753573330162bd5a50a714c41c0a4bfce1e53",
+      "size": 68855,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.bilimanga.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.boylove",
+      "name": "BoyLove",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.boylove-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "1471112097704477289",
+          "name": "香香腐宅",
+          "language": "zh"
+        }
+      ],
+      "sha256": "f46d294ae5b69a90182d90640a723447d77ecb2ef20881fe05688589ed0c8262",
+      "size": 61271,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.boylove.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.cartoon18",
+      "name": "Cartoon18",
+      "versionCode": 106006,
+      "versionName": "1.6.6",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.cartoon18-v1.6.6.apk",
+      "sources": [
+        {
+          "id": "28664779574072063",
+          "name": "Cartoon18",
+          "language": "zh"
+        }
+      ],
+      "sha256": "15e7200b57867564ce12edd9bd911ac45d3471117162954c1e6830ad7c5dea71",
+      "size": 51747,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.cartoon18.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.comicabc",
+      "name": "Comicabc",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.comicabc-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "8110122805257580230",
+          "name": "無限動漫",
+          "language": "zh"
+        }
+      ],
+      "sha256": "34e1f1c5724c5ec851cfa064c6e67290d63f1af95bb13724610adc263f644427",
+      "size": 87611,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.comicabc.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.creativecomic",
+      "name": "Creative Comic Collection",
+      "versionCode": 106004,
+      "versionName": "1.6.4",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.creativecomic-v1.6.4.apk",
+      "sources": [
+        {
+          "id": "8346821279138091413",
+          "name": "CCC追漫台",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "7520676bf58d44c05d147a220bafc1662360c386f31619cba9ba1e7ad139717d",
+      "size": 64751,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.creativecomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.dm5",
+      "name": "Dm5",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.dm5-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "293789630396851172",
+          "name": "动漫屋",
+          "language": "zh"
+        }
+      ],
+      "sha256": "267ab7f5d412067d0c760822f0d4c05a76ebb86eefd55f528a9e34ca142b2765",
+      "size": 49671,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.dm5.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.dongmanmanhua",
+      "name": "Dongman Manhua",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.dongmanmanhua-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "4222375517460530289",
+          "name": "Dongman Manhua",
+          "language": "zh-Hans"
+        }
+      ],
+      "sha256": "c232f520ba6b9fe17ff7bee53f2e5284907acf55b8b91cfc061e8902c4e8d694",
+      "size": 47399,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.dongmanmanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.dumanwu",
+      "name": "Dumanwu",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.dumanwu-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "7167507050606280098",
+          "name": "读漫屋",
+          "language": "zh"
+        }
+      ],
+      "sha256": "a4de7c1f61f532210312acdc74e7244d98703fac3c3a944ca9d3d2d8aa8f3446",
+      "size": 69203,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.dumanwu.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.eighteenmanhua",
+      "name": "18Manhua",
+      "versionCode": 106004,
+      "versionName": "1.6.4",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.eighteenmanhua-v1.6.4.apk",
+      "sources": [
+        {
+          "id": "5706270060628375954",
+          "name": "18漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "128b1c6dd84d48678fc7527dc9db716e8a78f622c2862b7745b6036ff23d0ab2",
+      "size": 48035,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.eighteenmanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.favcomic",
+      "name": "FavComic",
+      "versionCode": 106005,
+      "versionName": "1.6.5",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.favcomic-v1.6.5.apk",
+      "sources": [
+        {
+          "id": "2276541741750874058",
+          "name": "喜漫漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "72e9c93f6650cd52c68968dbda2682ac33f669788eb4e1e643623a1aa51410a7",
+      "size": 75415,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.favcomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.guazimanhua",
+      "name": "Guazimanhua",
+      "versionCode": 106007,
+      "versionName": "1.6.7",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.guazimanhua-v1.6.7.apk",
+      "sources": [
+        {
+          "id": "9103931521355991619",
+          "name": "瓜子漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "958790ccefc2348f17b534db4c1e7ce4260458f48111b7304d028d2890f681d2",
+      "size": 58279,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.guazimanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.hanabimanga",
+      "name": "HanabiManga",
+      "versionCode": 106006,
+      "versionName": "1.6.6",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hanabimanga-v1.6.6.apk",
+      "sources": [
+        {
+          "id": "6689953277839268159",
+          "name": "花火漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "310d20283728595e1d90c0eea8eb5dfe6a85b0fc142d6eed9e72f54a976e9c06",
+      "size": 119351,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.hanabimanga.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.hanime1",
+      "name": "Hanime1",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hanime1-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "2853734405579058222",
+          "name": "Hanime1.me",
+          "language": "zh"
+        }
+      ],
+      "sha256": "5e5ea3e3f934772921c2dde050d200c1cfa81d8a80d0d109fd1940e733f82c42",
+      "size": 40423,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.hanime1.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.hanman18",
+      "name": "HANMAN18",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hanman18-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "5092568988625041973",
+          "name": "HANMAN18",
+          "language": "zh"
+        }
+      ],
+      "sha256": "a5547aeb822775b077e16bb424b637d8e71e9a40b96eae96e096dfe09bd79db2",
+      "size": 81859,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.hanman18.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.hcomic",
+      "name": "H-Comic",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hcomic-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "984224034780344743",
+          "name": "H-Comic",
+          "language": "zh"
+        }
+      ],
+      "sha256": "57b80139c0a09db8a2ea54f14f55dd58495fc41d56faefbc2e896d0abe9c1049",
+      "size": 70475,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.hcomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.hentaiclub",
+      "name": "Shenshi Huisuo",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hentaiclub-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "8618065660246087865",
+          "name": "绅士会所",
+          "language": "zh"
+        }
+      ],
+      "sha256": "a480ffe597cf64f3d0d01fe52f824ce4df31a98308f1d0f5ab2c6bbb798f81cb",
+      "size": 69835,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.hentaiclub.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.hikarinagi",
+      "name": "Hikarinagi",
+      "versionCode": 106005,
+      "versionName": "1.6.5",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.hikarinagi-v1.6.5.apk",
+      "sources": [
+        {
+          "id": "3266193817034354049",
+          "name": "Hikarinagi",
+          "language": "zh"
+        }
+      ],
+      "sha256": "8ac4151f0021b250f8b65d9d3421e03b9788e48bdc3471cf99ea6bcf8ae7af54",
+      "size": 81155,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.hikarinagi.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.ikanmh",
+      "name": "Ikanmh",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.ikanmh-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "8826152585666516354",
+          "name": "漫小肆韓漫",
+          "language": "zh"
+        }
+      ],
+      "sha256": "b03985ce4fc6757fae7e029b668f0a0741baec9d93688b09f3fe6fd64bc80376",
+      "size": 61875,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.ikanmh.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.ikmmh",
+      "name": "Ikmmh",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.ikmmh-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "1793919771803569726",
+          "name": "爱看漫",
+          "language": "zh"
+        }
+      ],
+      "sha256": "e6eb5a88ab5e4d76063dd9f18c86ced8159cfd0d590b12fdd1c6575c0961d84e",
+      "size": 50695,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.ikmmh.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.iqiyi",
+      "name": "Iqiyi",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.iqiyi-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "2198877009406729694",
+          "name": "爱奇艺叭嗒",
+          "language": "zh-Hans"
+        }
+      ],
+      "sha256": "9e7f586a6d769a8628b76f51a4385d4e02f8e84658c684092041b4fd9b0d66da",
+      "size": 66151,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.iqiyi.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.jcomic",
+      "name": "JComic",
+      "versionCode": 106004,
+      "versionName": "1.6.4",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.jcomic-v1.6.4.apk",
+      "sources": [
+        {
+          "id": "7044663852863780949",
+          "name": "JComic",
+          "language": "zh"
+        }
+      ],
+      "sha256": "f529a2e310d03bcdf69a611df269c9ef10d3bb715dd11e9559b5791122c4b9a9",
+      "size": 42095,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.jcomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.jinmantiantang",
+      "name": "Jinman Tiantang",
+      "versionCode": 106064,
+      "versionName": "1.6.64",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.jinmantiantang-v1.6.64.apk",
+      "sources": [
+        {
+          "id": "6286738698187452081",
+          "name": "禁漫天堂",
+          "language": "zh"
+        }
+      ],
+      "sha256": "e30a1c09951a41cd486533112fdd220187f60f0c6165599a6ac2285454e3cfd0",
+      "size": 152063,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.jinmantiantang.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.jiuermanhua",
+      "name": "92Manhua",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.jiuermanhua-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "1520913911854846698",
+          "name": "92漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "be72d221a62e62a5fce37b959ccd122b0a5ae805896a9f7c61091792dc28bbb1",
+      "size": 79679,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.jiuermanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.komiic",
+      "name": "Komiic",
+      "versionCode": 106011,
+      "versionName": "1.6.11",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.komiic-v1.6.11.apk",
+      "sources": [
+        {
+          "id": "792932060924485302",
+          "name": "Komiic",
+          "language": "zh"
+        }
+      ],
+      "sha256": "1617a38c6234b3198a9f46fcdc90f2148d9542ea5b73b8f23e0e2381b249bf87",
+      "size": 59223,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.komiic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.kuaikanmanhua",
+      "name": "Kuaikanmanhua",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.kuaikanmanhua-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "8099870292642776005",
+          "name": "快看漫画",
+          "language": "zh-Hans"
+        }
+      ],
+      "sha256": "f02d9068291e68b0b4ee52a2fe8f6d0a04e98cf4cd07d31ac679e41a84c0021d",
+      "size": 77927,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.kuaikanmanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.mangabz",
+      "name": "Mangabz",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mangabz-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "5234610795363016972",
+          "name": "Mangabz",
+          "language": "zh"
+        }
+      ],
+      "sha256": "bef86a0431683c7588f7b8035bbf8cb85e500c96028970e8fa057b699968451b",
+      "size": 67507,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.mangabz.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.mangaxiaosi",
+      "name": "Manga Xiao Si",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mangaxiaosi-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "1939536259784675646",
+          "name": "Manga Xiao Si",
+          "language": "zh"
+        }
+      ],
+      "sha256": "c01fafa70529ca9e49118e45ee173ebd718755f81e93eadc381103764aa32de9",
+      "size": 66727,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.mangaxiaosi.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.manhuadui",
+      "name": "YKMH",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuadui-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "1637952806167036168",
+          "name": "优酷漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "bf27ce7661e349b9c768ad500a7b0bfd89ac48d856dbec22fa24e8ceb8884fff",
+      "size": 76727,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.manhuadui.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.manhuagui",
+      "name": "ManHuaGui",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuagui-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "7057750772596492765",
+          "name": "漫画柜",
+          "language": "zh"
+        }
+      ],
+      "sha256": "aa241080275a7fb99389b270b0887d663a8139e948e1998e1aa3895f3d604186",
+      "size": 75663,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.manhuagui.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.manhuaren",
+      "name": "Manhuaren",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuaren-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "3616827811449702173",
+          "name": "漫画人",
+          "language": "zh"
+        }
+      ],
+      "sha256": "63f8e27d0a8cf1854a2ee020faa74029e38e3edce8c19f1462ae221714cc90b0",
+      "size": 93635,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.manhuaren.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.manhuashe",
+      "name": "Manhuashe",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuashe-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "6230622879116184108",
+          "name": "漫画社",
+          "language": "zh"
+        }
+      ],
+      "sha256": "2725303e49861c73ccbeaa522d0467738b343949078ee54fb75d2ab8972ed7f6",
+      "size": 57059,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.manhuashe.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.manhuawu",
+      "name": "Manhuawu",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manhuawu-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "3279300917142951720",
+          "name": "漫画屋",
+          "language": "zh"
+        }
+      ],
+      "sha256": "2c340e6ef57ab172085cbe540b9d6fbbfeb160ecb539cc07bc59b3f2327d08a0",
+      "size": 52667,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.manhuawu.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.manwa",
+      "name": "Manwa",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.manwa-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "1795888684783606321",
+          "name": "漫蛙",
+          "language": "zh"
+        }
+      ],
+      "sha256": "a5c52fca323eca23e287c74a6c657ea08d5a8cb28e9e6de671bb648d3cad856e",
+      "size": 79231,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.manwa.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.manwamanhua",
+      "name": "Manwa Manhua",
+      "versionCode": 106000,
+      "versionName": "1.6.0",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/ee661f5/tachiyomi-zh.manwamanhua-v1.6.0.apk",
+      "sources": [
+        {
+          "id": "287323144843032723",
+          "name": "漫蛙漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "1f41aa5a32f67fc79177cf5a372326ae8d8d167579590dbe77754b119117ea49",
+      "size": 97927,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.manwamanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.mh1234",
+      "name": "MH1234",
+      "versionCode": 106006,
+      "versionName": "1.6.6",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mh1234-v1.6.6.apk",
+      "sources": [
+        {
+          "id": "7895725080195720063",
+          "name": "漫画1234",
+          "language": "zh"
+        }
+      ],
+      "sha256": "56bebff321a1bac35e78d129ad7c8f94ae566571944613dfc091f32b08721fd9",
+      "size": 61983,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.mh1234.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.mh160",
+      "name": "Manhua160",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mh160-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "8202483679232242177",
+          "name": "漫画160",
+          "language": "zh"
+        }
+      ],
+      "sha256": "ea8d66faa6fc9eca0eb66534d9984ffabe6b95173f5de78febca5c94a9d8b1b3",
+      "size": 51695,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.mh160.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.miaoqu",
+      "name": "Miaoqu Manhua",
+      "versionCode": 106003,
+      "versionName": "1.6.3",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.miaoqu-v1.6.3.apk",
+      "sources": [
+        {
+          "id": "116946528518438525",
+          "name": "喵趣漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "e9e28eff6a69dfa16e1d1ed33469f112363dcd41d891b1bf51c97f9f7e2e01bc",
+      "size": 52587,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.miaoqu.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.mycomic",
+      "name": "MyComic",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.mycomic-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "9119537447562549661",
+          "name": "MyComic",
+          "language": "zh"
+        }
+      ],
+      "sha256": "d8d12cdbce1b0a64bfd892183ae8c3a29f06fd088ab6e249ddd40e41265e7c86",
+      "size": 64675,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.mycomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.nnhanman",
+      "name": "NNHanman",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.nnhanman-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "6412117657297236190",
+          "name": "鸟鸟韩漫",
+          "language": "zh"
+        }
+      ],
+      "sha256": "329d39844b9eddc7053adc13da96387d1d44422e79b0a21e2ca93c287e6ac6e1",
+      "size": 82599,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.nnhanman.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.noyacg",
+      "name": "NoyAcg",
+      "versionCode": 106008,
+      "versionName": "1.6.8",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.noyacg-v1.6.8.apk",
+      "sources": [
+        {
+          "id": "6492346234228542735",
+          "name": "NoyAcg",
+          "language": "zh-Hant"
+        }
+      ],
+      "sha256": "f38baace2f7313d5a6dcafd463133be40acf1cef092767bfb3bbdf998a636b39",
+      "size": 81739,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.noyacg.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.picacomic",
+      "name": "Picacomic",
+      "versionCode": 106014,
+      "versionName": "1.6.14",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.picacomic-v1.6.14.apk",
+      "sources": [
+        {
+          "id": "5768337869316468367",
+          "name": "哔咔漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "fd4f509b1fe0c116c3ff658d918694c37104d7fdfc3b3fd1e474afbb5177151c",
+      "size": 138823,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.picacomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.roumanwu",
+      "name": "Roumanwu",
+      "versionCode": 106025,
+      "versionName": "1.6.25",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.roumanwu-v1.6.25.apk",
+      "sources": [
+        {
+          "id": "3647420805839021718",
+          "name": "肉漫屋",
+          "language": "zh"
+        }
+      ],
+      "sha256": "aac65a68f1b24ebfbc3cdbe46886629373f8d88d452ec8b24854363385b90091",
+      "size": 66079,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.roumanwu.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.rumanhua",
+      "name": "Rumanhua",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.rumanhua-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "392262758488714109",
+          "name": "如漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "bffbb2ce4e53345759f22569fba6912d4f08b12ff9325127369a5137f8aeb9e3",
+      "size": 92031,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.rumanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.sixmh",
+      "name": "6Manhua",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.sixmh-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "5183325399429659419",
+          "name": "六漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "11ab347914456e6f22ca55c6ed201db090c6cb167eb3c448221237d04e1ef75c",
+      "size": 71295,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.sixmh.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.tencentcomics",
+      "name": "Tencent Comics (ac.qq.com)",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.tencentcomics-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "6353436350537369479",
+          "name": "腾讯动漫",
+          "language": "zh-Hans"
+        }
+      ],
+      "sha256": "d55ce7edd13e6e3979ffb8fef1bd70fff789b6b5e3b9ba449e0ad6929a057d1b",
+      "size": 93431,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.tencentcomics.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.terrahistoricus",
+      "name": "Terra Historicus",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.terrahistoricus-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "4585134706567717130",
+          "name": "泰拉记事社",
+          "language": "zh"
+        }
+      ],
+      "sha256": "bc93d2f0fd99c0a1cbd1fb372fa6c6dfac38d5bcd3794bdfa5df9c2be3fa64fb",
+      "size": 62571,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.terrahistoricus.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.tongli",
+      "name": "Tongli",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.tongli-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "5530823947742715441",
+          "name": "東立",
+          "language": "zh"
+        }
+      ],
+      "sha256": "0a833d38577e8ac04489606600b88e7f87678d685c4cc05d76ee630a7de0628a",
+      "size": 74047,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.tongli.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.toptoon",
+      "name": "Toptoon.net",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.toptoon-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "1680248666203661128",
+          "name": "TOPTOON頂通",
+          "language": "zh"
+        }
+      ],
+      "sha256": "9c019c10b96a1bec46f97d9e8e3ec02b482df616c81ea8bb626dd755fc2b0f4a",
+      "size": 64935,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.toptoon.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.utifa",
+      "name": "Utifa",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.utifa-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "312206349505621113",
+          "name": "Utifa",
+          "language": "zh"
+        }
+      ],
+      "sha256": "ea9fd56367016c07ec5ae0c8bbce5f9c89edc3b30489c9b04bd998cd486299e9",
+      "size": 54791,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.utifa.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.vomic",
+      "name": "vomic",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.vomic-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "5428862423208834108",
+          "name": "vomic",
+          "language": "zh"
+        }
+      ],
+      "sha256": "086090bbf281c6dd80ab85c30738610e43d5282cb2e3fcb8e0ca8ff1d49aeafd",
+      "size": 54255,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.vomic.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.wnacg",
+      "name": "WNACG",
+      "versionCode": 106006,
+      "versionName": "1.6.6",
+      "extensionLib": "1.6",
+      "contentWarning": 3,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/6296017/tachiyomi-zh.wnacg-v1.6.6.apk",
+      "sources": [
+        {
+          "id": "6551136894818591762",
+          "name": "紳士漫畫",
+          "language": "zh"
+        }
+      ],
+      "sha256": "010f6a9019fc90a14ad7033aaa2a9d727a9fe21a477e1bbea23ec6fe58d89206",
+      "size": 80367,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.wnacg.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.xipimanhua",
+      "name": "Xipi Manhua",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.xipimanhua-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "10879178251255350",
+          "name": "嬉皮漫畫",
+          "language": "zh"
+        }
+      ],
+      "sha256": "5b5228d6816146b5fccbde3061679c502a46cba4723f7faa752c13163475a2be",
+      "size": 60415,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.xipimanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.zaimanhua",
+      "name": "Zaimanhua",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.zaimanhua-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "524579092615598717",
+          "name": "再漫画",
+          "language": "zh"
+        }
+      ],
+      "sha256": "b2f84823a732236635a833ccef311824cd406b45fcda2f676d567baa8c0098e2",
+      "size": 63251,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.zaimanhua.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.zazhimi",
+      "name": "Zazhimi",
+      "versionCode": 106001,
+      "versionName": "1.6.1",
+      "extensionLib": "1.6",
+      "contentWarning": 1,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.zazhimi-v1.6.1.apk",
+      "sources": [
+        {
+          "id": "6466445276541048432",
+          "name": "杂志迷",
+          "language": "zh"
+        }
+      ],
+      "sha256": "bbf25e22db8ef69fded8da446a4f93800814f4bec02da67ac07b13964ba35422",
+      "size": 89759,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.zazhimi.apk"
+    },
+    {
+      "packageName": "eu.kanade.tachiyomi.extension.zh.zerobyw",
+      "name": "Zerobyw",
+      "versionCode": 106002,
+      "versionName": "1.6.2",
+      "extensionLib": "1.6",
+      "contentWarning": 2,
+      "apkUrl": "https://github.com/keiyoushi/extensions/releases/download/726723b-2/tachiyomi-zh.zerobyw-v1.6.2.apk",
+      "sources": [
+        {
+          "id": "8743284448117690086",
+          "name": "zero搬运网",
+          "language": "zh"
+        }
+      ],
+      "sha256": "b04e4a298e6fef4fa58ef452ece77dc988025515f4b9b835d54a085c072dc874",
+      "size": 79679,
+      "asset": "exts/eu.kanade.tachiyomi.extension.zh.zerobyw.apk"
+    }
+  ]
+}

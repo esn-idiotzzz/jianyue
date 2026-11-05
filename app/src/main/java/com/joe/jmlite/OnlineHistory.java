@@ -1,0 +1,164 @@
+package com.joe.jmlite;
+
+import android.content.Context;
+import android.util.AtomicFile;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+/** Online reading history for extension sources. Stored separately from the local shelf. */
+public final class OnlineHistory {
+    private static final Object LOCK = new Object();
+    private static final int LIMIT = 200;
+    private final AtomicFile file;
+
+    public OnlineHistory(Context context) { this(context, false); }
+    public OnlineHistory(Context context, boolean jm) {
+        file = new AtomicFile(new File(context.getApplicationContext().getFilesDir(), jm ? "jm_online_history.json" : "online_history.json"));
+    }
+
+    public static String key(String sourceId, String url) {
+        return sourceId + "|" + url;
+    }
+
+    /** Older records may carry only sourceId=-1; treat both forms as JM. */
+    public static boolean isJm(JSONObject record) {
+        return record != null && (record.optBoolean("jm") || "-1".equals(record.optString("sourceId"))
+                || record.optInt("sourceId", 0) == -1 || record.optString("key").startsWith("-1|"));
+    }
+
+    /** Total pages for JM, falling back to the saved per-chapter progress. */
+    public static int totalPages(JSONObject record) {
+        if (record == null) return 0;
+        int total = record.optInt("totalPages", 0);
+        if (total > 0) return total;
+        JSONObject progress = record.optJSONObject("chapterProgress");
+        if (progress != null) {
+            String last = record.optString("lastChapterUrl");
+            JSONObject current = last.isEmpty() ? null : progress.optJSONObject(last);
+            if (current != null && current.optInt("total", 0) > 0) return current.optInt("total");
+            int best = 0;
+            for (Iterator<String> keys = progress.keys(); keys.hasNext(); ) {
+                JSONObject item = progress.optJSONObject(keys.next());
+                if (item != null) best = Math.max(best, item.optInt("total", 0));
+            }
+            return best;
+        }
+        return 0;
+    }
+
+    /** Number of pages already read, clamped to the known total. */
+    public static int readPages(JSONObject record) {
+        if (record == null) return 0;
+        int total = totalPages(record);
+        boolean started = record.has("progress") || total > 0;
+        if (!started) return 0;
+        int progress = Math.max(0, record.optInt("progress", 0));
+        boolean read = record.optBoolean("read");
+        int pages = read ? Math.max(progress + 1, total) : progress + 1;
+        if (total > 0) pages = Math.min(pages, total);
+        return Math.max(0, pages);
+    }
+
+    /** Compact reading position used by JM history rows and the JM detail page. */
+    public static String readingLabel(JSONObject record) {
+        int total = totalPages(record);
+        int read = readPages(record);
+        if (total <= 0 && read <= 0) return record != null && record.optBoolean("read") ? "已读完" : "尚未阅读";
+        if (total > 0) return "已读 " + read + "/" + total + " 页";
+        if (record != null && record.optBoolean("read")) return "已读完 · " + read + " 页";
+        return "已读 " + read + " 页";
+    }
+
+    public List<JSONObject> list() throws Exception {
+        synchronized (LOCK) {
+            ArrayList<JSONObject> result = new ArrayList<>();
+            JSONArray items = state().optJSONArray("items");
+            if (items != null) for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item != null) result.add(item);
+            }
+            result.sort((a, b) -> Long.compare(b.optLong("updated"), a.optLong("updated")));
+            return result;
+        }
+    }
+
+    public JSONObject find(String sourceId, String url) throws Exception {
+        synchronized (LOCK) {
+            String key = key(sourceId, url);
+            JSONArray items = state().optJSONArray("items");
+            if (items != null) for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item != null && key.equals(item.optString("key"))) return item;
+            }
+            return null;
+        }
+    }
+
+    public void save(JSONObject record) throws Exception {
+        synchronized (LOCK) {
+            JSONObject root = state();
+            JSONArray items = root.optJSONArray("items");
+            if (items == null) { items = new JSONArray(); root.put("items", items); }
+            String key = record.optString("key");
+            if (key.isEmpty()) key = key(record.optString("sourceId"), record.optString("url"));
+            record.put("key", key).put("updated", System.currentTimeMillis());
+            JSONArray next = new JSONArray();
+            if (items.length() > 0) {
+                // Keep the entry order stable, but replace the matching record in place.
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject old = items.optJSONObject(i);
+                    if (old != null && key.equals(old.optString("key"))) continue;
+                    if (old != null) next.put(old);
+                }
+            }
+            next.put(record);
+            if (next.length() > LIMIT) {
+                JSONArray trimmed = new JSONArray();
+                for (int i = next.length()-LIMIT; i < next.length(); i++) trimmed.put(next.getJSONObject(i));
+                next = trimmed;
+            }
+            root.put("items", next);
+            write(root);
+        }
+    }
+
+    public void remove(String sourceId, String url) throws Exception {
+        synchronized (LOCK) {
+            JSONObject root = state();
+            JSONArray items = root.optJSONArray("items");
+            if (items == null) return;
+            String key = key(sourceId, url);
+            JSONArray next = new JSONArray();
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item != null && !key.equals(item.optString("key"))) next.put(item);
+            }
+            root.put("items", next);
+            write(root);
+        }
+    }
+
+    private JSONObject state() throws Exception {
+        File base = file.getBaseFile();
+        if (!base.exists() && !new File(base + ".bak").exists()) return new JSONObject();
+        return new JSONObject(new String(file.readFully(), StandardCharsets.UTF_8));
+    }
+
+    private void write(JSONObject root) throws Exception {
+        FileOutputStream out = null;
+        try {
+            out = file.startWrite();
+            out.write(root.toString().getBytes(StandardCharsets.UTF_8));
+            file.finishWrite(out);
+        } catch (Exception e) {
+            if (out != null) file.failWrite(out);
+            throw e;
+        }
+    }
+}

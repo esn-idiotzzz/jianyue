@@ -1,0 +1,31 @@
+JM 简阅 2.1.1 incorporates Mihon's Android reader framework.
+Upstream: https://github.com/mihonapp/mihon
+Revision: 8794e89a866a3de578c02cefac1e609bcff5f092
+License: Apache License, Version 2.0 (LICENSE-Mihon.txt).
+
+Changes: custom launcher and library UI; JM download and image source adapter;
+Manga/Chapter repository entry points; PageLoader routing for jmlite:// content;
+reader title navigation returns to JM library; slider drag preserves its held value.
+Mihon's ReaderActivity, ReaderViewModel, PageLoader protocol, pager/webtoon viewers,
+image decoder, zoom/gestures and reader settings are included in the application.
+
+JMComic-Crawler-Python upstream API and image recovery adaptation is MIT licensed.
+Archive dependency licenses and notices: LICENSE-archives.txt.
+
+Further adaptations: PageLoader lifecycle cancellation/empty-page cleanup; bounded display demands with visible-page tracking; explicit SliderState updates; native library-screen back navigation compatibility.
+
+Packaging/UI update: arm64-v8a-only delivery and compact floating icon-only navigation capsule.
+
+2.0.2 adaptations: bundle all Chinese sources selected from Keiyoushi's index;
+verify private extension files and load them without system package installation;
+stream source-search results into JianYue's own UI; isolate source timeouts;
+fix null list selectors, chapter order, source-aware covers and download storage.
+Remove Mihon's standalone main/browse/library/history/settings interfaces,
+remote tracking, backup/library-update services, extension installers, Shizuku,
+widgets and JianYue's unused legacy custom reader. Keep the reader, source API,
+network/parser/runtime dependencies, local reading state and manga downloads.
+
+2.1.0 adaptations: integrated source repository and source favorites; separate JM/network reading histories; online bookshelf favorites and nested folders; three-column chapters with page history; exact-title ranking and confirmed-empty chapter filtering; bounded single-request cover decoding and drag/refresh fixes.
+
+2.1.1 adaptations: direct source catalogue and scoped search with pagination; animated inline search toolbar; extension icons and recycled source rows; source favorites by heart tap only; settings menu only in history; remove sharing for network-only books.
+Network-only reader pages also hide sharing; sharing remains available for locally loaded content.

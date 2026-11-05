@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.joe.jmlite.tests">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
+    <application android:label="JM Lite offline checks" android:hasCode="true" />
+    <instrumentation android:name="com.joe.jmlite.tests.SmokeTest" android:targetPackage="com.joe.jmlite" android:label="Offline regression checks" />
+    <instrumentation android:name="com.joe.jmlite.tests.LibraryTests" android:targetPackage="com.joe.jmlite" android:label="Isolated library and archive checks" />
+</manifest>

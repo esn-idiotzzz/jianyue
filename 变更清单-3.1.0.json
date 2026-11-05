@@ -1,0 +1,27 @@
+{
+  "baseline": "3.0.0",
+  "version": "3.1.0",
+  "added": [
+    "app/src/main/java/com/joe/jmlite/FavoriteStyle.java",
+    "更新说明与验证-3.1.0.md",
+    "变更清单-3.1.0.json"
+  ],
+  "modified": [
+    "README.md",
+    "app/src/main/AndroidManifest.xml",
+    "app/src/main/java/com/joe/jmlite/BookInfoActivity.java",
+    "app/src/main/java/com/joe/jmlite/Library.java",
+    "app/src/main/java/com/joe/jmlite/MainActivity.java",
+    "build-mihon.ps1",
+    "mihon/app/build.gradle.kts",
+    "mihon/app/src/main/java/com/joe/jmlite/OnlineMangaActivity.kt",
+    "mihon/app/src/main/java/com/joe/jmlite/RepositoryPanel.kt",
+    "mihon/app/src/main/java/com/joe/jmlite/SearchRanking.kt"
+  ],
+  "deleted": [],
+  "counts": {
+    "added": 3,
+    "modified": 10,
+    "deleted": 0
+  }
+}
