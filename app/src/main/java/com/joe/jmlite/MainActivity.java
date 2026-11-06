@@ -5,6 +5,9 @@ import android.app.AlertDialog;
 import android.animation.ValueAnimator;
 import android.content.ClipData;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -40,11 +43,18 @@ public final class MainActivity extends Activity {
     private final Handler handler=new Handler();
     private final ExecutorService disk=Executors.newSingleThreadExecutor();
     private final ArrayList<JSONObject> books=new ArrayList<>(),libraryBooks=new ArrayList<>(),bookFolders=new ArrayList<>(),rows=new ArrayList<>(),onlineBooks=new ArrayList<>();
+    private final ArrayList<JSONObject> downloadRecords=new ArrayList<>();
     private LinearLayout content,taskCard,nav;
     private FrameLayout actionSlot;
     private LinearLayout downloadActions;
     private TextView title,taskTitle,taskInfo,taskAction,start;
-    private Ui.Icon plus,back,eye,more;
+    private TextView taskCount;
+    private float actionFraction;
+    private boolean preparingDownload,downloadReceiverRegistered;
+    private boolean forceDownloadRefresh;
+    private Ui.Icon plus,back,eye;
+    private HeaderSearch shelfSearch;
+    private String shelfQuery="";
     private NavItem downloadNav,localNav,onlineNav,repositoryNav;
     private boolean jmHistory=false,historyLoaded=false;
     private TextView repoHint;
@@ -56,7 +66,7 @@ public final class MainActivity extends Activity {
     private BookAdapter adapter;
     private ShelfAdapter shelfAdapter;
     private OnlineAdapter onlineAdapter;
-    private int tab=0,refreshGeneration=0;
+    private int tab=1,refreshGeneration=0;
     private boolean resumed=false,reading=false,starting=false,operation=false,revealed=true;
     private String rowsSnapshot="",draft="",searchDraft="",taskId="",folderId="";
     private JSONObject pendingShare;
@@ -78,21 +88,31 @@ public final class MainActivity extends Activity {
     private ValueAnimator actionAnimator;
     private AppUpdate appUpdate;
     private final Runnable poll=new Runnable(){public void run(){refresh();if(resumed&&DownloadService.running)handler.postDelayed(this,1800);}};
+    private final Runnable downloadRefresh=()->{boolean force=forceDownloadRefresh;forceDownloadRefresh=false;if(resumed)refresh(force);};
+    private final BroadcastReceiver downloadChanges=new BroadcastReceiver(){
+        @Override public void onReceive(Context context,Intent intent){
+            if(!resumed||!DownloadService.ACTION_CHANGED.equals(intent.getAction()))return;
+            String state=intent.getStringExtra(DownloadService.EXTRA_STATUS);
+            boolean terminal="complete".equals(state)||"paused".equals(state)||"error".equals(state)||!DownloadService.running;
+            if(terminal&&taskId.equals(intent.getStringExtra(DownloadService.EXTRA_ID)))preparingDownload=false;
+            forceDownloadRefresh|=terminal;handler.removeCallbacks(downloadRefresh);handler.postDelayed(downloadRefresh,forceDownloadRefresh?0:70);
+        }
+    };
 
     @Override public void onCreate(Bundle b){
         super.onCreate(b);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);
-        if(b!=null){tab=b.getInt("tab");draft=b.getString("draft","");searchDraft=b.getString("search","");folderId=b.getString("folder","");}
+        if(b!=null){tab=b.getInt("tab",1);draft=b.getString("draft","");searchDraft=b.getString("search","");folderId=b.getString("folder","");taskId=b.getString("task_id","");}
         LinearLayout root=u.column();root.setBackgroundColor(u.bg);Ui.insets(this,root,u.dark);
         LinearLayout heading=u.row();heading.setPadding(u.dp(16),u.dp(8),u.dp(12),u.dp(12));
         back=u.icon("back",u.ink);back.setContentDescription("返回书架");heading.addView(back,new LinearLayout.LayoutParams(u.dp(40),u.dp(44)));back.setOnClickListener(v->leaveFolder());
         title=u.text("简阅",23,u.ink,true);title.setMaxLines(1);title.setEllipsize(android.text.TextUtils.TruncateAt.END);title.setPadding(u.dp(4),0,0,0);heading.addView(title,new LinearLayout.LayoutParams(0,u.dp(48),1));title.setGravity(Gravity.CENTER_VERTICAL);
         plus=u.icon("add",u.ink);plus.setContentDescription("导入漫画");heading.addView(plus,new LinearLayout.LayoutParams(u.dp(44),u.dp(44)));plus.setOnClickListener(v->importMenu());
-        repoHint=u.text("<不行请尝试魔法~>",11,u.muted,false);heading.addView(repoHint);
-        more=u.icon("more",u.ink);more.setContentDescription("关于");heading.addView(more,new LinearLayout.LayoutParams(u.dp(44),u.dp(44)));more.setOnClickListener(v->settings());root.addView(heading);
+        repoHint=u.text("<不行请尝试魔法~>",11,u.muted,false);repoHint.setContentDescription("关于简阅与开源许可");repoHint.setPadding(0,u.dp(12),0,u.dp(12));repoHint.setOnClickListener(v->license());heading.addView(repoHint);
+        shelfSearch=new HeaderSearch(this,heading,title,plus,"搜索书架编号或名称",query->{shelfQuery=query;rowsSnapshot="";if(tab==1)render();});root.addView(heading);
         FrameLayout stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
         nav=u.row();nav.setClickable(true);nav.setGravity(Gravity.CENTER);nav.setPadding(u.dp(6),u.dp(5),u.dp(6),u.dp(5));GradientDrawable navBg=u.shape(u.card,28);navBg.setStroke(u.dp(1),u.dark?0x1affffff:0x0d000000);nav.setBackground(navBg);nav.setElevation(u.dp(10));nav.setClipToOutline(true);
         downloadNav=new NavItem(0,"download","下载");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
-        LinearLayout.LayoutParams navGap=new LinearLayout.LayoutParams(u.dp(60),u.dp(46));navGap.setMargins(0,0,u.dp(4),0);nav.addView(downloadNav,navGap);nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));LinearLayout.LayoutParams onlineGap=new LinearLayout.LayoutParams(u.dp(60),u.dp(46));onlineGap.setMargins(u.dp(4),0,0,0);nav.addView(onlineNav,onlineGap);FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(14);stage.addView(nav,capsule);setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());nav.setVisibility(keyboard?View.GONE:View.VISIBLE);return insets;});
+        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(14);stage.addView(nav,capsule);setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());nav.setVisibility(keyboard?View.GONE:View.VISIBLE);return insets;});
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);nav.setVisibility(keyboard?View.GONE:View.VISIBLE);});
         buildTab();
         appUpdate=new AppUpdate(this);
@@ -107,12 +127,12 @@ public final class MainActivity extends Activity {
         }
         void active(boolean on){icon.color(on?Ui.BLUE:u.muted);label.setTextColor(on?Ui.BLUE:u.muted);u.round(this,on?u.tint:Color.TRANSPARENT,23);setSelected(on);}
     }
-    private void switchTab(int next){if(tab==next)return;if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();}
+    private void switchTab(int next){if(tab==next)return;if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();}
     private void buildTab(){
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
         content.removeAllViews();input=null;searchInput=null;taskCard=null;actionSlot=null;downloadActions=null;taskAction=null;taskShown=false;list=null;grid=null;adapter=null;shelfAdapter=null;onlineAdapter=null;rowsSnapshot="";
-        title.setText(tab==0?"简阅":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&!folderId.isEmpty()?View.VISIBLE:View.GONE);
-        more.setVisibility(tab==2?View.VISIBLE:View.GONE);repoHint.setVisibility(tab==3?View.VISIBLE:View.GONE);repositoryNav.active(tab==3);downloadNav.active(tab==0);localNav.active(tab==1);onlineNav.active(tab==2);
+        shelfSearch.setVisible(tab==1);title.setText(tab==0?"下载":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1&&!shelfSearch.isExpanded()?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&!folderId.isEmpty()?View.VISIBLE:View.GONE);
+        repoHint.setVisibility(tab==3?View.VISIBLE:View.GONE);repositoryNav.active(tab==3);downloadNav.active(tab==0);localNav.active(tab==1);onlineNav.active(tab==2);
         if(tab==0)buildDownload();else if(tab==1)buildShelf();else if(tab==3)content.addView(RepositoryPanel.create(this),new LinearLayout.LayoutParams(-1,-1));else buildOnline();render();
         if(tab==2&&resumed)refresh(true);
     }
@@ -121,16 +141,30 @@ public final class MainActivity extends Activity {
         LinearLayout header=u.column(),card=u.column();card.setPadding(u.dp(18),u.dp(20),u.dp(18),u.dp(18));u.round(card,u.card,22);card.addView(u.text("JM Comic",18,u.ink,true));u.space(card,16);
         input=new EditText(this);input.setId(1001);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(u.ink);input.setHintTextColor(u.muted);input.setHint("输入 JM 编号或链接");input.setText(draft);input.setPadding(u.dp(15),0,u.dp(15),0);input.setSelectAllOnFocus(true);u.round(input,u.bg,14);card.addView(input,new LinearLayout.LayoutParams(-1,u.dp(52)));u.space(card,14);
         actionSlot=new FrameLayout(this);downloadActions=u.row();start=u.button("开始下载",true);start.setTextSize(14);start.setMinHeight(u.dp(48));start.setId(1002);start.setOnClickListener(v->download());LinearLayout.LayoutParams d=new LinearLayout.LayoutParams(0,u.dp(48),1);d.setMargins(0,0,u.dp(10),0);downloadActions.addView(start,d);TextView online=u.button("在线阅读",false);online.setTextSize(14);online.setMinHeight(u.dp(48));online.setId(1003);online.setOnClickListener(v->online());downloadActions.addView(online,new LinearLayout.LayoutParams(0,u.dp(48),1));actionSlot.addView(downloadActions,new FrameLayout.LayoutParams(-1,u.dp(48)));card.addView(actionSlot,new LinearLayout.LayoutParams(-1,-2));header.addView(card);u.space(header,12);
+        Ui.clearable(input);
         LinearLayout searchCard=u.row();searchCard.setPadding(u.dp(10),0,u.dp(8),0);u.round(searchCard,u.card,18);
         Ui.Icon find=u.icon("search",u.muted);find.glyphScale=.8f;find.setMinimumWidth(0);find.setMinimumHeight(0);searchCard.addView(find,new LinearLayout.LayoutParams(u.dp(30),u.dp(54)));
         searchInput=new EditText(this);searchInput.setId(1006);searchInput.setSingleLine(true);searchInput.setTextSize(15);searchInput.setTextColor(u.ink);searchInput.setHintTextColor(u.muted);searchInput.setHint("搜索全网漫画");searchInput.setText(searchDraft);searchInput.setBackgroundColor(Color.TRANSPARENT);searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);searchInput.setPadding(u.dp(6),0,u.dp(6),0);
+        Ui.magicWandHint(searchInput);Ui.clearable(searchInput);
         searchInput.setOnEditorActionListener((v,actionId,event)->{if(actionId==EditorInfo.IME_ACTION_SEARCH){searchOnline();return true;}return false;});
         searchCard.addView(searchInput,new LinearLayout.LayoutParams(0,u.dp(54),1));
         TextView searchGo=u.text("搜索",13,Color.WHITE,true);searchGo.setGravity(Gravity.CENTER);u.round(searchGo,Ui.BLUE,14);searchGo.setPadding(u.dp(14),0,u.dp(14),0);searchGo.setOnClickListener(v->searchOnline());
         LinearLayout.LayoutParams searchGoParams=new LinearLayout.LayoutParams(u.dp(56),u.dp(36));searchGoParams.setMargins(0,0,u.dp(2),0);searchCard.addView(searchGo,searchGoParams);
         header.addView(searchCard,new LinearLayout.LayoutParams(-1,u.dp(56)));u.space(header,12);
-        taskCard=u.column();taskCard.setPadding(u.dp(18),u.dp(14),u.dp(18),u.dp(14));u.round(taskCard,u.card,20);LinearLayout status=u.row();taskTitle=u.text("准备就绪",15,u.ink,true);status.addView(taskTitle,new LinearLayout.LayoutParams(0,-2,1));taskAction=u.text("暂停",13,Ui.BLUE,true);taskAction.setPadding(u.dp(12),u.dp(8),0,u.dp(8));taskAction.setOnClickListener(v->onTaskAction());status.addView(taskAction);taskCard.addView(status);u.space(taskCard,8);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));taskCard.addView(progress,new LinearLayout.LayoutParams(-1,u.dp(4)));u.space(taskCard,8);taskInfo=u.text("",12,u.muted,false);taskCard.addView(taskInfo);taskCard.setVisibility(View.GONE);taskCard.setAlpha(0f);actionSlot.addView(taskCard,new FrameLayout.LayoutParams(-1,-2));
-        LinearLayout caption=u.row();caption.setPadding(u.dp(2),u.dp(12),0,u.dp(6));caption.addView(u.text("最近下载",16,u.ink,true),new LinearLayout.LayoutParams(0,-2,1));eye=u.icon(revealed?"eye":"eye-off",u.muted);eye.setId(1004);eye.setContentDescription(revealed?"隐藏封面和书名":"显示封面和书名");caption.addView(eye,new LinearLayout.LayoutParams(u.dp(40),u.dp(40)));eye.setOnClickListener(v->togglePrivacy());header.addView(caption);
+        taskCard=u.column();taskCard.setPadding(u.dp(16),u.dp(13),u.dp(16),u.dp(14));
+        GradientDrawable panel=u.shape(u.dark?0xff182b47:0xffedf5ff,18);panel.setStroke(u.dp(1),u.dark?0x553478f6:0x243478f6);taskCard.setBackground(panel);
+        LinearLayout status=u.row();taskTitle=u.text("正在准备下载",14,u.ink,true);status.addView(taskTitle,new LinearLayout.LayoutParams(0,-2,1));
+        taskCount=u.text("0/…",18,Ui.BLUE,true);taskCount.setFontFeatureSettings("tnum");taskCount.setContentDescription("已下载页数/总页数");
+        LinearLayout.LayoutParams countParams=new LinearLayout.LayoutParams(-2,-2);countParams.rightMargin=u.dp(12);status.addView(taskCount,countParams);
+        taskAction=u.text("暂停",12,Ui.BLUE,true);taskAction.setGravity(Gravity.CENTER);taskAction.setPadding(u.dp(11),u.dp(7),u.dp(11),u.dp(7));u.round(taskAction,u.dark?0xff243e63:Color.WHITE,13);taskAction.setOnClickListener(v->onTaskAction());status.addView(taskAction);taskCard.addView(status);
+        u.space(taskCard,7);taskInfo=u.text("正在获取章节与页数",11,u.muted,false);taskInfo.setMaxLines(2);taskInfo.setEllipsize(android.text.TextUtils.TruncateAt.END);taskCard.addView(taskInfo);
+        u.space(taskCard,10);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+        GradientDrawable track=u.shape(u.dark?0xff2b4568:0xffd6e6fb,3);
+        GradientDrawable fill=new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{Ui.BLUE,0xff65a8ff});fill.setCornerRadius(u.dp(3));
+        android.graphics.drawable.LayerDrawable bar=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{track,new android.graphics.drawable.ClipDrawable(fill,Gravity.LEFT,android.graphics.drawable.ClipDrawable.HORIZONTAL)});
+        bar.setId(0,android.R.id.background);bar.setId(1,android.R.id.progress);progress.setProgressDrawable(bar);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));
+        taskCard.addView(progress,new LinearLayout.LayoutParams(-1,u.dp(6)));taskCard.setVisibility(View.GONE);taskCard.setAlpha(0f);actionFraction=0f;actionSlot.addView(taskCard,new FrameLayout.LayoutParams(-1,-2));
+        LinearLayout caption=u.row();caption.setPadding(u.dp(2),u.dp(12),0,u.dp(6));TextView recent=u.text("最近下载  ›",16,u.ink,true);recent.setContentDescription("查看全部下载记录");recent.setPadding(0,u.dp(10),0,u.dp(10));recent.setOnClickListener(v->startActivity(new Intent(this,AllDownloadsActivity.class)));caption.addView(recent,new LinearLayout.LayoutParams(0,-2,1));eye=u.icon(revealed?"eye":"eye-off",u.muted);eye.setId(1004);eye.setContentDescription(revealed?"隐藏封面和书名":"显示封面和书名");caption.addView(eye,new LinearLayout.LayoutParams(u.dp(40),u.dp(40)));eye.setOnClickListener(v->togglePrivacy());header.addView(caption);
         list.addHeaderView(header,null,false);adapter=new BookAdapter();list.setAdapter(adapter);list.setOnItemClickListener((p,v,pos,id)->{int n=pos-list.getHeaderViewsCount();if(n>=0&&n<rows.size())open(rows.get(n));});list.setOnItemLongClickListener((p,v,pos,id)->{int n=pos-list.getHeaderViewsCount();if(n<0||n>=rows.size()||rows.get(n).optBoolean("empty"))return false;manage(rows.get(n));return true;});content.addView(list,new LinearLayout.LayoutParams(-1,-1));
     }
     private void buildShelf(){
@@ -161,7 +195,7 @@ public final class MainActivity extends Activity {
             }
         });
     }
-    private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return "本地书架";}
+    private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return "书架";}
     private void leaveFolder(){String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");folderId=parent;buildTab();}
     private void togglePrivacy(){revealed=!revealed;prefs.edit().putBoolean("history_revealed",revealed).apply();eye.kind(revealed?"eye":"eye-off");eye.setContentDescription(revealed?"隐藏封面和书名":"显示封面和书名");rowsSnapshot="";render();}
     private void download() {
@@ -172,7 +206,7 @@ public final class MainActivity extends Activity {
         draft=input.getText().toString();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},42);
         starting=true;
-        disk.execute(()->{try{JSONObject b=store.read(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null&&"complete".equals(b.optString("status"))){open(b);return;}try{startForegroundService(new Intent(this,DownloadService.class).setAction(DownloadService.ACTION_START).putExtra("id",id));taskId=id;handler.removeCallbacks(poll);handler.post(poll);toast("已开始下载");}catch(RuntimeException e){toast("无法启动下载，请重新打开后重试");}});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
+        disk.execute(()->{try{JSONObject b=store.read(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null&&"complete".equals(b.optString("status"))){open(b);return;}beginDownload(id,"已开始下载");});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
     }
     private void online(){
         final String id;try{id=JmApi.parseId(input.getText().toString());}catch(IllegalArgumentException e){input.setError("请输入有效编号或 JM 链接");return;}
@@ -227,7 +261,7 @@ public final class MainActivity extends Activity {
         reading=true;
         disk.execute(()->{
             try{
-                List<JSONObject> result=store.list(),local=library.books(),folders=library.folders(),online=new OnlineHistory(this,jm).list();
+                List<JSONObject> result=store.list(),local=library.books(),folders=library.folders(),online=new OnlineHistory(this,jm).list(),downloads=new DownloadHistory(this).list(3);
                 runOnUiThread(()->{
                     if(isDestroyed()||generation!=refreshGeneration)return;
                     // This generation owns the latch even if the JM/全网 tab changed while it ran.
@@ -235,7 +269,7 @@ public final class MainActivity extends Activity {
                     if(draggingBook!=null)return;
                     // A slower JM/全网 read must never replace the list of the tab now on screen.
                     if(jm!=jmHistory||!resumed)return;
-                    books.clear();books.addAll(result);libraryBooks.clear();libraryBooks.addAll(local);bookFolders.clear();bookFolders.addAll(folders);onlineBooks.clear();onlineBooks.addAll(online);historyLoaded=true;render();
+                    books.clear();books.addAll(result);libraryBooks.clear();libraryBooks.addAll(local);bookFolders.clear();bookFolders.addAll(folders);onlineBooks.clear();onlineBooks.addAll(online);downloadRecords.clear();downloadRecords.addAll(downloads);historyLoaded=true;render();
                 });
             }catch(Exception e){
                 runOnUiThread(()->{if(generation==refreshGeneration)reading=false;});
@@ -245,66 +279,70 @@ public final class MainActivity extends Activity {
     private void render(){
         if(tab==3)return;
         if(tab==2){rows.clear();rows.addAll(onlineBooks);String snap=new JSONArray(rows).toString();if(!snap.equals(rowsSnapshot)){rowsSnapshot=snap;if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}paintHistoryEmpty();return;}
-        rows.clear();if(tab==0){for(JSONObject b:libraryBooks)if("download".equals(b.optString("type")))rows.add(b);rows.sort((a,b)->Long.compare(b.optLong("updated"),a.optLong("updated")));if(rows.isEmpty())rows.add(empty());}
-        else{for(JSONObject f:bookFolders)if(folderId.equals(f.optString("parent"))){try{JSONObject row=new JSONObject(f.toString());row.put("book_folder",true);rows.add(row);}catch(Exception ignored){}}for(JSONObject b:libraryBooks)if(folderId.equals(b.optString("folder")))rows.add(b);title.setText(folderTitle());if(emptyShelf!=null)emptyShelf.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);}
-        JSONArray visible=new JSONArray();for(JSONObject b:rows)visible.put(new JSONArray().put(b.optString("key")).put(b.optString("id")).put(b.optString("title")).put(b.optString("folder")).put(b.optInt("done")).put(b.optString("uri")).put(b.optBoolean("empty")).put(b.optBoolean("book_folder")));
+        rows.clear();if(tab==0){rows.addAll(downloadRecords.subList(0,Math.min(3,downloadRecords.size())));if(rows.isEmpty())rows.add(empty());}
+        else{if(shelfQuery.trim().isEmpty())for(JSONObject f:bookFolders)if(folderId.equals(f.optString("parent"))){try{JSONObject row=new JSONObject(f.toString());row.put("book_folder",true);rows.add(row);}catch(Exception ignored){}}rows.addAll(BookSearch.shelf(libraryBooks,folderId,shelfQuery));title.setText(folderTitle());if(emptyShelf!=null){emptyShelf.setText(shelfQuery.trim().isEmpty()?"书架还空着":"没有匹配的书籍");emptyShelf.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);}}
+        JSONArray visible=new JSONArray();for(JSONObject b:rows)visible.put(new JSONArray().put(b.optString("key")).put(b.optString("id")).put(b.optString("title")).put(b.optString("folder")).put(b.optInt("done")).put(b.optString("uri")).put(b.optBoolean("empty")).put(b.optBoolean("book_folder")).put(b.optLong("completedAt")).put(b.optInt("downloadedChapters")).put(b.optString("thumbnail")));
         if(tab==1)for(JSONObject member:libraryBooks)visible.put(new JSONArray().put(member.optString("key")).put(member.optString("folder")));
         String snapshot=visible.toString()+revealed;if(!snapshot.equals(rowsSnapshot)){rowsSnapshot=snapshot;if(adapter!=null)adapter.notifyDataSetChanged();if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}updateTask();
     }
     private JSONObject empty(){JSONObject b=new JSONObject();try{b.put("empty",true);}catch(Exception ignored){}return b;}
     private void paintHistoryEmpty(){if(emptyShelf!=null)emptyShelf.setVisibility(historyLoaded&&onlineBooks.isEmpty()?View.VISIBLE:View.GONE);}
     private void updateTask(){
-        if(taskCard==null)return;boolean running=DownloadService.running;if(running)taskId=DownloadService.activeId;
+        if(taskCard==null)return;boolean running=DownloadService.running;if(running){taskId=DownloadService.activeId;preparingDownload=false;}
         text(start,running?"任务下载中":"开始下载");JSONObject current=null;for(JSONObject b:books){if(!taskId.isEmpty()&&b.optString("id").equals(taskId)){current=b;break;}}
-        if(current==null){setTaskVisible(false);return;}
+        if(current==null||preparingDownload){if(preparingDownload||running){paintPreparingTask();setTaskVisible(true);}else setTaskVisible(false);return;}
         boolean active=running&&taskId.equals(DownloadService.activeId);String status=current.optString("status");
-        if(!active&&"complete".equals(status)){try{if(input!=null&&taskId.equals(JmApi.parseId(input.getText().toString()))){input.setText("");draft="";}}catch(IllegalArgumentException ignored){}taskId="";setTaskVisible(false);return;}
-        text(taskTitle,active?"正在下载":"error".equals(status)?"下载未完成":"已暂停 · 可继续下载");
         int done=current.optInt("done"),total=current.optInt("total");boolean waiting=active&&total==0;if(progress.isIndeterminate()!=waiting)progress.setIndeterminate(waiting);if(progress.getMax()!=Math.max(total,1))progress.setMax(Math.max(total,1));if(progress.getProgress()!=done)progress.setProgress(done);
-        String msg=current.optString("message");text(taskInfo,"JM"+current.optString("id")+"  ·  "+done+" / "+total+" 页"+("error".equals(status)?"\n"+msg:""));
-        taskAction.setVisibility(View.VISIBLE);text(taskAction,active?"暂停":("error".equals(status)?"重试":"继续"));
+        text(taskCount,DownloadTransition.pages(done,total));taskCount.setContentDescription("已下载 "+done+" 页，总共 "+(total>0?total:"未知")+" 页");
+        String label="JM"+current.optString("id"),name=current.optString("title");if(!name.isEmpty()&&!name.equals(label))label+=" · "+name;
+        String msg=current.optString("message");text(taskInfo,label+("error".equals(status)?"\n"+msg:""));
+        if(!active&&"complete".equals(status)){text(taskTitle,"下载完成");try{if(input!=null&&taskId.equals(JmApi.parseId(input.getText().toString()))){input.setText("");draft="";}}catch(IllegalArgumentException ignored){}taskId="";setTaskVisible(false);return;}
+        text(taskTitle,active?(waiting?"正在获取章节":"正在下载"):"error".equals(status)?"下载未完成":"下载已暂停");
+        taskAction.setVisibility(View.VISIBLE);taskAction.setEnabled(true);text(taskAction,active?"暂停":("error".equals(status)?"重试":"继续"));
         setTaskVisible(true);
+    }
+    private void paintPreparingTask(){text(taskTitle,"正在准备下载");text(taskCount,"0/…");taskCount.setContentDescription("正在获取总页数");text(taskInfo,"JM"+taskId+" · 正在获取章节与页数");progress.setIndeterminate(true);taskAction.setEnabled(false);text(taskAction,"准备中");}
+    private void beginDownload(String id,String message){
+        taskId=id;preparingDownload=true;paintPreparingTask();setTaskVisible(true);
+        try{startForegroundService(new Intent(this,DownloadService.class).setAction(DownloadService.ACTION_START).putExtra("id",id));handler.removeCallbacks(poll);handler.post(poll);toast(message);}
+        catch(RuntimeException e){preparingDownload=false;taskId="";setTaskVisible(false);toast("无法启动下载，请重试");}
     }
     private void onTaskAction(){
         if(DownloadService.running){startService(new Intent(this,DownloadService.class).setAction(DownloadService.ACTION_CANCEL));return;}
         if(taskId.isEmpty())return;
-        try{startForegroundService(new Intent(this,DownloadService.class).setAction(DownloadService.ACTION_START).putExtra("id",taskId));handler.removeCallbacks(poll);handler.post(poll);toast("继续下载");}catch(RuntimeException e){toast("无法继续下载，请重试");}
+        beginDownload(taskId,"继续下载");
     }
     private void setTaskVisible(boolean show){
         if(taskCard==null||actionSlot==null||downloadActions==null)return;
         if(show==taskShown)return;
         taskShown=show;
-        if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
-        int width=actionSlot.getWidth();if(width<=0)width=content.getWidth()-u.dp(36);
-        final View target=show?taskCard:downloadActions;
-        final int targetHeight=measureActionHeight(target,width);
-        int startHeight=actionSlot.getHeight();
-        if(startHeight<=0){
-            downloadActions.setVisibility(show?View.GONE:View.VISIBLE);
-            taskCard.setVisibility(show?View.VISIBLE:View.GONE);
-            taskCard.setAlpha(show?1f:0f);downloadActions.setAlpha(show?0f:1f);
-            ViewGroup.LayoutParams lp=actionSlot.getLayoutParams();lp.height=show?targetHeight:u.dp(48);actionSlot.setLayoutParams(lp);
-            return;
-        }
-        downloadActions.setVisibility(View.VISIBLE);taskCard.setVisibility(View.VISIBLE);
-        final int from=startHeight,to=targetHeight;
-        actionAnimator=ValueAnimator.ofFloat(0f,1f);actionAnimator.setDuration(230);actionAnimator.setInterpolator(new DecelerateInterpolator());
-        actionAnimator.addUpdateListener(a->{
-            if(actionSlot==null||taskCard==null||downloadActions==null)return;
-            float f=(float)a.getAnimatedValue();ViewGroup.LayoutParams lp=actionSlot.getLayoutParams();lp.height=(int)(from+(to-from)*f);actionSlot.setLayoutParams(lp);
-            float slide=u.dp(7)*(1f-f);
-            if(show){downloadActions.setAlpha(1f-f);downloadActions.setTranslationY(-slide);taskCard.setAlpha(f);taskCard.setTranslationY(slide);}
-            else{downloadActions.setAlpha(f);downloadActions.setTranslationY(slide);taskCard.setAlpha(1f-f);taskCard.setTranslationY(-slide);}
-        });
-        actionAnimator.addListener(new android.animation.AnimatorListenerAdapter(){
+        ValueAnimator previous=actionAnimator;actionAnimator=null;if(previous!=null){previous.removeAllListeners();previous.cancel();}
+        final FrameLayout slot=actionSlot;final LinearLayout buttons=downloadActions,card=taskCard;
+        final int width=Math.max(1,slot.getWidth()>0?slot.getWidth():content.getWidth()-u.dp(36));
+        final int targetHeight=measureActionHeight(card,width);final float target=show?1f:0f;
+        buttons.setVisibility(View.VISIBLE);card.setVisibility(View.VISIBLE);start.setEnabled(!show);buttons.getChildAt(1).setEnabled(!show);
+        if(slot.getWidth()<=0){applyDownloadTransition(target,slot,buttons,card,width,targetHeight);finishDownloadTransition(show,slot,buttons,card);return;}
+        final ValueAnimator animator=ValueAnimator.ofFloat(actionFraction,target);actionAnimator=animator;
+        animator.setDuration(Math.max(120,(int)(480*Math.abs(target-actionFraction))));animator.setInterpolator(new android.view.animation.LinearInterpolator());
+        animator.addUpdateListener(a->{if(actionAnimator==animator&&actionSlot==slot)applyDownloadTransition((float)a.getAnimatedValue(),slot,buttons,card,width,targetHeight);});
+        animator.addListener(new android.animation.AnimatorListenerAdapter(){
+            private boolean cancelled;
+            @Override public void onAnimationCancel(android.animation.Animator animation){cancelled=true;}
             @Override public void onAnimationEnd(android.animation.Animator animation){
-                if(actionSlot==null||taskCard==null||downloadActions==null)return;
-                ViewGroup.LayoutParams lp=actionSlot.getLayoutParams();lp.height=-2;actionSlot.setLayoutParams(lp);
-                downloadActions.setVisibility(show?View.GONE:View.VISIBLE);taskCard.setVisibility(show?View.VISIBLE:View.GONE);
-                downloadActions.setAlpha(show?0f:1f);taskCard.setAlpha(show?1f:0f);
-                downloadActions.setTranslationY(0f);taskCard.setTranslationY(0f);actionAnimator=null;
+                if(cancelled||actionAnimator!=animator||actionSlot!=slot)return;
+                actionAnimator=null;finishDownloadTransition(show,slot,buttons,card);
             }
-        });actionAnimator.start();
+        });animator.start();
+    }
+    private void applyDownloadTransition(float fraction,FrameLayout slot,LinearLayout buttons,LinearLayout card,int width,int height){
+        actionFraction=fraction;float merge=DownloadTransition.merge(fraction),expand=DownloadTransition.expand(fraction);
+        for(int n=0;n<buttons.getChildCount();n++){View button=buttons.getChildAt(n);button.setTranslationX((width/2f-button.getLeft()-button.getWidth()/2f)*merge);button.setScaleX(DownloadTransition.buttonScaleX(fraction));button.setScaleY(1f-.18f*merge);}
+        buttons.setAlpha(DownloadTransition.buttonsAlpha(fraction));card.setPivotX(width/2f);card.setPivotY(u.dp(24));card.setScaleX(DownloadTransition.panelScaleX(fraction));card.setScaleY(.82f+.18f*expand);card.setAlpha(DownloadTransition.panelAlpha(fraction));
+        ViewGroup.LayoutParams lp=slot.getLayoutParams();lp.height=Math.round(u.dp(48)+(height-u.dp(48))*expand);slot.setLayoutParams(lp);
+    }
+    private void finishDownloadTransition(boolean show,FrameLayout slot,LinearLayout buttons,LinearLayout card){
+        buttons.setVisibility(show?View.GONE:View.VISIBLE);card.setVisibility(show?View.VISIBLE:View.GONE);
+        ViewGroup.LayoutParams lp=slot.getLayoutParams();lp.height=show?-2:u.dp(48);slot.setLayoutParams(lp);
     }
     private int measureActionHeight(View view,int width){
         view.measure(View.MeasureSpec.makeMeasureSpec(Math.max(1,width),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
@@ -313,11 +351,12 @@ public final class MainActivity extends Activity {
     private void text(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
 
     private void open(JSONObject b){
-        if(b.optBoolean("empty"))return;if(b.has("sourceId")){openOnline(b);return;}if(b.optBoolean("book_folder")){folderId=b.optString("id");buildTab();return;}
+        if(b.optBoolean("empty"))return;if(b.optBoolean("download_history")){DownloadRecordActions.open(this,b,disk);return;}if(b.has("sourceId")){openOnline(b);return;}if(b.optBoolean("book_folder")){folderId=b.optString("id");buildTab();return;}
         startActivity(new Intent(this,BookInfoActivity.class).putExtra("book",b.toString()));
     }
     private void manage(JSONObject b){
         if(b.optBoolean("empty"))return;if(tab==1){if(b.optBoolean("book_folder"))manageFolder(b);else manageBook(b);return;}
+        if(b.optBoolean("download_history")){DownloadRecordActions.confirmRemove(this,b,disk,()->refresh(true));return;}
         String id=b.optString("id");new AlertDialog.Builder(this).setTitle(revealed?b.optString("title"):id).setItems(new String[]{"查看车牌号","删除下载内容"},(d,n)->{if(n==0)new AlertDialog.Builder(this).setTitle("车牌号").setMessage(id).setPositiveButton("知道了",null).show();else confirmDelete(b,true);}).show();
     }
     private void manageBook(JSONObject b){
@@ -367,7 +406,7 @@ public final class MainActivity extends Activity {
     }
     private interface Named {void run(String name);}
     private interface DiskAction {void run()throws Exception;}
-    private void nameDialog(String caption,String value,Named done){EditText edit=new EditText(this);edit.setSingleLine(true);edit.setTextSize(16);edit.setText(value);edit.setSelectAllOnFocus(true);LinearLayout box=u.column();box.setPadding(u.dp(24),u.dp(8),u.dp(24),0);box.addView(edit);AlertDialog d=new AlertDialog.Builder(this).setTitle(caption).setView(box).setNegativeButton("取消",null).setPositiveButton("确定",null).create();d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{String name=edit.getText().toString().trim();if(name.isEmpty()){edit.setError("请输入名称");return;}if(name.length()>100){edit.setError("名称最多 100 个字");return;}d.dismiss();done.run(name);}));d.show();edit.requestFocus();}
+    private void nameDialog(String caption,String value,Named done){EditText edit=new EditText(this);edit.setSingleLine(true);edit.setTextSize(16);edit.setText(value);edit.setSelectAllOnFocus(true);Ui.clearable(edit);LinearLayout box=u.column();box.setPadding(u.dp(24),u.dp(8),u.dp(24),0);box.addView(edit);AlertDialog d=new AlertDialog.Builder(this).setTitle(caption).setView(box).setNegativeButton("取消",null).setPositiveButton("确定",null).create();d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{String name=edit.getText().toString().trim();if(name.isEmpty()){edit.setError("请输入名称");return;}if(name.length()>100){edit.setError("名称最多 100 个字");return;}d.dismiss();done.run(name);}));d.show();edit.requestFocus();}
     private void classify(JSONObject b){ArrayList<String> names=new ArrayList<>(),ids=new ArrayList<>();for(JSONObject f:bookFolders){names.add(f.optString("title"));ids.add(f.optString("id"));}names.add("＋ 创建书籍夹");if(!b.optString("folder").isEmpty())names.add("移回书架");new AlertDialog.Builder(this).setTitle("书籍分类").setItems(names.toArray(new String[0]),(d,n)->{if(n<ids.size())mutate(()->library.move(b.optString("key"),ids.get(n)));else if(n==ids.size())nameDialog("创建书籍夹","",name->mutate(()->library.move(b.optString("key"),library.createFolder(name,folderId))));else mutate(()->library.move(b.optString("key"),""));}).show();}
     private void confirmDelete(JSONObject b,boolean history){boolean tree="tree".equals(b.optString("type"));new AlertDialog.Builder(this).setTitle(history?"删除已下载图片？":tree?"移除这本书？":"删除这本书？").setMessage(tree?"原始文件夹和图片会保留。":"将删除本书及内置目录中的图片。").setNegativeButton("取消",null).setPositiveButton("确定",(d,n)->mutate(()->{if(DownloadService.running&&b.optString("id").equals(DownloadService.activeId))throw new IllegalStateException("请先暂停下载");library.delete(b.optString("key","download:"+b.optString("id")));})).show();}
     private void mutate(DiskAction action){if(operation){toast("请等待当前操作完成");return;}operation=true;disk.execute(()->{String error=null;try{action.run();}catch(Exception e){error=e.getMessage();}String msg=error;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);refresh();});});}
@@ -431,18 +470,14 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void settings(){
-        new AlertDialog.Builder(this).setItems(new String[]{"关于"},(d,n)->license()).show();
-    }
-
-    private void license(){new AlertDialog.Builder(this).setTitle("JM 简阅 3.4.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL},(d,n)->{if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){new AlertDialog.Builder(this).setTitle("JM 简阅 3.5.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL},(d,n)->{if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);new AlertDialog.Builder(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
-    @Override protected void onResume(){super.onResume();resumed=true;handler.post(poll);if(appUpdate!=null)appUpdate.onResume();}
-    @Override protected void onPause(){super.onPause();resumed=false;handler.removeCallbacks(poll);if(appUpdate!=null)appUpdate.onPause();}
+    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(appUpdate!=null)appUpdate.onResume();}
+    @Override protected void onPause(){super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);if(appUpdate!=null)appUpdate.onPause();}
     @Override protected void onDestroy(){resumed=false;if(appUpdate!=null)appUpdate.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
-    @Override public void onBackPressed(){if(tab==1&&!folderId.isEmpty())leaveFolder();else super.onBackPressed();}
-    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("draft",input==null?draft:input.getText().toString());b.putString("search",searchInput==null?searchDraft:searchInput.getText().toString());b.putString("folder",folderId);}
+    @Override public void onBackPressed(){if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&!folderId.isEmpty())leaveFolder();else super.onBackPressed();}
+    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("draft",input==null?draft:input.getText().toString());b.putString("search",searchInput==null?searchDraft:searchInput.getText().toString());b.putString("folder",folderId);b.putString("task_id",taskId);}
     private final class OnlineAdapter extends BaseAdapter {
         public int getCount(){return onlineBooks.size();}public Object getItem(int p){return onlineBooks.get(p);}public long getItemId(int p){return p;}
         public View getView(int p,View old,ViewGroup parent){
@@ -465,9 +500,9 @@ public final class MainActivity extends Activity {
     private final class BookAdapter extends BaseAdapter {
         public int getCount(){return rows.size();}public Object getItem(int p){return rows.get(p);}public long getItemId(int p){return p;}
         public View getView(int p,View old,ViewGroup parent){JSONObject b=rows.get(p);LinearLayout outer=u.column();outer.setPadding(0,0,0,u.dp(10));LinearLayout r=u.row();r.setPadding(u.dp(14),u.dp(12),u.dp(14),u.dp(12));u.round(r,u.card,20);outer.addView(r,new LinearLayout.LayoutParams(-1,-2));if(b.optBoolean("empty")){TextView empty=u.text("从一个编号开始",14,u.muted,false);empty.setGravity(17);empty.setPadding(0,u.dp(30),0,u.dp(30));r.addView(empty,new LinearLayout.LayoutParams(-1,-2));return outer;}
-            FrameLayout cover=cover(b,revealed);r.addView(cover,new LinearLayout.LayoutParams(u.dp(52),u.dp(72)));LinearLayout details=u.column();LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-2,1);dp.setMargins(u.dp(14),0,u.dp(8),0);r.addView(details,dp);TextView name=u.text(revealed?b.optString("title","JM"+b.optString("id")):b.optString("id"),14,u.ink,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);details.addView(name);u.space(details,7);details.addView(u.text(b.optInt("done")+" 页",11,u.muted,false));return outer;}
+            FrameLayout cover=cover(b,revealed);r.addView(cover,new LinearLayout.LayoutParams(u.dp(52),u.dp(72)));LinearLayout details=u.column();LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-2,1);dp.setMargins(u.dp(14),0,u.dp(8),0);r.addView(details,dp);TextView name=u.text(DownloadRecordActions.displayTitle(b,revealed),14,u.ink,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);details.addView(name);u.space(details,7);details.addView(u.text(DownloadRecordActions.summary(b),11,u.muted,false));return outer;}
     }
-    private FrameLayout cover(JSONObject b,boolean show){FrameLayout frame=new FrameLayout(this);frame.setBackground(u.shape(u.tint,12));frame.setClipToOutline(true);TextView mark=u.text("JM",17,Ui.BLUE,true);mark.setGravity(17);frame.addView(mark,new FrameLayout.LayoutParams(-1,-1));if(show){ImageView image=new ImageView(this);image.setTag(b);image.setScaleType(ImageView.ScaleType.CENTER_CROP);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));if(b.has("sourceId")&&!OnlineHistory.isJm(b))RemoteCovers.load(image,b.optString("thumbnail"),b.optLong("sourceId"));else covers.load(image,b);}return frame;}
+    private FrameLayout cover(JSONObject b,boolean show){FrameLayout frame=new FrameLayout(this);frame.setBackground(u.shape(u.tint,12));frame.setClipToOutline(true);TextView mark=u.text("JM",17,Ui.BLUE,true);mark.setGravity(17);frame.addView(mark,new FrameLayout.LayoutParams(-1,-1));if(show){ImageView image=new ImageView(this);image.setTag(b);image.setScaleType(ImageView.ScaleType.CENTER_CROP);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));if(b.has("sourceId")&&!OnlineHistory.isJm(b)&&(!b.optBoolean("download_history")||b.optString("thumbnail").startsWith("https://")))RemoteCovers.load(image,b.optString("thumbnail"),b.optLong("sourceId"));else covers.load(image,b);}return frame;}
     private String onlineDetail(JSONObject b){
         if(!b.has("sourceId")||b.optBoolean("book_folder"))return "";
         if(OnlineHistory.isJm(b)){
@@ -486,7 +521,7 @@ public final class MainActivity extends Activity {
     }
     private final class ShelfTile extends LinearLayout {
         private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private final int width,height;private int touchX,touchY;private View folderPreview;
-        ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);int columns=grid.getNumColumns();width=(getResources().getDisplayMetrics().widthPixels-u.dp(40)-u.dp(12)*(columns-1))/columns;height=(int)(width*1.40f);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,9);name=u.text("",13,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setLineSpacing(u.dp(2),1);name.setPadding(u.dp(1),0,u.dp(1),0);addView(name,new LinearLayout.LayoutParams(-1,Math.max(u.dp(38),name.getLineHeight()*2+u.dp(2))));info=u.text("",10,u.muted,false);info.setMaxLines(2);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setLineSpacing(u.dp(1),1);info.setPadding(u.dp(1),u.dp(4),u.dp(1),0);info.setVisibility(View.GONE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){touchX=(int)e.getX();touchY=(int)e.getY();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{if(tab==2){manageBook(book);return true;}if(operation){toast("请等待当前操作完成");return true;}draggingBook=book;dragRows.clear();dragRows.addAll(rows);dragTarget=null;dragZone=ShelfOrder.NONE;dragCover=snapshotFace(face);dragMoved=false;dragX=v.getLeft()+touchX;dragY=v.getTop()+touchY;v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);boolean started=v.startDragAndDrop(ClipData.newPlainText("book",Library.key(book)),new TileShadow(v,touchX,touchY),book,0);if(!started){draggingBook=null;dragRows.clear();dragCover=null;if(book.optBoolean("book_folder"))manageFolder(book);else manageBook(book);}else v.setAlpha(0f);return true;});
+        ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);int columns=grid.getNumColumns();width=(getResources().getDisplayMetrics().widthPixels-u.dp(40)-u.dp(12)*(columns-1))/columns;height=(int)(width*1.40f);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,9);name=u.text("",13,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setLineSpacing(u.dp(2),1);name.setPadding(u.dp(1),0,u.dp(1),0);addView(name,new LinearLayout.LayoutParams(-1,Math.max(u.dp(38),name.getLineHeight()*2+u.dp(2))));info=u.text("",10,u.muted,false);info.setMaxLines(2);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setLineSpacing(u.dp(1),1);info.setPadding(u.dp(1),u.dp(4),u.dp(1),0);info.setVisibility(View.GONE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){touchX=(int)e.getX();touchY=(int)e.getY();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{if(tab==2||(shelfSearch!=null&&shelfSearch.isExpanded())){if(book.optBoolean("book_folder"))manageFolder(book);else manageBook(book);return true;}if(operation){toast("请等待当前操作完成");return true;}draggingBook=book;dragRows.clear();dragRows.addAll(rows);dragTarget=null;dragZone=ShelfOrder.NONE;dragCover=snapshotFace(face);dragMoved=false;dragX=v.getLeft()+touchX;dragY=v.getTop()+touchY;v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);boolean started=v.startDragAndDrop(ClipData.newPlainText("book",Library.key(book)),new TileShadow(v,touchX,touchY),book,0);if(!started){draggingBook=null;dragRows.clear();dragCover=null;if(book.optBoolean("book_folder"))manageFolder(book);else manageBook(book);}else v.setAlpha(0f);return true;});
         }
         void bind(JSONObject b){boolean rebound=book==null||!shelfKey(book).equals(shelfKey(b));if(draggingBook==null||rebound){animate().cancel();setTranslationX(0);setTranslationY(0);setScaleX(1);setScaleY(1);setForeground(null);clearFolderPreview();}book=b;setAlpha(draggingBook!=null&&Library.key(draggingBook).equals(Library.key(b))?0f:1f);name.setText(b.optString("title","未命名"));setContentDescription(b.optString("title"));String detail=onlineDetail(b);info.setText(detail);info.setVisibility(detail.isEmpty()?View.GONE:View.VISIBLE);String identity=b.optBoolean("book_folder")?"folder:"+b.optString("id"):b.optString("key");if(b.optBoolean("book_folder")){for(JSONObject member:libraryBooks)if(b.optString("id").equals(member.optString("folder")))identity+="/"+member.optString("key");}else if(b.has("sourceId"))identity+="|"+b.optString("thumbnail");if(!identity.equals(faceKey)){faceKey=identity;face.removeAllViews();face.addView(b.optBoolean("book_folder")?folderCover(b,width,height):cover(b,true),new FrameLayout.LayoutParams(-1,-1));}else retryMissingCovers(face);if(rebound&&draggingBook!=null){String bound=shelfKey(b);post(()->{Integer position=dragPreviewPositions.get(bound);if(draggingBook!=null&&bound.equals(shelfKey(book))&&position!=null){Point slot=shelfSlot(position);animate().cancel();setTranslationX(slot.x-getLeft());setTranslationY(slot.y-getTop());}});}}
         void clearFolderPreview(){if(folderPreview!=null){face.removeView(folderPreview);folderPreview=null;if(book!=null)name.setText(book.optString("title","未命名"));}}

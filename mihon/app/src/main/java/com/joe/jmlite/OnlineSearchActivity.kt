@@ -65,6 +65,7 @@ class OnlineSearchActivity : Activity() {
             setBackgroundColor(Color.TRANSPARENT);inputType=InputType.TYPE_CLASS_TEXT;imeOptions=EditorInfo.IME_ACTION_SEARCH
             setPadding(ui.dp(12),0,ui.dp(6),0)
         }
+        Ui.clearable(queryInput)
         val header=ui.header(if(sourceMode) intent.getStringExtra("sourceName").orEmpty() else "搜索全网漫画") {
             if(searchExpanded) toggleSearch?.invoke(false) else finish()
         }

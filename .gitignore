@@ -1,5 +1,6 @@
 # Local tools, credentials, and generated output
 /toolchain/
+/work/
 /signing/
 **/build/
 **/.gradle/

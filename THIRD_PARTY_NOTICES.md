@@ -90,6 +90,7 @@ Junrar 的 UnRAR 限制许可不等同于 MIT 或 Apache-2.0；这里只用于�
 - [Valkyrie](https://github.com/ComposeGears/Valkyrie)：将 SVG 图标生成为 Compose 向量资源。
 - [Spotless](https://github.com/diffplug/spotless)、[ktlint](https://github.com/pinterest/ktlint)、[TAP-MOC](https://github.com/GradleUp/tapmoc)：代码格式与构建配置工具。
 - [JUnit](https://github.com/junit-team/junit-framework)、[Kotest](https://github.com/kotest/kotest)、[MockK](https://github.com/mockk/mockk)、[AndroidX Test](https://github.com/android/android-test)：JVM 及 Android 测试依赖。
+- [JSON-java](https://github.com/stleary/JSON-java)：`org.json:json:20240303` 仅用于 JVM 测试，验证下载记录迁移、删除隔离及搜索，不打入 APK；所用 Maven POM 标注 Public Domain，详见该版本原许可。
 
 框架版本目录还保留了 Firebase、Google Services 和 Shizuku 等可选条目；简阅当前发布脚本传入 `include-telemetry=false`，原生 Mihon 更新器传入 `enable-updater=false`。简阅的版本检查直接面向本项目 GitHub Releases，不使用上游 Mihon 的更新仓库。目录中保留条目不表示启用了对应服务。
 

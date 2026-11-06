@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.data.download
 
 import android.content.Context
+import com.joe.jmlite.OnlineDownloadCompletion
 import com.hippo.unifile.UniFile
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
@@ -438,6 +439,7 @@ class Downloader(
             mangaDir.findFile(chapterDirname + TMP_DIR_SUFFIX)?.delete()
             cache.addChapter(chapterDirname, mangaDir, download.manga)
             download.status = Download.State.DOWNLOADED
+            OnlineDownloadCompletion.onStoredChapter(context, download)
             return
         }
 
@@ -508,6 +510,7 @@ class Downloader(
             DiskUtil.createNoMediaFile(tmpDir, context)
 
             download.status = Download.State.DOWNLOADED
+            OnlineDownloadCompletion.onStoredChapter(context, download)
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             // If the page list threw, it will resume here

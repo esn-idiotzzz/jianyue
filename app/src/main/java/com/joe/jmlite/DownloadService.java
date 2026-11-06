@@ -21,7 +21,9 @@ import java.util.concurrent.CountDownLatch;
 public final class DownloadService extends Service {
     public static final String ACTION_START = "com.joe.jmlite.START";
     public static final String ACTION_CANCEL = "com.joe.jmlite.CANCEL";
+    public static final String ACTION_CHANGED = "com.joe.jmlite.DOWNLOAD_CHANGED";
     public static final String EXTRA_ID = "id";
+    public static final String EXTRA_STATUS = "status", EXTRA_DONE = "done", EXTRA_TOTAL = "total";
     public static volatile boolean running;
     public static volatile String activeId = "";
     private static final String CHANNEL = "downloads";
@@ -33,6 +35,7 @@ public final class DownloadService extends Service {
     private final List<JmApi> imageApis = new ArrayList<>();
     private Store store;
     private final Handler main = new Handler(Looper.getMainLooper());
+    private long lastProgressNotice;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -56,6 +59,7 @@ public final class DownloadService extends Service {
         running = true;
         activeId = id;
         startForeground(NOTIFICATION, notification("正在准备下载", 0, 0));
+        DownloadHistory.notifyChanged(this,id,"starting",0,0);
         new Thread(() -> download(id), "jm-download").start();
         return START_NOT_STICKY;
     }
@@ -67,13 +71,15 @@ public final class DownloadService extends Service {
             if (meta == null) meta = new JSONObject().put("id", id).put("title", "JM" + id);
             meta.put("status", "downloading").put("message", "正在获取章节");
             store.write(id, meta);
+            changed(meta,true);
             api = new JmApi(getSharedPreferences("settings", MODE_PRIVATE).getString("api_host", ""));
             checkCancelled();
             if (!meta.optBoolean("plan_complete")) plan(id, meta);
             downloadImages(id, meta);
             checkCancelled();
-            meta.put("done", savedPages(id, meta)).put("status", "complete").put("message", "下载完成");
+            meta.put("done", savedPages(id, meta)).put("status", "complete").put("message", "下载完成").put("completedAt",System.currentTimeMillis());
             store.write(id, meta);
+            try{new DownloadHistory(this).record(meta);}catch(Exception historyError){android.util.Log.w("JMDownload","Completed book retained; unable to save download history",historyError);}
         } catch (Exception e) {
             try {
                 if (meta == null) meta = new JSONObject().put("id", id).put("title", "JM" + id);
@@ -84,9 +90,12 @@ public final class DownloadService extends Service {
             } catch (Exception ignored) { }
         } finally {
             api = null;
+            final String status=meta==null?"error":meta.optString("status","error");
+            final int done=meta==null?0:meta.optInt("done"),total=meta==null?0:meta.optInt("total");
             main.post(() -> {
                 running = false;
                 activeId = "";
+                DownloadHistory.notifyChanged(this,id,status,done,total);
                 stopForeground(true);
                 stopSelf();
             });
@@ -133,6 +142,7 @@ public final class DownloadService extends Service {
                                 done[0]++;
                                 meta.put("done", done[0]).put("message", "多线程下载 · " + done[0] + "/" + totalPages + " 页");
                                 store.write(id, meta);
+                                changed(meta,false);
                                 getSystemService(NotificationManager.class).notify(NOTIFICATION, notification(meta.optString("title"), done[0], totalPages));
                             }
                         }
@@ -224,9 +234,16 @@ public final class DownloadService extends Service {
                     .put("scramble_id", detail.getInt("scramble_id")));
             meta.put("message", "正在获取章节 " + (i + 1) + "/" + ordered.size());
             store.write(id, meta);
+            changed(meta,false);
         }
         meta.put("plan_complete", true);
         store.write(id, meta);
+        changed(meta,true);
+    }
+
+    private synchronized void changed(JSONObject meta,boolean force){
+        long now=System.nanoTime()/1_000_000L;
+        if(force||now-lastProgressNotice>=250){lastProgressNotice=now;DownloadHistory.notifyChanged(this,meta.optString("id"),meta.optString("status"),meta.optInt("done"),meta.optInt("total"));}
     }
 
     private void checkCancelled() throws IOException {

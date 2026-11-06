@@ -33,6 +33,8 @@ final class CoverLoader implements AutoCloseable {
 
     CoverLoader(Context context){this.context=context.getApplicationContext();library=new Library(this.context);}
 
+    void clear(ImageView view){view.setTag(COVER_TAG,null);view.setImageDrawable(null);}
+
     void load(ImageView view,JSONObject book){
         String key=Library.key(book);view.setTag(COVER_TAG,key);view.setImageDrawable(null);
         if(closed||key.isEmpty())return;
@@ -49,7 +51,7 @@ final class CoverLoader implements AutoCloseable {
             try{
                 Bitmap image=cache.get(key);
                 if(image==null){
-                    List<LocalImages.Page> pages=OnlineHistory.isJm(book)&&!book.optString("thumbnail").isEmpty()?java.util.Collections.singletonList(new LocalImages.Page(book.optString("thumbnail"),"cover.jpg")):library.pages(book);
+                    List<LocalImages.Page> pages=(book.optBoolean("download_history")||OnlineHistory.isJm(book))&&!book.optString("thumbnail").isEmpty()?java.util.Collections.singletonList(new LocalImages.Page(book.optString("thumbnail"),"cover.jpg")):library.pages(book);
                     if(pages.isEmpty()||closed||Thread.currentThread().isInterrupted())return;
                     image=decode(pages.get(0).uri);
                     if(image==null)return;

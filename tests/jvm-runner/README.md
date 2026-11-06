@@ -37,13 +37,19 @@ The runner selects the compiled production project's tests:
 - `ShelfOrderTest`: 12 cases for insertion, contiguous ordering, hover zones, cancellation plans,
   restored order, and the two-book merge plan.
 
-It exits unsuccessfully unless all 95 cases pass. Output is saved beside the script as `results.log`.
+3.5.0 also selects `BookSearchTest` (7), `DownloadHistoryTest` (11), `DownloadRefreshTest` (3),
+`DownloadTransitionTest` (7), `OnlineDownloadCompletionTest` (6), and `DownloadPrivacyTest` (4).
+These cover cross-folder search, durable records and deletion markers, completion refresh,
+the two-button transition geometry, committed web-download side effects, and hidden titles.
+JSON state tests use the test-only JSON-java dependency; it is not included in the app.
+
+It exits unsuccessfully unless all 133 cases pass. Output is saved beside the script as `results.log`.
 These JVM tests do not prove Android UI, real extension loading, website availability, or device reading.
 
 The direct runner works around this machine's Gradle test-worker startup failure (`ClassNotFoundException: Test`).
 The precise worker command-line cause has not been established. The classpath-export task and this
 runner were both executed successfully for the previous 3.1.0 source: 53 tests passed, 0 failed.
-Re-run against the current source to verify all 95 cases, including the 3.4.0 regressions.
+Re-run against the current source to verify all 133 cases, including the 3.5.0 regressions.
 The exported classpath came from the actual AGP `testDebugUnitTest` task inputs.
 
 FeatureLogicTest adds 12 cases for ranking, confirmed-empty versus network errors/timeouts, and source popular browsing.

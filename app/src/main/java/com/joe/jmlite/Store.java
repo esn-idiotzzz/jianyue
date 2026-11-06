@@ -13,9 +13,11 @@ import java.util.List;
 
 public final class Store {
     private static final Object LOCK = new Object();
+    private final Context context;
     private final File root;
 
     public Store(Context context) {
+        this.context = context;
         root = new File(context.getFilesDir(), "books");
         root.mkdirs();
     }
@@ -90,6 +92,8 @@ public final class Store {
     }
 
     public void delete(String id) throws Exception {
+        // History may read Store while migrating; never take its lock while holding LOCK.
+        new DownloadHistory(context).preserveBeforeDelete(read(id));
         synchronized (LOCK) {
             File folder = dir(id);
             String expected = root.getCanonicalPath() + File.separator + id;

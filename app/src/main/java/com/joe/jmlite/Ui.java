@@ -9,11 +9,18 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.ColorFilter;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.content.res.ColorStateList;
 import android.view.View;
+import android.view.MotionEvent;
 import android.view.Window;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -33,6 +40,33 @@ final class Ui {
         tint = dark ? 0xff202f4a : 0xffeaf1ff;
     }
     int dp(float n) { return (int)(n * c.getResources().getDisplayMetrics().density + .5f); }
+    static void magicWandHint(EditText input){
+        final Drawable wand=input.getContext().getDrawable(eu.kanade.tachiyomi.R.drawable.magic_wand);
+        final int size=Math.max(1,Math.round(input.getTextSize()));wand.setBounds(0,0,size,size);
+        android.text.SpannableString hint=new android.text.SpannableString("搜索全网漫画\ufffc");
+        hint.setSpan(new android.text.style.ReplacementSpan(){
+            @Override public int getSize(Paint paint,CharSequence text,int start,int end,Paint.FontMetricsInt fm){if(fm!=null){Paint.FontMetricsInt original=paint.getFontMetricsInt();fm.top=original.top;fm.ascent=original.ascent;fm.descent=original.descent;fm.bottom=original.bottom;fm.leading=original.leading;}return size;}
+            @Override public void draw(Canvas canvas,CharSequence text,int start,int end,float x,int top,int y,int bottom,Paint paint){Paint.FontMetricsInt fm=paint.getFontMetricsInt();canvas.save();canvas.translate(x,y+(fm.ascent+fm.descent-size)/2f);wand.draw(canvas);canvas.restore();}
+        },hint.length()-1,hint.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        input.setHint(hint);
+    }
+    static void clearable(EditText input) {
+        Ui ui=new Ui(input.getContext());final Drawable[] original=input.getCompoundDrawablesRelative();
+        Drawable clear=new Drawable(){final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+            @Override public void draw(Canvas canvas){float x=getBounds().exactCenterX(),y=getBounds().exactCenterY(),r=ui.dp(8);paint.setColor(ui.muted);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(ui.dp(1.4f));paint.setStrokeCap(Paint.Cap.ROUND);canvas.drawCircle(x,y,r,paint);float d=ui.dp(3);canvas.drawLine(x-d,y-d,x+d,y+d,paint);canvas.drawLine(x-d,y+d,x+d,y-d,paint);}
+            @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
+            @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
+            @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+        };clear.setBounds(0,0,ui.dp(28),ui.dp(28));input.setCompoundDrawablePadding(ui.dp(5));
+        Runnable paint=()->input.setCompoundDrawablesRelative(original[0],original[1],input.length()>0?clear:original[2],original[3]);
+        input.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void afterTextChanged(Editable s){paint.run();}public void onTextChanged(CharSequence s,int start,int before,int count){}});
+        final boolean[] pressed={false};input.setOnTouchListener((v,event)->{
+            boolean rtl=input.getLayoutDirection()==View.LAYOUT_DIRECTION_RTL;
+            boolean hit=input.length()>0&&(rtl?event.getX()<=input.getPaddingLeft()+ui.dp(33):event.getX()>=input.getWidth()-input.getPaddingRight()-ui.dp(33));
+            if(event.getActionMasked()==MotionEvent.ACTION_DOWN){pressed[0]=hit;return hit;}
+            if(pressed[0]){if(event.getActionMasked()==MotionEvent.ACTION_UP){pressed[0]=false;if(hit){input.setText("");input.requestFocus();input.performClick();}}else if(event.getActionMasked()==MotionEvent.ACTION_CANCEL)pressed[0]=false;return true;}return false;
+        });paint.run();
+    }
     GradientDrawable shape(int color, int radius) {
         GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d;
     }

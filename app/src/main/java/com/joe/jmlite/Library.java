@@ -58,6 +58,8 @@ public final class Library {
     private static final String ONLINE_JM_SYSTEM="online_jm";
     private static final String ONLINE_WEB_SYSTEM="online_web";
     private static final String ONLINE_LEGACY_SYSTEM="online";
+    /** Preserve an existing favorite's title, parent folder and ordering under concurrent completions. */
+    public void ensureOnline(JSONObject record) throws Exception {synchronized(LOCK){String key=record.optString("key",OnlineHistory.key(record.optString("sourceId"),record.optString("url")));if(!hasOnline(key))favoriteOnline(record,true);}}
     public void favoriteOnline(JSONObject record,boolean on) throws Exception {synchronized(LOCK){
         JSONObject state=read();JSONArray old=array(state,"online"),next=new JSONArray();String key=record.optString("key",OnlineHistory.key(record.optString("sourceId"),record.optString("url")));
         for(int n=0;n<old.length();n++)if(!key.equals(old.getJSONObject(n).optString("key")))next.put(old.getJSONObject(n));

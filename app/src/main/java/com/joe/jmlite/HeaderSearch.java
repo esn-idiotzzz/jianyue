@@ -1,0 +1,75 @@
+package com.joe.jmlite;
+
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Color;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.Gravity;
+import android.view.View;
+import android.view.animation.DecelerateInterpolator;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import java.util.function.Consumer;
+
+/** The same expanding title search used by source browsing. */
+public final class HeaderSearch {
+    private final Activity activity;
+    private final Ui ui;
+    private final LinearLayout header;
+    private final TextView title;
+    private final View companion;
+    private final FrameLayout box;
+    private final LinearLayout editor;
+    private final Ui.Icon icon;
+    private final EditText input;
+    private ValueAnimator animation;
+    private boolean expanded,visible=true;
+    private int transition;
+
+    public HeaderSearch(Activity activity,LinearLayout header,TextView title,View companion,String hint,Consumer<String> onQuery){
+        this.activity=activity;this.header=header;this.title=title;this.companion=companion;ui=new Ui(activity);
+        box=new FrameLayout(activity);header.addView(box,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
+        icon=ui.icon("search",Ui.BLUE);icon.setContentDescription(hint);box.addView(icon,new FrameLayout.LayoutParams(ui.dp(44),-1,Gravity.END));
+        editor=ui.row();editor.setVisibility(View.GONE);
+        input=new EditText(activity);input.setHint(hint);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(ui.ink);input.setHintTextColor(ui.muted);input.setBackgroundColor(Color.TRANSPARENT);input.setPadding(ui.dp(12),0,ui.dp(6),0);Ui.clearable(input);
+        editor.addView(input,new LinearLayout.LayoutParams(0,-1,1));
+        TextView close=ui.text("×",25,ui.muted,false);close.setGravity(Gravity.CENTER);close.setContentDescription("关闭搜索");editor.addView(close,new LinearLayout.LayoutParams(ui.dp(40),-1));
+        box.addView(editor,new FrameLayout.LayoutParams(-1,-1));
+        input.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void afterTextChanged(Editable s){}public void onTextChanged(CharSequence s,int start,int before,int count){onQuery.accept(s.toString());}});
+        icon.setOnClickListener(v->toggle(true));close.setOnClickListener(v->collapse());
+        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){}public void onViewDetachedFromWindow(View v){transition++;if(animation!=null){animation.cancel();animation=null;}}});
+    }
+
+    public boolean isExpanded(){return expanded||animation!=null;}
+    public void collapse(){if(expanded)toggle(false);}
+    public void setVisible(boolean show){
+        visible=show;
+        if(!show){
+            transition++;if(animation!=null){animation.cancel();animation=null;}expanded=false;
+            input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
+            title.setAlpha(1f);title.setVisibility(View.VISIBLE);editor.setVisibility(View.GONE);icon.setAlpha(1f);icon.setVisibility(View.VISIBLE);ui.round(box,Color.TRANSPARENT,20);box.getLayoutParams().width=ui.dp(44);box.requestLayout();
+        }
+        box.setVisibility(show?View.VISIBLE:View.GONE);
+    }
+
+    private void toggle(boolean expand){
+        expanded=expand;final int token=++transition;if(animation!=null)animation.cancel();
+        title.setVisibility(View.VISIBLE);editor.setVisibility(View.VISIBLE);icon.setVisibility(View.VISIBLE);
+        if(companion!=null)companion.setVisibility(View.GONE);
+        int fixed=0;for(int n=0;n<header.getChildCount();n++){View child=header.getChildAt(n);if(child!=title&&child!=companion&&child!=box&&child.getVisibility()!=View.GONE)fixed+=child.getWidth();}
+        int target=expand?Math.max(ui.dp(120),header.getWidth()-header.getPaddingLeft()-header.getPaddingRight()-fixed):ui.dp(44);
+        animation=ValueAnimator.ofInt(Math.max(ui.dp(44),box.getWidth()),target);animation.setDuration(220);animation.setInterpolator(new DecelerateInterpolator());
+        animation.addUpdateListener(a->{box.getLayoutParams().width=(int)a.getAnimatedValue();box.requestLayout();float f=a.getAnimatedFraction(),progress=expand?f:1f-f;title.setAlpha(1f-progress);editor.setAlpha(progress);icon.setAlpha(1f-progress);});
+        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setVisibility(expand?View.GONE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}}});
+        ui.round(box,expand?ui.tint:Color.TRANSPARENT,20);
+        if(!expand){input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);}
+        animation.start();
+    }
+}
