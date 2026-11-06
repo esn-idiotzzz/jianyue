@@ -10,10 +10,12 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 internal data class AppRelease(val version: String, val notes: String, val url: String) {
+    data class Check(val valid: Boolean, val release: AppRelease?)
     companion object {
         const val PROJECT = "esn-idiotzzz/jianyue"
         const val PROJECT_URL = "https://github.com/$PROJECT"
         const val API_URL = "https://api.github.com/repos/$PROJECT/releases/latest"
+        const val MANIFEST_URL = "$PROJECT_URL/releases/latest/download/update.json"
         private val versionPattern = Regex("[vV]?[0-9]+(?:\\.[0-9]+){1,3}")
 
         fun isNewer(candidate: String, current: String): Boolean {
@@ -26,6 +28,12 @@ internal data class AppRelease(val version: String, val notes: String, val url: 
                 if (comparison != 0) return comparison > 0
             }
             return false
+        }
+
+        fun check(status: Int, body: String, current: String): Check {
+            if (status == 304) return Check(true, null)
+            val candidate = parse(status, body, "0.0.0") ?: return Check(false, null)
+            return Check(true, candidate.takeIf { isNewer(it.version, current) })
         }
 
         fun parse(status: Int, body: String, current: String): AppRelease? {

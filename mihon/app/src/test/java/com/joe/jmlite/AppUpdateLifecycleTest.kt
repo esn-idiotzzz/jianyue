@@ -22,23 +22,31 @@ class AppUpdateLifecycleTest {
         val update = spyk(mockk<AppUpdate>(relaxed = true), recordPrivateCalls = true)
         val handler = mockk<Handler>(relaxed = true)
         field(update, "handler", handler)
-        field(update, "recheck", Runnable {})
+        every { update["check"](any<AppUpdateChecks.Endpoint>()) } answers { Unit }
         field(update, "checks", AppUpdateChecks().apply { completed(1_000, 200) })
         return update to handler
     }
 
-    @Test fun `returning to the foreground schedules the next eligible check`() {
+    @Test fun `opening starts one check without scheduling polling`() {
         val (update, handler) = fixture()
         invoke(update, "onResume")
-        verify(exactly = 1) { handler.postDelayed(any<Runnable>(), 60_000) }
+        verify(exactly = 1) { update["check"](AppUpdateChecks.Endpoint.MANIFEST) }
+        verify(exactly = 0) { handler.postDelayed(any<Runnable>(), any<Long>()) }
     }
 
-    @Test fun `backgrounding cancels foreground polling`() {
+    @Test fun `switching screens attaches the result without another network check`() {
+        val (update, handler) = fixture()
+        update.attach(mockk<android.app.Activity>(relaxed=true))
+        verify(exactly=0){update["check"](any<AppUpdateChecks.Endpoint>())}
+        verify(exactly=0){handler.postDelayed(any<Runnable>(),any<Long>())}
+    }
+
+    @Test fun `backgrounding does not schedule polling`() {
         val (update, handler) = fixture()
         invoke(update, "onResume")
         clearMocks(handler)
         invoke(update, "onPause")
-        verify(exactly = 1) { handler.removeCallbacks(any<Runnable>()) }
+        verify(exactly = 0) { handler.postDelayed(any<Runnable>(), any<Long>()) }
         verify(exactly = 0) { handler.postDelayed(any<Runnable>(), any<Long>()) }
     }
 

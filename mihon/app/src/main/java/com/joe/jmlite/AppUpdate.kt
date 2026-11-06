@@ -20,7 +20,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Response
 
 /** Background release checks on opening the app; no account or token is required. */
-class AppUpdate(private val activity: Activity) {
+class AppUpdate(private var activity: Activity) {
     private val handler = Handler(Looper.getMainLooper())
     private var call: Call? = null
     private var pending: AppRelease? = null
@@ -28,49 +28,46 @@ class AppUpdate(private val activity: Activity) {
     private var resumed = false
     private var closed = false
     private var shownVersion: String? = null
-    private val checks = AppUpdateChecks()
-    private val recheck = Runnable { check() }
+    private val checks = sharedChecks
 
-    private fun scheduleCheck() {
-        handler.removeCallbacks(recheck)
-        if (resumed && !closed) handler.postDelayed(recheck, checks.delay(SystemClock.elapsedRealtime()))
-    }
 
-    private fun check() {
-        if (closed || !resumed || call != null) return
-        if (checks.delay(SystemClock.elapsedRealtime()) > 0) {
-            scheduleCheck()
-            return
-        }
+    fun attach(host: Activity){activity=host;resumed=true;showPending()}
+
+    private fun check(endpoint: AppUpdateChecks.Endpoint = AppUpdateChecks.Endpoint.MANIFEST) {
+        if (closed || call != null) return
+        if(endpoint==AppUpdateChecks.Endpoint.API&&checks.delay(SystemClock.elapsedRealtime(),endpoint)>0)return
         val current = activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: return
-        val request = checks.request(current)
-        call = client.newCall(request).also { check ->
-            check.enqueue(object : Callback {
+        val request = checks.request(current, endpoint)
+        call = client.newCall(request).also { requestCall ->
+            requestCall.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     handler.post {
                         if (closed || this@AppUpdate.call !== call) return@post
                         this@AppUpdate.call = null
-                        checks.completed(SystemClock.elapsedRealtime())
-                        scheduleCheck()
+                        checks.completed(SystemClock.elapsedRealtime(), endpoint = endpoint)
+                        if (endpoint == AppUpdateChecks.Endpoint.MANIFEST) check(AppUpdateChecks.Endpoint.API)
                     }
                 }
 
                 override fun onResponse(call: Call, response: Response) {
                     var status: Int? = response.code
                     val headers = response.headers
-                    val release = try {
-                        response.use { AppRelease.parse(it.code, it.body.string(), current) }
+                    val result = try {
+                        response.use { AppRelease.check(it.code, if (it.code == 304) "" else it.body.string(), current) }
                     } catch (_: IOException) {
                         if (status == 200 || status == 304) status = null
-                        null
+                        AppRelease.Check(false, null)
                     }
+                    if (status == 200 && !result.valid) status = null
                     handler.post {
                         if (!closed && this@AppUpdate.call === call) {
                             this@AppUpdate.call = null
-                            checks.completed(SystemClock.elapsedRealtime(), status, headers, System.currentTimeMillis())
+                            checks.completed(SystemClock.elapsedRealtime(), status, headers, System.currentTimeMillis(), endpoint)
+                            if(status==200&&result.valid)checks.remember(endpoint,result.release)
+                            val release = result.release ?: if(status==304)checks.known(endpoint)?.takeIf{AppRelease.isNewer(it.version,current)} else null
                             if (release != null && release.version != shownVersion) pending = release
                             showPending()
-                            scheduleCheck()
+                            if (endpoint == AppUpdateChecks.Endpoint.MANIFEST && !result.valid) check(AppUpdateChecks.Endpoint.API)
                         }
                     }
                 }
@@ -79,6 +76,7 @@ class AppUpdate(private val activity: Activity) {
     }
 
     fun onResume() {
+        if(closed)return
         resumed = true
         showPending()
         check()
@@ -86,7 +84,6 @@ class AppUpdate(private val activity: Activity) {
 
     fun onPause() {
         resumed = false
-        handler.removeCallbacks(recheck)
     }
 
     private fun showPending() {
@@ -131,6 +128,7 @@ class AppUpdate(private val activity: Activity) {
 
     companion object {
         const val PROJECT_URL = AppRelease.PROJECT_URL
+        private val sharedChecks=AppUpdateChecks()
         private val client = OkHttpClient.Builder().callTimeout(15, TimeUnit.SECONDS).build()
     }
 }

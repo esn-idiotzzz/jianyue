@@ -41,7 +41,7 @@ android {
         }
 
         versionCode = 17
-        versionName = "3.6.1"
+        versionName = "3.7.0"
 
         buildConfigField("boolean", "TELEMETRY_INCLUDED", "${Config.includeTelemetry}")
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")

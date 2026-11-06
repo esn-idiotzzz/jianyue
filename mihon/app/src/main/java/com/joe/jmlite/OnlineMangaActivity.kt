@@ -440,9 +440,13 @@ class OnlineMangaActivity : Activity() {
     private fun downloadChapters(ids: List<Long>) {
         val result = details ?: return
         if (ids.isEmpty()) return
-        Toast.makeText(this, "正在加入下载队列…", Toast.LENGTH_SHORT).show()
         scope.launch {
             try {
+                if(applicationContext.appGraph.downloadManager.getDownloadCount(result.manga)>0){
+                    val existing=withContext(Dispatchers.IO){Library(this@OnlineMangaActivity).find("$sourceId|$mangaUrl")}
+                    if(existing!=null){DownloadCollision.show(this@OnlineMangaActivity,existing);return@launch}
+                }
+                Toast.makeText(this@OnlineMangaActivity,"正在加入下载队列…",Toast.LENGTH_SHORT).show()
                 val count = OnlineRepository.download(this@OnlineMangaActivity, result.manga.id, ids)
                 Toast.makeText(
                     this@OnlineMangaActivity,

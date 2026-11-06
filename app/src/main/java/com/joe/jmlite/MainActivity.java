@@ -86,8 +86,8 @@ public final class MainActivity extends Activity {
     private boolean dragMoved,taskShown;
     private float dragX,dragY;
     private ValueAnimator actionAnimator;
-    private AppUpdate appUpdate;
     private FirstRunGuide firstRunGuide;
+    private boolean privateShelf;
     private PredictiveBack predictiveBack;
     private TextView localComicHint;
     private Runnable localComicHintDismiss;
@@ -116,13 +116,13 @@ public final class MainActivity extends Activity {
         FrameLayout stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
         nav=u.row();nav.setClickable(true);nav.setGravity(Gravity.CENTER);nav.setPadding(u.dp(6),u.dp(5),u.dp(6),u.dp(5));GradientDrawable navBg=u.shape(u.card,28);navBg.setStroke(u.dp(1),u.dark?0x1affffff:0x0d000000);nav.setBackground(navBg);nav.setElevation(u.dp(10));nav.setClipToOutline(true);
         downloadNav=new NavItem(0,"download","下载");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
-        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(14);stage.addView(nav,capsule);setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());nav.setVisibility(keyboard?View.GONE:View.VISIBLE);return insets;});
-        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);nav.setVisibility(keyboard?View.GONE:View.VISIBLE);});
+        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(14);stage.addView(nav,capsule);setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());nav.setVisibility(keyboard||privateShelf?View.GONE:View.VISIBLE);return insets;});
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);nav.setVisibility(keyboard||privateShelf?View.GONE:View.VISIBLE);});
         buildTab();
-        appUpdate=new AppUpdate(this);
-        firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();if(resumed&&appUpdate!=null)appUpdate.onResume();});
-        predictiveBack=new PredictiveBack(this,root,()->firstRunGuide==null||!firstRunGuide.isShowing(),()->!shelfSearch.isExpanded()&&(tab!=1||folderId.isEmpty()),this::onBackPressed);
-        shelfSearch.setOnExpansionChanged(()->{if(predictiveBack!=null)predictiveBack.refresh();});
+        firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();ForegroundUpdates.checkAfterGuide();});
+        predictiveBack=new PredictiveBack(this,root,()->firstRunGuide==null||!firstRunGuide.isShowing(),()->!shelfSearch.isExpanded()&&(tab!=1||(!privateShelf&&folderId.isEmpty())),this::onBackPressed);
+        handleShelfJump(getIntent());
+        shelfSearch.setOnExpansionChanged(()->{if(privateShelf)plus.setVisibility(View.GONE);if(predictiveBack!=null)predictiveBack.refresh();});
     }
     private final class NavItem extends LinearLayout {
         final Ui.Icon icon;final TextView label;final int index;
@@ -134,11 +134,11 @@ public final class MainActivity extends Activity {
         }
         void active(boolean on){icon.color(on?Ui.BLUE:u.muted);label.setTextColor(on?Ui.BLUE:u.muted);u.round(this,on?u.tint:Color.TRANSPARENT,23);setSelected(on);}
     }
-    private void switchTab(int next){if(tab==next)return;if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();}
+    private void switchTab(int next){if(tab==next&&!privateShelf)return;privateShelf=false;library=new Library(this);if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();}
     private void buildTab(){
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
         content.removeAllViews();input=null;searchInput=null;taskCard=null;actionSlot=null;downloadActions=null;taskAction=null;taskShown=false;list=null;grid=null;adapter=null;shelfAdapter=null;onlineAdapter=null;rowsSnapshot="";
-        shelfSearch.setVisible(tab==1);title.setText(tab==0?"下载":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1&&!shelfSearch.isExpanded()?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&!folderId.isEmpty()?View.VISIBLE:View.GONE);
+        shelfSearch.setVisible(tab==1);title.setText(tab==0?"下载":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1&&!privateShelf&&!shelfSearch.isExpanded()?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&(privateShelf||!folderId.isEmpty())?View.VISIBLE:View.GONE);
         repoHint.setVisibility(tab==3?View.VISIBLE:View.GONE);repositoryNav.active(tab==3);downloadNav.active(tab==0);localNav.active(tab==1);onlineNav.active(tab==2);
         if(tab==0)buildDownload();else if(tab==1)buildShelf();else if(tab==3)content.addView(RepositoryPanel.create(this),new LinearLayout.LayoutParams(-1,-1));else buildOnline();render();
         if(tab==2&&resumed)refresh(true);
@@ -177,7 +177,7 @@ public final class MainActivity extends Activity {
     }
     private void buildShelf(){
         FrameLayout frame=new FrameLayout(this);grid=new GridView(this);grid.setId(1005);grid.setNumColumns(Math.max(3,Math.min(6,getResources().getConfiguration().screenWidthDp/120)));grid.setHorizontalSpacing(u.dp(12));grid.setVerticalSpacing(u.dp(18));grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);grid.setPadding(u.dp(20),u.dp(6),u.dp(20),u.dp(88));grid.setClipToPadding(false);grid.setSelector(android.R.color.transparent);shelfAdapter=new ShelfAdapter();grid.setAdapter(shelfAdapter);frame.addView(grid,new FrameLayout.LayoutParams(-1,-1));
-        emptyShelf=u.text(tab==2?"暂无浏览记录":"书架还空着",15,u.muted,false);emptyShelf.setVisibility(tab==2?View.GONE:View.VISIBLE);emptyShelf.setGravity(Gravity.CENTER);frame.addView(emptyShelf,new FrameLayout.LayoutParams(-1,-1));emptyShelf.setOnClickListener(v->{if(tab==1)importMenu();});content.addView(frame,new LinearLayout.LayoutParams(-1,0,1));
+        emptyShelf=u.text(tab==2?"暂无浏览记录":"书架还空着",15,u.muted,false);emptyShelf.setVisibility(tab==2?View.GONE:View.VISIBLE);emptyShelf.setGravity(Gravity.CENTER);frame.addView(emptyShelf,new FrameLayout.LayoutParams(-1,-1));emptyShelf.setOnClickListener(v->{if(tab==1&&!privateShelf)importMenu();});if(tab==1&&!privateShelf)attachPrivacyPull(frame);content.addView(frame,new LinearLayout.LayoutParams(-1,0,1));
         grid.setClipChildren(false);
         grid.setOnDragListener((v,e)->{
             if(draggingBook==null)return false;
@@ -203,8 +203,24 @@ public final class MainActivity extends Activity {
             }
         });
     }
-    private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return "书架";}
-    private void leaveFolder(){String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");folderId=parent;buildTab();}
+    private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return privateShelf?"隐私书架":"书架";}
+    private void leaveFolder(){if(folderId.isEmpty()&&privateShelf){setPrivateShelf(false);return;}String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");folderId=parent;buildTab();}
+
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleShelfJump(intent);}
+    private void handleShelfJump(Intent intent){String key=intent.getStringExtra("shelf_jump");if(key==null)return;intent.removeExtra("shelf_jump");Runnable jump=()->disk.execute(()->{try{JSONObject book=new Library(this).find(key);runOnUiThread(()->{if(book==null||isDestroyed())return;Runnable navigate=()->{tab=1;setPrivateShelf(book.optBoolean("privacy"));folderId=book.optString("folder");buildTab();refresh(true);};if(book.optBoolean("privacy"))PrivacyVault.enter(this,navigate);else navigate.run();});}catch(Exception e){runOnUiThread(()->toast("书籍已不存在"));}});if(intent.getBooleanExtra("shelf_private",false))PrivacyVault.enter(this,jump);else jump.run();}
+    private void setPrivateShelf(boolean hidden){privateShelf=hidden;library=new Library(this,hidden);folderId="";shelfSearch.collapse();libraryBooks.clear();bookFolders.clear();rowsSnapshot="";buildTab();refresh(true);}
+    private void transferPrivacy(JSONObject book,boolean folder){Runnable move=()->mutate(()->library.transfer(folder?book.optString("id"):Library.key(book),folder,!privateShelf));if(privateShelf)move.run();else PrivacyVault.beforeFirstMove(this,move);}
+    private void attachPrivacyPull(FrameLayout frame){
+        final GridView pullGrid=grid;final TextView pullEmpty=emptyShelf;
+        final float[] start={-1},distance={0};final boolean[] pulling={false};final float threshold=getResources().getDisplayMetrics().heightPixels/3f;
+        PrivacyPull ring=new PrivacyPull(this);frame.addView(ring,new FrameLayout.LayoutParams(-1,0,Gravity.TOP));
+        View.OnTouchListener pullListener=(v,event)->{if(draggingBook!=null||!folderId.isEmpty()||shelfSearch.isExpanded())return false;
+            if(event.getActionMasked()==MotionEvent.ACTION_DOWN){start[0]=event.getRawY();pulling[0]=false;return false;}
+            if(event.getActionMasked()==MotionEvent.ACTION_MOVE&&start[0]>=0){float delta=event.getRawY()-start[0];boolean top=pullGrid.getFirstVisiblePosition()==0&&(pullGrid.getChildCount()==0||pullGrid.getChildAt(0).getTop()>=pullGrid.getPaddingTop());if(!pulling[0]&&top&&delta>u.dp(12)){pulling[0]=true;MotionEvent cancel=MotionEvent.obtain(event);cancel.setAction(MotionEvent.ACTION_CANCEL);v.onTouchEvent(cancel);cancel.recycle();}if(pulling[0]){distance[0]=Math.max(0,Math.min(threshold,delta));ring.progress=distance[0]/threshold;ring.getLayoutParams().height=(int)distance[0];ring.requestLayout();ring.invalidate();pullGrid.setTranslationY(distance[0]);pullEmpty.setTranslationY(distance[0]);return true;}}
+            if(event.getActionMasked()==MotionEvent.ACTION_UP||event.getActionMasked()==MotionEvent.ACTION_CANCEL){boolean complete=event.getActionMasked()==MotionEvent.ACTION_UP&&distance[0]>=threshold;start[0]=-1;if(pulling[0]){pulling[0]=false;ValueAnimator a=ValueAnimator.ofFloat(distance[0],0);a.setDuration(180);a.addUpdateListener(anim->{float value=(float)anim.getAnimatedValue();ring.progress=value/threshold;ring.getLayoutParams().height=(int)value;ring.requestLayout();ring.invalidate();pullGrid.setTranslationY(value);pullEmpty.setTranslationY(value);});a.start();distance[0]=0;if(complete)PrivacyVault.enter(this,()->setPrivateShelf(true));return true;}}return false;};pullGrid.setOnTouchListener(pullListener);pullEmpty.setOnTouchListener(pullListener);
+    }
+    private static final class PrivacyPull extends View {float progress;final android.graphics.Paint pen=new android.graphics.Paint(3);PrivacyPull(android.content.Context c){super(c);}protected void onDraw(Canvas canvas){float density=getResources().getDisplayMetrics().density,radius=15*density,x=getWidth()/2f,y=getHeight()/2f;pen.setStyle(android.graphics.Paint.Style.STROKE);pen.setStrokeWidth(3*density);pen.setColor(0x223478f6);canvas.drawCircle(x,y,radius,pen);pen.setColor(Ui.BLUE);pen.setStrokeCap(android.graphics.Paint.Cap.ROUND);canvas.drawArc(new android.graphics.RectF(x-radius,y-radius,x+radius,y+radius),-90,360*progress,false,pen);}}
+
     private void togglePrivacy(){revealed=!revealed;prefs.edit().putBoolean("history_revealed",revealed).apply();eye.kind(revealed?"eye":"eye-off");eye.setContentDescription(revealed?"隐藏封面和书名":"显示封面和书名");rowsSnapshot="";render();}
     private void download() {
         if(starting)return;
@@ -214,7 +230,7 @@ public final class MainActivity extends Activity {
         draft=input.getText().toString();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},42);
         starting=true;
-        disk.execute(()->{try{JSONObject b=store.read(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null&&"complete".equals(b.optString("status"))){open(b);return;}beginDownload(id,"已开始下载");});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
+        disk.execute(()->{try{JSONObject b=new Library(this).findLocalDownload(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null){DownloadCollision.show(this,b);return;}beginDownload(id,"已开始下载");});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
     }
     private void online(){
         final String id;try{id=JmApi.parseId(input.getText().toString());}catch(IllegalArgumentException e){input.setError("请输入有效编号或 JM 链接");return;}
@@ -378,22 +394,23 @@ public final class MainActivity extends Activity {
         TextView flabel=u.text(favorite?"已收藏":"收藏",13,u.muted,true);flabel.setPadding(u.dp(7),0,0,0);fav.addView(flabel);
         FavoriteStyle.paint(u,heart,fav,flabel,favorite);
         head.addView(fav,new LinearLayout.LayoutParams(-2,u.dp(38)));
-        AlertDialog dlg=PredictiveBack.dialog(this).setCustomTitle(head).setItems(new String[]{"重命名书籍","书籍分类","删除","分享"},(d,n)->{if(n==0)nameDialog("重命名书籍",b.optString("title"),name->mutate(()->library.rename(b.optString("key"),name)));else if(n==1)classify(b);else if(n==2)confirmDelete(b,false);else share(b);}).create();
+        AlertDialog dlg=PredictiveBack.dialog(this).setCustomTitle(head).setItems(new String[]{"重命名书籍","书籍分类","删除","分享",privateShelf?"从隐私书架移除":"添加到隐私书架"},(d,n)->{if(n==0)nameDialog("重命名书籍",b.optString("title"),name->mutate(()->library.rename(b.optString("key"),name)));else if(n==1)classify(b);else if(n==2)confirmDelete(b,false);else if(n==3)share(b);else transferPrivacy(b,false);}).create();
         fav.setOnClickListener(v->{dlg.dismiss();setFavorite(b,!favorite);});
         dlg.show();
     }
     private void manageOnlineBook(JSONObject b){
-        boolean fav=false;for(JSONObject saved:libraryBooks)if(Library.key(saved).equals(b.optString("key")))fav=true;final boolean favorite=fav;
+        boolean fav=false;for(JSONObject saved:libraryBooks)if(Library.key(saved).equals(b.optString("key")))fav=saved.optBoolean("favorite",true);final boolean favorite=fav;
         String caption=b.optString("title")+(OnlineHistory.isJm(b)?"\n编号："+b.optString("url"):"");
-        PredictiveBack.dialog(this).setTitle(caption).setItems(new String[]{favorite?"♥ 取消收藏":"♡ 收藏", "重命名书籍","书籍分类","删除"},(d,n)->{
+        PredictiveBack.dialog(this).setTitle(caption).setItems(tab==1?new String[]{favorite?"♥ 取消收藏":"♡ 收藏", "重命名书籍","书籍分类","删除",privateShelf?"从隐私书架移除":"添加到隐私书架"}:new String[]{favorite?"♥ 取消收藏":"♡ 收藏", "重命名书籍","书籍分类","删除"},(d,n)->{
             if(n==0)mutate(()->library.favoriteOnline(b,!favorite));
             else if(n==1)nameDialog("重命名书籍",b.optString("title"),name->mutate(()->{b.put("title",name).put("customTitle",name);new OnlineHistory(this,OnlineHistory.isJm(b)).save(b);if(favorite)library.rename(b.optString("key"),name);}));
-            else if(n==2){if(favorite)classify(b);else {operation=true;disk.execute(()->{try{library.favoriteOnline(b,true);runOnUiThread(()->{operation=false;refresh();classify(b);});}catch(Exception e){runOnUiThread(()->{operation=false;toast("分类失败");});}});}}
-            else if(n==3)PredictiveBack.dialog(this).setTitle("移除这本漫画？").setMessage("移出历史和在线书架，已下载图片保留。").setNegativeButton("取消",null).setPositiveButton("移除",(x,y)->mutate(()->{new OnlineHistory(this,OnlineHistory.isJm(b)).remove(b.optString("sourceId"),b.optString("url"));library.favoriteOnline(b,false);})).show();
+            else if(n==2){if(tab==1||favorite)classify(b);else {operation=true;disk.execute(()->{try{library.favoriteOnline(b,true);runOnUiThread(()->{operation=false;refresh();classify(b);});}catch(Exception e){runOnUiThread(()->{operation=false;toast("分类失败");});}});}}
+            else if(n==4&&tab==1)transferPrivacy(b,false);
+            else if(n==3)PredictiveBack.dialog(this).setTitle("移除这本漫画？").setMessage("移出历史和在线书架，已下载图片保留。").setNegativeButton("取消",null).setPositiveButton("移除",(x,y)->mutate(()->{new OnlineHistory(this,OnlineHistory.isJm(b)).remove(b.optString("sourceId"),b.optString("url"));library.delete(b.optString("key"));})).show();
         }).show();
     }
     private String plate(JSONObject b){String type=b.optString("type");if("import".equals(type))return "本地导入";if("tree".equals(type))return "本地文件夹";return b.optString("id","—");}
-    private boolean isFavorite(JSONObject b){for(JSONObject f:bookFolders)if("favorites".equals(f.optString("system"))||Library.FAVORITES.equals(f.optString("title")))return f.optString("id").equals(b.optString("folder"));return false;}
+    private boolean isFavorite(JSONObject b){if(b.optBoolean("favorite"))return true;for(JSONObject f:bookFolders)if("favorites".equals(f.optString("system"))||Library.FAVORITES.equals(f.optString("title")))return f.optString("id").equals(b.optString("folder"));return false;}
     private void setFavorite(JSONObject b,boolean favorite){
         if(operation){toast("请等待当前操作完成");return;}operation=true;
         disk.execute(()->{String error=null;try{library.favorite(b.optString("key"),favorite);}catch(Exception e){error=e.getMessage();}
@@ -403,19 +420,20 @@ public final class MainActivity extends Activity {
         String parent=f.optString("parent");int index=-1,count=0;
         for(JSONObject item:bookFolders)if(parent.equals(item.optString("parent"))){if(f.optString("id").equals(item.optString("id")))index=count;count++;}
         boolean canUp=index>0,canDown=index>=0&&index<count-1;
-        ArrayList<String> items=new ArrayList<>();items.add("重命名书籍夹");if(canUp)items.add("上移");if(canDown)items.add("下移");items.add("删除书籍夹");
+        ArrayList<String> items=new ArrayList<>();items.add("重命名书籍夹");if(canUp)items.add("上移");if(canDown)items.add("下移");items.add("删除书籍夹");items.add(privateShelf?"从隐私书架移除":"添加到隐私书架");
         PredictiveBack.dialog(this).setTitle(f.optString("title")).setItems(items.toArray(new String[0]),(d,n)->{
             String action=items.get(n);
             if("重命名书籍夹".equals(action))nameDialog("重命名书籍夹",f.optString("title"),name->mutate(()->library.renameFolder(f.optString("id"),name)));
             else if("上移".equals(action))mutate(()->library.moveFolder(f.optString("id"),-1));
             else if("下移".equals(action))mutate(()->library.moveFolder(f.optString("id"),1));
+            else if(action.equals("添加到隐私书架")||action.equals("从隐私书架移除"))transferPrivacy(f,true);
             else PredictiveBack.dialog(this).setTitle("删除书籍夹？").setMessage("夹内书籍会回到书架。").setNegativeButton("取消",null).setPositiveButton("删除",(x,y)->mutate(()->library.deleteFolder(f.optString("id")))).show();
         }).show();
     }
     private interface Named {void run(String name);}
     private interface DiskAction {void run()throws Exception;}
     private void nameDialog(String caption,String value,Named done){EditText edit=new EditText(this);edit.setSingleLine(true);edit.setTextSize(16);edit.setText(value);edit.setSelectAllOnFocus(true);Ui.clearable(edit);LinearLayout box=u.column();box.setPadding(u.dp(24),u.dp(8),u.dp(24),0);box.addView(edit);AlertDialog d=PredictiveBack.dialog(this).setTitle(caption).setView(box).setNegativeButton("取消",null).setPositiveButton("确定",null).create();d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{String name=edit.getText().toString().trim();if(name.isEmpty()){edit.setError("请输入名称");return;}if(name.length()>100){edit.setError("名称最多 100 个字");return;}d.dismiss();done.run(name);}));d.show();edit.requestFocus();}
-    private void classify(JSONObject b){ArrayList<String> names=new ArrayList<>(),ids=new ArrayList<>();for(JSONObject f:bookFolders){names.add(f.optString("title"));ids.add(f.optString("id"));}names.add("＋ 创建书籍夹");if(!b.optString("folder").isEmpty())names.add("移回书架");PredictiveBack.dialog(this).setTitle("书籍分类").setItems(names.toArray(new String[0]),(d,n)->{if(n<ids.size())mutate(()->library.move(b.optString("key"),ids.get(n)));else if(n==ids.size())nameDialog("创建书籍夹","",name->mutate(()->library.moveToNewFolder(b.optString("key"),name,folderId)));else mutate(()->library.move(b.optString("key"),""));}).show();}
+    private void classify(JSONObject b){ArrayList<String> names=new ArrayList<>(),ids=new ArrayList<>();for(JSONObject f:bookFolders){names.add(f.optString("title"));ids.add(f.optString("id"));}names.add("＋ 创建书籍夹");if(!b.optString("folder").isEmpty())names.add(privateShelf?"移回隐私书架":"移回书架");PredictiveBack.dialog(this).setTitle("书籍分类").setItems(names.toArray(new String[0]),(d,n)->{if(n<ids.size())mutate(()->library.move(b.optString("key"),ids.get(n)));else if(n==ids.size())nameDialog("创建书籍夹","",name->mutate(()->library.moveToNewFolder(b.optString("key"),name,folderId)));else mutate(()->library.move(b.optString("key"),""));}).show();}
     private void confirmDelete(JSONObject b,boolean history){boolean tree="tree".equals(b.optString("type"));PredictiveBack.dialog(this).setTitle(history?"删除已下载图片？":tree?"移除这本书？":"删除这本书？").setMessage(tree?"原始文件夹和图片会保留。":"将删除本书及内置目录中的图片。").setNegativeButton("取消",null).setPositiveButton("确定",(d,n)->mutate(()->{if(DownloadService.running&&b.optString("id").equals(DownloadService.activeId))throw new IllegalStateException("请先暂停下载");library.delete(b.optString("key","download:"+b.optString("id")));})).show();}
     private void mutate(DiskAction action){if(operation){toast("请等待当前操作完成");return;}operation=true;disk.execute(()->{String error=null;boolean localComic=false;try{action.run();}catch(Library.LocalComicException e){localComic=true;}catch(Exception e){error=e.getMessage();}String msg=error;boolean rejectedLocal=localComic;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(rejectedLocal)showLocalComicHint();else if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);refresh();});});}
     private void share(JSONObject b){if(b.has("sourceId")){toast("在线漫画不提供分享");return;}if(Build.VERSION.SDK_INT<29&&checkSelfPermission("android.permission.WRITE_EXTERNAL_STORAGE")!=PackageManager.PERMISSION_GRANTED){pendingShare=b;requestPermissions(new String[]{"android.permission.WRITE_EXTERNAL_STORAGE"},44);return;}if(operation){toast("请等待当前操作完成");return;}toast("正在打包 CBZ…");operation=true;disk.execute(()->{try{Uri uri=library.exportCbz(b);runOnUiThread(()->{operation=false;if(isDestroyed())return;toast("已保存到 Download/jmshare");Intent send=new Intent(Intent.ACTION_SEND).setType("application/vnd.comicbook+zip").putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);send.setClipData(ClipData.newRawUri("CBZ",uri));try{startActivity(Intent.createChooser(send,"分享漫画"));}catch(Exception e){toast("CBZ 已保存到 Download/jmshare");}refresh();});}catch(Exception e){runOnUiThread(()->{operation=false;if(!isDestroyed())toast("分享失败："+e.getMessage());});}});}
@@ -478,7 +496,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 3.6.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL},(d,n)->{if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 3.7.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -489,11 +507,11 @@ public final class MainActivity extends Activity {
         localComicHintDismiss=()->hint.animate().alpha(0).translationY(u.dp(8)).setDuration(160).withEndAction(()->{if(localComicHint==hint)clearLocalComicHint();}).start();handler.postDelayed(localComicHintDismiss,3000-160);
     }
     private void clearLocalComicHint(){if(localComicHintDismiss!=null){handler.removeCallbacks(localComicHintDismiss);localComicHintDismiss=null;}if(localComicHint!=null){TextView hint=localComicHint;localComicHint=null;hint.animate().cancel();if(hint.getParent() instanceof ViewGroup)((ViewGroup)hint.getParent()).removeView(hint);}}
-    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);boolean showingGuide=firstRunGuide!=null&&firstRunGuide.showIfNeeded();if(predictiveBack!=null)predictiveBack.refresh();if(!showingGuide&&appUpdate!=null)appUpdate.onResume();}
-    @Override protected void onPause(){super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);if(appUpdate!=null)appUpdate.onPause();}
+    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(firstRunGuide!=null)firstRunGuide.showIfNeeded();if(predictiveBack!=null)predictiveBack.refresh();}
+    @Override protected void onPause(){super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
-    @Override protected void onDestroy(){resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();if(appUpdate!=null)appUpdate.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
-    @Override public void onBackPressed(){if(firstRunGuide!=null&&firstRunGuide.isShowing())return;if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&!folderId.isEmpty())leaveFolder();else super.onBackPressed();}
+    @Override protected void onDestroy(){resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
+    @Override public void onBackPressed(){if(firstRunGuide!=null&&firstRunGuide.isShowing())return;if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&(privateShelf||!folderId.isEmpty()))leaveFolder();else super.onBackPressed();}
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("draft",input==null?draft:input.getText().toString());b.putString("search",searchInput==null?searchDraft:searchInput.getText().toString());b.putString("folder",folderId);b.putString("task_id",taskId);}
     private final class OnlineAdapter extends BaseAdapter {
         public int getCount(){return onlineBooks.size();}public Object getItem(int p){return onlineBooks.get(p);}public long getItemId(int p){return p;}

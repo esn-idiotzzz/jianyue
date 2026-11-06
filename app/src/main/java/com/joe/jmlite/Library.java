@@ -25,10 +25,12 @@ public final class Library {
     private static final Object LOCK=new Object();
     private static final Set<String> IMPORTING=new HashSet<>();
     private final Context context;
+    private final boolean privateShelf;
     private final File root;
     private final AtomicFile metadata;
 
-    public Library(Context context){this.context=context.getApplicationContext();root=new File(this.context.getFilesDir(),"imports");metadata=new AtomicFile(new File(this.context.getFilesDir(),"library.json"));}
+    public Library(Context context){this(context,false);}
+    public Library(Context context,boolean privateShelf){this.privateShelf=privateShelf;this.context=context.getApplicationContext();root=new File(this.context.getFilesDir(),"imports");metadata=new AtomicFile(new File(this.context.getFilesDir(),"library.json"));}
     public static String key(JSONObject book){return book.optString("key",book.has("uri")?"tree:"+book.optString("uri"):"download:"+book.optString("id"));}
     public static String title(JSONObject book){return book.optString("title","未命名");}
     public static String folder(JSONObject book){return book.optString("folder","");}
@@ -46,15 +48,16 @@ public final class Library {
         for(int n=0;n<trees.length();n++){JSONObject item=trees.optJSONObject(n);if(item!=null&&item.has("uri")){JSONObject book=new JSONObject(item.toString());book.put("key","tree:"+item.getString("uri")).put("type","tree");result.add(book);}}
         JSONArray online=state.optJSONArray("online");if(online!=null)for(int n=0;n<online.length();n++)result.add(new JSONObject(online.getJSONObject(n).toString()).put("type","online"));
         JSONObject entries=state.optJSONObject("entries");
-        if(entries!=null)for(JSONObject book:result){JSONObject entry=entries.optJSONObject(key(book));if(entry!=null){if(entry.has("title"))book.put("title",entry.getString("title"));book.put("folder",entry.optString("folder"));}}
+        if(entries!=null)for(JSONObject book:result){JSONObject entry=entries.optJSONObject(key(book));if(entry!=null){if(entry.has("title"))book.put("title",entry.getString("title"));book.put("folder",entry.optString("folder")).put("privacy",entry.optBoolean("privacy")).put("favorite",entry.optBoolean("favorite",book.has("sourceId")));}}
         JSONArray saved=state.optJSONArray("bookOrder");if(saved!=null){ArrayList<String> available=new ArrayList<>(),order=new ArrayList<>();HashMap<String,JSONObject> byKey=new HashMap<>();for(JSONObject book:result){String key=key(book);available.add(key);byKey.put(key,book);}for(int n=0;n<saved.length();n++)order.add(saved.optString(n));result.clear();for(String key:ShelfOrder.restore(available,order))result.add(byKey.get(key));}
+        result.removeIf(book->book.optBoolean("privacy")!=privateShelf);
         return result;
     }
-    public List<JSONObject> folders() throws Exception {synchronized(LOCK){JSONObject state=read();migrateOnlineFolders(state);JSONArray folders=state.optJSONArray("folders");ArrayList<JSONObject> result=new ArrayList<>();if(folders!=null)for(int n=0;n<folders.length();n++)result.add(folders.getJSONObject(n));return result;}}
-    public JSONObject find(String key) throws Exception {for(JSONObject book:books())if(key.equals(key(book)))return book;return null;}
+    public List<JSONObject> folders() throws Exception {synchronized(LOCK){JSONObject state=read();migrateOnlineFolders(state);JSONArray folders=state.optJSONArray("folders");ArrayList<JSONObject> result=new ArrayList<>();if(folders!=null)for(int n=0;n<folders.length();n++)if(folders.getJSONObject(n).optBoolean("privacy")==privateShelf)result.add(folders.getJSONObject(n));return result;}}
+    public JSONObject find(String key) throws Exception {for(boolean hidden:new boolean[]{false,true})for(JSONObject book:new Library(context,hidden).books())if(key.equals(key(book)))return book;return null;}
     public void rename(String key,String name) throws Exception {name=name(name);synchronized(LOCK){JSONObject state=read();entry(state,key).put("title",name);write(state);}}
     public String createFolder(String name) throws Exception {return createFolder(name, "");}
-    public String createFolder(String name,String parent) throws Exception {name=name(name);synchronized(LOCK){JSONObject state=read();JSONArray folders=array(state,"folders");String id=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",id).put("title",name).put("parent",parent));write(state);return id;}}
+    public String createFolder(String name,String parent) throws Exception {name=name(name);synchronized(LOCK){JSONObject state=read();requireScope(state,parent);JSONArray folders=array(state,"folders");String id=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",id).put("title",name).put("parent",parent).put("privacy",privateShelf));write(state);return id;}}
     public static final String ONLINE_JM="在线JM漫画";
     public static final String ONLINE_WEB="在线全网漫画";
     private static final String ONLINE_JM_SYSTEM="online_jm";
@@ -75,13 +78,13 @@ public final class Library {
     }
     static void requirePlacement(JSONObject state,String key,String folderId) throws Exception {if(localBookKey(key)&&onlineFolder(state,folderId))throw new LocalComicException();}
     /** Preserve an existing favorite's title, parent folder and ordering under concurrent completions. */
-    public void ensureOnline(JSONObject record) throws Exception {synchronized(LOCK){String key=record.optString("key",OnlineHistory.key(record.optString("sourceId"),record.optString("url")));if(!hasOnline(key))favoriteOnline(record,true);}}
+    public void ensureOnline(JSONObject record) throws Exception {synchronized(LOCK){String key=record.optString("key",OnlineHistory.key(record.optString("sourceId"),record.optString("url")));JSONArray online=array(read(),"online");for(int n=0;n<online.length();n++)if(key.equals(online.getJSONObject(n).optString("key")))return;favoriteOnline(record,true);}}
     public void favoriteOnline(JSONObject record,boolean on) throws Exception {synchronized(LOCK){
-        JSONObject state=read();String key=record.optString("key",OnlineHistory.key(record.optString("sourceId"),record.optString("url")));if(on&&localBookKey(key))throw new LocalComicException();JSONArray old=array(state,"online"),next=new JSONArray();
+        JSONObject state=read();String key=record.optString("key",OnlineHistory.key(record.optString("sourceId"),record.optString("url")));if(on&&localBookKey(key))throw new LocalComicException();JSONObject savedEntry=state.optJSONObject("entries")==null?null:state.getJSONObject("entries").optJSONObject(key);if(savedEntry!=null&&savedEntry.optBoolean("privacy")){savedEntry.put("favorite",on);write(state);return;}JSONArray old=array(state,"online"),next=new JSONArray();
         for(int n=0;n<old.length();n++)if(!key.equals(old.getJSONObject(n).optString("key")))next.put(old.getJSONObject(n));
-        if(on){boolean jm=OnlineHistory.isJm(record);String system=jm?ONLINE_JM_SYSTEM:ONLINE_WEB_SYSTEM,title=jm?ONLINE_JM:ONLINE_WEB;String folder="";JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(system.equals(folders.getJSONObject(n).optString("system")))folder=folders.getJSONObject(n).optString("id");
-            if(folder.isEmpty()){folder=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",folder).put("title",title).put("system",system));}
-            next.put(new JSONObject(record.toString()).put("key",key).put("type","online"));entry(state,key).put("folder",folder);
+        if(on){boolean jm=OnlineHistory.isJm(record);String system=jm?ONLINE_JM_SYSTEM:ONLINE_WEB_SYSTEM,title=jm?ONLINE_JM:ONLINE_WEB;String folder="";JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(system.equals(folders.getJSONObject(n).optString("system"))&&folders.getJSONObject(n).optBoolean("privacy")==privateShelf)folder=folders.getJSONObject(n).optString("id");
+            if(folder.isEmpty()){folder=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",folder).put("title",title).put("system",system).put("privacy",privateShelf));}
+            next.put(new JSONObject(record.toString()).put("key",key).put("type","online"));entry(state,key).put("folder",folder).put("favorite",true);
         }else{JSONObject entries=state.optJSONObject("entries");if(entries!=null)entries.remove(key);}
         state.put("online",next);write(state);
     }}
@@ -97,7 +100,7 @@ public final class Library {
             if(entry==null||!legacy.equals(entry.optString("folder")))continue;
             boolean jm=OnlineHistory.isJm(record);String system=jm?ONLINE_JM_SYSTEM:ONLINE_WEB_SYSTEM,title=jm?ONLINE_JM:ONLINE_WEB;
             String target="";for(int i=0;i<folders.length();i++)if(system.equals(folders.getJSONObject(i).optString("system")))target=folders.getJSONObject(i).optString("id");
-            if(target.isEmpty()){target=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",target).put("title",title).put("system",system));}
+            if(target.isEmpty()){target=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",target).put("title",title).put("system",system).put("privacy",privateShelf));}
             entry.put("folder",target);changed=true;
         }
         if(changed){
@@ -107,17 +110,17 @@ public final class Library {
             write(state);
         }
     }
-    public boolean hasOnline(String key) throws Exception {synchronized(LOCK){JSONArray all=array(read(),"online");for(int n=0;n<all.length();n++)if(key.equals(all.getJSONObject(n).optString("key")))return true;return false;}}
+    public boolean hasOnline(String key) throws Exception {synchronized(LOCK){JSONObject state=read();JSONArray all=array(state,"online");for(int n=0;n<all.length();n++)if(key.equals(all.getJSONObject(n).optString("key"))){JSONObject entries=state.optJSONObject("entries");JSONObject e=entries==null?null:entries.optJSONObject(key);return e==null||e.optBoolean("favorite",true);}return false;}}
     public String favoriteFolderId(boolean create) throws Exception {
         synchronized(LOCK){
             JSONObject state=read();JSONArray folders=array(state,"folders");
-            for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if("favorites".equals(f.optString("system"))||FAVORITES.equals(f.optString("title")))return f.getString("id");}
+            for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(f.optBoolean("privacy")==privateShelf&&("favorites".equals(f.optString("system"))||FAVORITES.equals(f.optString("title"))))return f.getString("id");}
             if(!create)return "";
-            String id=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",id).put("title",FAVORITES).put("system","favorites"));write(state);return id;
+            String id=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",id).put("title",FAVORITES).put("system","favorites").put("privacy",privateShelf));write(state);return id;
         }
     }
-    public void favorite(String key,boolean on) throws Exception {if(on)move(key,favoriteFolderId(true));else move(key,"");}
-    public boolean isFavorite(JSONObject book) throws Exception {String id=favoriteFolderId(false);return !id.isEmpty()&&id.equals(book.optString("folder"));}
+    public void favorite(String key,boolean on) throws Exception {synchronized(LOCK){JSONObject state=read();JSONObject entries=state.optJSONObject("entries");JSONObject existing=entries==null?null:entries.optJSONObject(key);if(existing!=null&&existing.optBoolean("privacy")!=privateShelf){new Library(context,existing.optBoolean("privacy")).favorite(key,on);return;}}if(on)move(key,favoriteFolderId(true));else move(key,"");synchronized(LOCK){JSONObject state=read();entry(state,key).put("favorite",on);write(state);}}
+    public boolean isFavorite(JSONObject book) throws Exception {synchronized(LOCK){JSONObject state=read(),entries=state.optJSONObject("entries"),e=entries==null?null:entries.optJSONObject(key(book));if(e!=null){if(e.has("favorite"))return e.optBoolean("favorite");JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(e.optString("folder").equals(f.optString("id"))&&"favorites".equals(f.optString("system")))return true;}}}String id=favoriteFolderId(false);return book.optBoolean("favorite")||(!id.isEmpty()&&id.equals(book.optString("folder")));}
     public static final String FAVORITES="我的收藏";
     public void renameFolder(String id,String name) throws Exception {name=name(name);synchronized(LOCK){JSONObject state=read();JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(id.equals(folders.getJSONObject(n).optString("id"))){folders.getJSONObject(n).put("title",name);write(state);return;}throw new IOException("书籍夹不存在");}}
     /** Moves a folder one position among its siblings. */
@@ -125,8 +128,8 @@ public final class Library {
         JSONObject state=read();JSONArray folders=array(state,"folders");int index=-1;String parent="";
         for(int n=0;n<folders.length();n++)if(id.equals(folders.getJSONObject(n).optString("id"))){index=n;parent=folders.getJSONObject(n).optString("parent");break;}
         if(index<0)return false;
-        int sibling=-1;if(delta<0){for(int n=index-1;n>=0;n--)if(parent.equals(folders.getJSONObject(n).optString("parent"))){sibling=n;break;}}
-        else{for(int n=index+1;n<folders.length();n++)if(parent.equals(folders.getJSONObject(n).optString("parent"))){sibling=n;break;}}
+        int sibling=-1;if(delta<0){for(int n=index-1;n>=0;n--)if(parent.equals(folders.getJSONObject(n).optString("parent"))&&folders.getJSONObject(n).optBoolean("privacy")==privateShelf){sibling=n;break;}}
+        else{for(int n=index+1;n<folders.length();n++)if(parent.equals(folders.getJSONObject(n).optString("parent"))&&folders.getJSONObject(n).optBoolean("privacy")==privateShelf){sibling=n;break;}}
         if(sibling<0)return false;
         JSONObject a=folders.getJSONObject(index),b=folders.getJSONObject(sibling);folders.put(index,b);folders.put(sibling,a);write(state);return true;
     }}
@@ -147,27 +150,27 @@ public final class Library {
         if(source==null||target==null||!folder(source).equals(folder(target)))return false;
         ArrayList<String> siblings=new ArrayList<>();for(JSONObject book:all)if(folder(source).equals(folder(book)))siblings.add(key(book));
         List<String> ordered=ShelfOrder.insert(siblings,sourceKey,targetKey,after);JSONArray saved=new JSONArray();int n=0;for(JSONObject book:all)saved.put(folder(source).equals(folder(book))?ordered.get(n++):key(book));
-        JSONObject state=read();state.put("bookOrder",saved);write(state);return true;
+        JSONObject state=read();saveScopedOrder(state,saved);write(state);return true;
     }}
     /** One metadata transaction creates the folder and assigns exactly its two books. */
     public String mergeBooks(String sourceKey,String targetKey,String parent) throws Exception {synchronized(LOCK){
-        JSONObject state=read();requirePlacement(state,sourceKey,parent);requirePlacement(state,targetKey,parent);
+        JSONObject state=read();requireBookScope(state,sourceKey);requireBookScope(state,targetKey);requireScope(state,parent);requirePlacement(state,sourceKey,parent);requirePlacement(state,targetKey,parent);
         List<JSONObject> all=books();ArrayList<String> siblings=new ArrayList<>();for(JSONObject book:all)if(parent.equals(folder(book)))siblings.add(key(book));
         List<String> members=ShelfOrder.mergeMembers(siblings,sourceKey,targetKey);
-        state=read();String id=UUID.randomUUID().toString();array(state,"folders").put(new JSONObject().put("id",id).put("title","新建书夹").put("parent",parent));
+        state=read();String id=UUID.randomUUID().toString();array(state,"folders").put(new JSONObject().put("id",id).put("title","新建书夹").put("parent",parent).put("privacy",privateShelf));
         for(String key:members)entry(state,key).put("folder",id);
-        JSONArray saved=new JSONArray();int n=0;for(JSONObject book:all){String key=key(book);saved.put(members.contains(key)?members.get(n++):key);}state.put("bookOrder",saved);
+        JSONArray saved=new JSONArray();int n=0;for(JSONObject book:all){String key=key(book);saved.put(members.contains(key)?members.get(n++):key);}saveScopedOrder(state,saved);
         write(state);return id;
     }}
-    public void move(String key,String folderId) throws Exception {synchronized(LOCK){JSONObject state=read();if(!folderId.isEmpty()){boolean found=false;JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(folderId.equals(folders.getJSONObject(n).optString("id")))found=true;if(!found)throw new IOException("书籍夹不存在");}requirePlacement(state,key,folderId);entry(state,key).put("folder",folderId);write(state);}}
+    public void move(String key,String folderId) throws Exception {synchronized(LOCK){JSONObject state=read();if(!folderId.isEmpty()){boolean found=false;JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(folderId.equals(folders.getJSONObject(n).optString("id")))found=true;if(!found)throw new IOException("书籍夹不存在");}requireBookScope(state,key);requireScope(state,folderId);requirePlacement(state,key,folderId);entry(state,key).put("folder",folderId);write(state);}}
     public String moveToNewFolder(String key,String name,String parent) throws Exception {name=name(name);synchronized(LOCK){
-        JSONObject state=read();requirePlacement(state,key,parent);String id=UUID.randomUUID().toString();
-        array(state,"folders").put(new JSONObject().put("id",id).put("title",name).put("parent",parent));entry(state,key).put("folder",id);write(state);return id;
+        JSONObject state=read();requireBookScope(state,key);requireScope(state,parent);requirePlacement(state,key,parent);String id=UUID.randomUUID().toString();
+        array(state,"folders").put(new JSONObject().put("id",id).put("title",name).put("parent",parent).put("privacy",privateShelf));entry(state,key).put("folder",id);write(state);return id;
     }}
     public void deleteFolder(String id) throws Exception {synchronized(LOCK){JSONObject state=read();JSONArray old=array(state,"folders"),next=new JSONArray();for(int n=0;n<old.length();n++)if(!id.equals(old.getJSONObject(n).optString("id")))next.put(old.getJSONObject(n));state.put("folders",next);for(int n=0;n<next.length();n++)if(id.equals(next.getJSONObject(n).optString("parent")))next.getJSONObject(n).put("parent","");JSONObject entries=state.optJSONObject("entries");if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject entry=entries.optJSONObject(keys.next());if(entry!=null&&id.equals(entry.optString("folder")))entry.remove("folder");}}write(state);}}
     public void delete(String key) throws Exception {
         synchronized(LOCK){
-            if(bookKeyOnline(key)){favoriteOnline(new JSONObject().put("key",key),false);return;}
+            if(bookKeyOnline(key)){JSONObject state=read();JSONArray old=array(state,"online"),next=new JSONArray();for(int n=0;n<old.length();n++)if(!key.equals(old.getJSONObject(n).optString("key")))next.put(old.getJSONObject(n));state.put("online",next);JSONObject entries=state.optJSONObject("entries");if(entries!=null)entries.remove(key);write(state);return;}
             if(key.startsWith("download:")){String id=key.substring(9);if(DownloadService.running&&id.equals(DownloadService.activeId))throw new IOException("请先暂停下载");new Store(context).delete(id);}
             else if(key.startsWith("import:")){String uuid=key.substring(7);deleteTree(importDir(uuid),root);}
             else if(key.startsWith("tree:")){String uri=key.substring(5);JSONArray old=new JSONArray(context.getSharedPreferences("settings",Context.MODE_PRIVATE).getString("folders","[]")),next=new JSONArray();for(int n=0;n<old.length();n++){JSONObject item=old.getJSONObject(n);if(!uri.equals(item.optString("uri")))next.put(item);}context.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putString("folders",next.toString()).commit();}
@@ -176,7 +179,34 @@ public final class Library {
             if(key.startsWith("import:")){JSONArray old=array(state,"imports"),next=new JSONArray();for(int n=0;n<old.length();n++)if(!key.equals("import:"+old.getJSONObject(n).optString("uuid")))next.put(old.getJSONObject(n));state.put("imports",next);}write(state);
         }
     }
-    private boolean bookKeyOnline(String key)throws Exception{return hasOnline(key);}
+    private boolean bookKeyOnline(String key)throws Exception{synchronized(LOCK){JSONArray all=array(read(),"online");for(int n=0;n<all.length();n++)if(key.equals(all.getJSONObject(n).optString("key")))return true;return false;}}
+
+    private void saveScopedOrder(JSONObject state,JSONArray ordered)throws Exception {JSONArray combined=new JSONArray(),old=state.optJSONArray("bookOrder");JSONObject entries=state.optJSONObject("entries");if(old!=null)for(int n=0;n<old.length();n++){String key=old.optString(n);JSONObject e=entries==null?null:entries.optJSONObject(key);if((e!=null&&e.optBoolean("privacy"))!=privateShelf)combined.put(key);}for(int n=0;n<ordered.length();n++)combined.put(ordered.get(n));state.put("bookOrder",combined);}
+    private void requireBookScope(JSONObject state,String key)throws Exception {JSONObject entries=state.optJSONObject("entries"),e=entries==null?null:entries.optJSONObject(key);if((e!=null&&e.optBoolean("privacy"))!=privateShelf)throw new IOException("不能跨书架分类");}
+    private void requireScope(JSONObject state,String id)throws Exception {if(id.isEmpty())return;for(int n=0;n<array(state,"folders").length();n++){JSONObject f=array(state,"folders").getJSONObject(n);if(id.equals(f.optString("id"))&&f.optBoolean("privacy")!=privateShelf)throw new IOException("不能跨书架分类");}}
+    /** Transfer membership in one metadata transaction; media files are never copied or deleted. */
+    public void transfer(String key,boolean folder,boolean target)throws Exception {synchronized(LOCK){
+        JSONObject state=read();JSONArray folders=array(state,"folders");JSONObject entries=state.optJSONObject("entries");if(entries==null){entries=new JSONObject();state.put("entries",entries);}
+        if(folder){
+            HashSet<String> ids=new HashSet<>();ids.add(key);boolean changed=true;
+            while(changed){changed=false;for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(ids.contains(f.optString("parent"))&&ids.add(f.optString("id")))changed=true;}}
+            for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(ids.contains(f.optString("id"))){f.put("privacy",target);if(key.equals(f.optString("id")))f.put("parent","");}}
+            Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject e=entries.getJSONObject(keys.next());if(ids.contains(e.optString("folder")))e.put("privacy",target);}
+            JSONObject rootFolder=null;String counterpart="";
+            for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(key.equals(f.optString("id")))rootFolder=f;}
+            if(rootFolder!=null&&!rootFolder.optString("system").isEmpty())for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(!key.equals(f.optString("id"))&&f.optBoolean("privacy")==target&&rootFolder.optString("system").equals(f.optString("system")))counterpart=f.optString("id");}
+            if(!counterpart.isEmpty()){Iterator<String> members=entries.keys();while(members.hasNext()){JSONObject e=entries.getJSONObject(members.next());if(key.equals(e.optString("folder")))e.put("folder",counterpart);}JSONArray next=new JSONArray();for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(key.equals(f.optString("id")))continue;if(key.equals(f.optString("parent")))f.put("parent",counterpart);next.put(f);}state.put("folders",next);}
+        }else{
+            JSONObject e=entry(state,key);String destination="";String old=e.optString("folder");
+            for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(old.equals(f.optString("id"))){String system=f.optString("system");if("favorites".equals(system))e.put("favorite",true);if(!system.isEmpty()){
+                for(int j=0;j<folders.length();j++){JSONObject t=folders.getJSONObject(j);if(t.optBoolean("privacy")==target&&system.equals(t.optString("system")))destination=t.optString("id");}
+                if(destination.isEmpty()){destination=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",destination).put("system",system).put("title",f.optString("title")).put("privacy",target));}
+            }break;}}
+            e.put("privacy",target).put("folder",destination);
+        }write(state);
+    }}
+    public JSONObject findLocalDownload(String id)throws Exception {for(boolean hidden:new boolean[]{false,true})for(JSONObject b:new Library(context,hidden).books())if(("download:"+id).equals(key(b)))return b;return null;}
+
     public List<LocalImages.Page> pages(JSONObject book) throws Exception {
         String key=key(book);ArrayList<LocalImages.Page> result=new ArrayList<>();
         if(key.startsWith("download:"))for(File page:new Store(context).pages(key.substring(9)))result.add(new LocalImages.Page(Uri.fromFile(page).toString(),page.getName()));

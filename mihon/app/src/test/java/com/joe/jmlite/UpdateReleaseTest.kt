@@ -125,4 +125,36 @@ class UpdateReleaseTest {
             assertNull(AppRelease.parse(200, payload(assets = JsonArray(listOf(asset))), "3.3.0"))
         }
     }
+
+    @Test fun `same version valid manifest succeeds without offering an update`() {
+        val result = AppRelease.check(200, payload(tag = "v3.6.0"), "3.6.0")
+        assertTrue(result.valid)
+        assertNull(result.release)
+    }
+
+    @Test fun `older valid manifest also succeeds without falling back`() {
+        val result = AppRelease.check(200, payload(tag = "v3.5.0"), "3.6.0")
+        assertTrue(result.valid)
+        assertNull(result.release)
+    }
+
+    @Test fun `newer valid manifest preserves the canonical release and notes`() {
+        val result = AppRelease.check(200, payload(tag = "v3.7.0"), "3.6.0")
+        assertTrue(result.valid)
+        assertEquals("3.7.0", result.release?.version)
+        assertEquals("新增功能\n修复问题", result.release?.notes)
+    }
+
+    @Test fun `not modified manifest never requires api fallback`() {
+        val result = AppRelease.check(304, "", "3.6.0")
+        assertTrue(result.valid)
+        assertNull(result.release)
+    }
+
+    @Test fun `missing invalid or incomplete manifests permit api fallback`() {
+        assertFalse(AppRelease.check(404, "", "3.6.0").valid)
+        assertFalse(AppRelease.check(200, "not json", "3.6.0").valid)
+        assertFalse(AppRelease.check(200, payload(assets = JsonArray(emptyList())), "3.6.0").valid)
+        assertFalse(AppRelease.check(200, payload(url = "https://example.invalid"), "3.6.0").valid)
+    }
 }

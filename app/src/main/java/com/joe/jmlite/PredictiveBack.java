@@ -112,7 +112,7 @@ public final class PredictiveBack implements AutoCloseable {
             Window window=dialog.getWindow();View decor=window.getDecorView();
             decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
                 private PredictiveBack back;
-                @Override public void onViewAttachedToWindow(View view){view.post(()->{if(view.isAttachedToWindow()&&back==null)back=new PredictiveBack(activity,window,view,dialog::isShowing,()->true,dialog::cancel);});}
+                @Override public void onViewAttachedToWindow(View view){view.post(()->{if(!view.isAttachedToWindow())return;view.setAlpha(0);view.setScaleX(.97f);view.setScaleY(.97f);view.animate().alpha(1).scaleX(1).scaleY(1).setDuration(150).withEndAction(()->{if(view.isAttachedToWindow()&&back==null)back=new PredictiveBack(activity,window,view,dialog::isShowing,()->true,dialog::cancel);}).start();});}
                 @Override public void onViewDetachedFromWindow(View view){if(back!=null){back.close();back=null;}}
             });return dialog;
         }

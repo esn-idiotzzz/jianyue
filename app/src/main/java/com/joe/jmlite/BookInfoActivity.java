@@ -44,7 +44,7 @@ public final class BookInfoActivity extends Activity {
         try{book=raw==null?null:new JSONObject(raw);}catch(Exception e){book=null;}
         if(book==null){finish();return;}
         onlineJm=OnlineHistory.isJm(book);
-        key=Library.key(book);
+        key=Library.key(book);library=new Library(this,book.optBoolean("privacy"));
         LinearLayout root=u.column();root.setBackgroundColor(u.bg);
         FrameLayout header=new FrameLayout(this);
         Ui.Icon back=u.icon("back",u.ink);back.setContentDescription("返回");back.setOnClickListener(v->finish());u.round(back,Color.TRANSPARENT,22);
