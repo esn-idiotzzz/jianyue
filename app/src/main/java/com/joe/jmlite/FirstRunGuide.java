@@ -46,7 +46,7 @@ public final class FirstRunGuide implements AutoCloseable {
         LinearLayout content=ui.column();int screen=activity.getResources().getDisplayMetrics().heightPixels;
         int height=Math.min(ui.dp(420),Math.min((int)(screen*.52f),Math.max(0,screen-ui.dp(170))));
         content.addView(scroll,new LinearLayout.LayoutParams(-1,height));
-        final AlertDialog shown=new AlertDialog.Builder(activity).setTitle("首次使用 · 使用手册").setView(content)
+        final AlertDialog shown=PredictiveBack.dialog(activity).setTitle("首次使用 · 使用手册").setView(content)
                 .setCancelable(false).setPositiveButton("我已知晓",(d,which)->acknowledge()).create();
         dialog=shown;shown.setCanceledOnTouchOutside(false);shown.setOnShowListener(d->shown.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Ui.BLUE));shown.show();
         return true;

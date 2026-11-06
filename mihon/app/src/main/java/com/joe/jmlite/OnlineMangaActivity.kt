@@ -68,6 +68,7 @@ class OnlineMangaActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PageMotion.detail(this)
         ui = OnlineUi(this)
         sourceId = intent.getLongExtra("sourceId", 0L)
         mangaUrl = intent.getStringExtra("url").orEmpty()

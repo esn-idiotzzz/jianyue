@@ -109,20 +109,14 @@ final class Ui {
         }
     }
     void space(LinearLayout l, int n) { View v = new View(c); l.addView(v,new LinearLayout.LayoutParams(1,dp(n))); }
-    static void insets(Activity a, View root, boolean dark) {
-        Window w = a.getWindow(); w.setStatusBarColor(Color.TRANSPARENT); w.setNavigationBarColor(Color.TRANSPARENT);
-        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
-        if(!dark) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-        w.getDecorView().setSystemUiVisibility(flags);
-        root.setOnApplyWindowInsetsListener((v,i)->{ v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom()); return i; });
-    }
+    static void insets(Activity a, View root, boolean dark) {EdgeNavigation.install(a,root,dark);}
     static void readerBars(Window w, boolean fullscreen) {
         int flags=View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
-        if(fullscreen)flags|=View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        if(fullscreen)flags|=View.SYSTEM_UI_FLAG_FULLSCREEN;
         w.getDecorView().setSystemUiVisibility(flags);
         w.setStatusBarColor(Color.TRANSPARENT);w.setNavigationBarColor(Color.TRANSPARENT);
         if(android.os.Build.VERSION.SDK_INT>=28){android.view.WindowManager.LayoutParams p=w.getAttributes();p.layoutInDisplayCutoutMode=android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;w.setAttributes(p);}
         if(android.os.Build.VERSION.SDK_INT>=29)w.setNavigationBarContrastEnforced(false);
-        if(android.os.Build.VERSION.SDK_INT>=30){android.view.WindowInsetsController c=w.getInsetsController();if(c!=null){c.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);if(fullscreen)c.hide(android.view.WindowInsets.Type.systemBars());else c.show(android.view.WindowInsets.Type.systemBars());}}
+        if(android.os.Build.VERSION.SDK_INT>=30){android.view.WindowInsetsController c=w.getInsetsController();if(c!=null){c.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);if(fullscreen)c.hide(android.view.WindowInsets.Type.statusBars());else c.show(android.view.WindowInsets.Type.statusBars());c.show(android.view.WindowInsets.Type.navigationBars());}}
     }
 }

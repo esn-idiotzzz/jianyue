@@ -38,7 +38,7 @@ public final class BookInfoActivity extends Activity {
     private PredictiveBack predictiveBack;
 
     @Override protected void onCreate(Bundle state){
-        super.onCreate(state);
+        super.onCreate(state);PageMotion.detail(this);
         u=new Ui(this);library=new Library(this);covers=new CoverLoader(this);
         String raw=getIntent().getStringExtra("book");
         try{book=raw==null?null:new JSONObject(raw);}catch(Exception e){book=null;}

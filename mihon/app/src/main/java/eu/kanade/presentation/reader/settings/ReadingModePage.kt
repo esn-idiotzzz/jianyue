@@ -63,6 +63,7 @@ internal fun ColumnScope.ReadingModePage(viewModel: ReaderSettingsViewModel) {
     }
     if (confirmReset) {
         AlertDialog(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             onDismissRequest = { confirmReset = false },
             title = { Text("恢复默认设置") },
             text = { Text("将阅读模式、常规、滤镜中的设置全部恢复为默认值，此操作不可撤销。") },

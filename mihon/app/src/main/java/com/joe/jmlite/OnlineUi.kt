@@ -99,21 +99,5 @@ internal class OnlineUi(private val context: Context) {
 }
 
 internal fun applyOnlineInsets(activity: Activity, root: View, dark: Boolean) {
-    val window = activity.window
-    window.statusBarColor = Color.TRANSPARENT
-    window.navigationBarColor = Color.TRANSPARENT
-    var flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-    if (!dark) flags = flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-    window.decorView.systemUiVisibility = flags
-    root.setOnApplyWindowInsetsListener { view, insets ->
-        view.setPadding(
-            insets.systemWindowInsetLeft,
-            insets.systemWindowInsetTop,
-            insets.systemWindowInsetRight,
-            insets.systemWindowInsetBottom,
-        )
-        insets
-    }
+    EdgeNavigation.install(activity,root,dark)
 }

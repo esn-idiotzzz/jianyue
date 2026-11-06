@@ -95,6 +95,7 @@ private fun SetCoverDialog(
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         text = {
             Text(stringResource(MR.strings.confirm_set_image_as_cover))
         },

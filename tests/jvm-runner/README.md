@@ -52,13 +52,13 @@ and gesture cancellation, lifecycle cleanup, and stale navigation guards.
 `PredictiveBackTest` now has 14 cases, including immediate navigation at the gesture position,
 duplicate-commit prevention, temporary layer cleanup, and per-dialog window registration.
 
-It exits unsuccessfully unless all 228 cases pass. Output is saved beside the script as `results.log`.
+It exits unsuccessfully unless all 239 cases pass. Output is saved beside the script as `results.log`.
 These JVM tests do not prove Android UI, real extension loading, website availability, or device reading.
 
 The direct runner works around this machine's Gradle test-worker startup failure (`ClassNotFoundException: Test`).
 The precise worker command-line cause has not been established. The classpath-export task and this
 runner were both executed successfully for the previous 3.1.0 source: 53 tests passed, 0 failed.
-Re-run against the current source to verify all 228 cases, including the 3.6.1 regressions.
+Re-run against the current source to verify all 239 cases, including the 3.6.1 regressions.
 The exported classpath came from the actual AGP `testDebugUnitTest` task inputs.
 
 FeatureLogicTest adds 12 cases for ranking, confirmed-empty versus network errors/timeouts, and source popular browsing.
@@ -68,3 +68,7 @@ SourceBrowserTest adds 12 cases for selected-source resolution, popular browsing
 3.7.0 adds PrivacyShelfTest (13) for isolated membership, system-directory mapping, recursive folder transfers, classification rejection, independent sort persistence, and shared favorite state without relocation. Update lifecycle tests now verify one check on opening and host attachment without polling.
 
 3.7.1 adds PrivacyIntroductionTest (4) for the shared first-use decision across pull and move entry points, delayed actions and cancellation; SystemFolderNamesTest (4) for protected identities in both shelves, rejected writes and ordinary-folder renaming. These do not replace device touch/rendering checks.
+
+PrivacyRecoveryTest adds 6 cases for exact-code validation without unintended writes, clearing the PIN, preserving the first-use decision, and entry after recovery/session reset.
+
+FolderCoverIndexTest adds 5 cases for cached folder membership, visible-cover invalidation, count changes, immutable membership and cross-shelf snapshot isolation.

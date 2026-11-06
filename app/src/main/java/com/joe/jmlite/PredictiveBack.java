@@ -57,7 +57,7 @@ public final class PredictiveBack implements AutoCloseable {
         reset();gesturing=true;left=fromLeft;progress=0;
         width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
-        surface.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),view.getResources().getDisplayMetrics().density*20);}});
+        surface.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),view.getResources().getDisplayMetrics().density*(window==activity.getWindow()?20:16));}});
         surface.setClipToOutline(true);
         if(surface.isHardwareAccelerated()&&originalLayer==View.LAYER_TYPE_NONE)surface.setLayerType(View.LAYER_TYPE_HARDWARE,null);
     }
@@ -108,8 +108,15 @@ public final class PredictiveBack implements AutoCloseable {
         private boolean cancelable=true;
         @Override public AlertDialog.Builder setCancelable(boolean value){cancelable=value;return super.setCancelable(value);}
         @Override public AlertDialog create(){
-            AlertDialog dialog=super.create();if(!cancelable)return dialog;
-            Window window=dialog.getWindow();View decor=window.getDecorView();
+            AlertDialog dialog=super.create();Window window=dialog.getWindow();Ui ui=new Ui(activity);
+            android.util.TypedValue background=new android.util.TypedValue();int color=ui.card;
+            if(activity.getTheme().resolveAttribute(android.R.attr.colorBackgroundFloating,background,true))color=background.resourceId!=0?activity.getColor(background.resourceId):background.data;
+            window.setBackgroundDrawable(ui.shape(color,16));window.setNavigationBarColor(android.graphics.Color.TRANSPARENT);
+            if(Build.VERSION.SDK_INT>=28)window.setNavigationBarDividerColor(android.graphics.Color.TRANSPARENT);
+            if(Build.VERSION.SDK_INT>=29)window.setNavigationBarContrastEnforced(false);
+            View decor=window.getDecorView();androidx.core.view.WindowCompat.getInsetsController(window,decor).setAppearanceLightNavigationBars(androidx.core.view.WindowCompat.getInsetsController(activity.getWindow(),activity.getWindow().getDecorView()).isAppearanceLightNavigationBars());
+            decor.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),ui.dp(16));}});decor.setClipToOutline(true);
+            if(!cancelable)return dialog;
             decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
                 private PredictiveBack back;
                 @Override public void onViewAttachedToWindow(View view){view.post(()->{if(!view.isAttachedToWindow())return;view.setAlpha(0);view.setScaleX(.97f);view.setScaleY(.97f);view.animate().alpha(1).scaleX(1).scaleY(1).setDuration(150).withEndAction(()->{if(view.isAttachedToWindow()&&back==null)back=new PredictiveBack(activity,window,view,dialog::isShowing,()->true,dialog::cancel);}).start();});}

@@ -40,6 +40,7 @@ fun DropdownMenu(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ComposeDropdownMenu(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         expanded = expanded,
         onDismissRequest = onDismissRequest,
         modifier = modifier.sizeIn(minWidth = 196.dp, maxWidth = 196.dp),

@@ -42,6 +42,11 @@ object RepositoryPanel {
         val count=ui.text("",12,ui.muted).apply{setPadding(ui.dp(22),ui.dp(12),ui.dp(22),ui.dp(10))}
         root.addView(count)
         val list=ListView(activity).apply{divider=null;selector=ColorDrawable(Color.TRANSPARENT);setPadding(ui.dp(18),0,ui.dp(18),ui.dp(88));clipToPadding=false}
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(list){view,insets->
+            val bottom=ui.dp(88)+insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom
+            if(view.paddingBottom!=bottom)view.setPadding(view.paddingLeft,view.paddingTop,view.paddingRight,bottom)
+            insets
+        }
         root.addView(list,LinearLayout.LayoutParams(-1,0,1f))
         var shown=all
         fun favorite(item:JSONObject)=prefs.getBoolean(item.getString("id"),false)

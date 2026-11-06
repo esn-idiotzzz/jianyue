@@ -179,6 +179,8 @@ class ReaderActivity : BaseActivity() {
         }
 
         enableEdgeToEdge()
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= 28) window.navigationBarDividerColor = android.graphics.Color.TRANSPARENT
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
@@ -198,6 +200,10 @@ class ReaderActivity : BaseActivity() {
             val navigation = settingsViewModel.navigation.collectAsState().value
 
             val backgroundColor = remember(general.theme) { Color(baseContext.readerBackgroundColor(general.theme)) }
+            LaunchedEffect(general.theme) {
+                windowInsetsController.isAppearanceLightNavigationBars = androidx.core.graphics.ColorUtils.calculateLuminance(baseContext.readerBackgroundColor(general.theme)) > 0.5
+                windowInsetsController.show(WindowInsetsCompat.Type.navigationBars())
+            }
             val colorOverlayBlendMode = remember(colorOverlayMode) {
                 ReaderPreferences.ColorFilterMode.getOrNull(colorOverlayMode)?.second
             }
@@ -263,6 +269,7 @@ class ReaderActivity : BaseActivity() {
 
             if (state.isLoadingAdjacentChapter) {
                 AlertDialog(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     onDismissRequest = {},
                     confirmButton = {},
                     text = {
@@ -620,7 +627,8 @@ class ReaderActivity : BaseActivity() {
         if (visible) {
             windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
         } else if (readerPreferences.fullscreen.get()) {
-            windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+            windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
+            windowInsetsController.show(WindowInsetsCompat.Type.navigationBars())
         }
     }
 
