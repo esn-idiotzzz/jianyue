@@ -170,6 +170,7 @@ public final class Library {
     public void deleteFolder(String id) throws Exception {synchronized(LOCK){JSONObject state=read();JSONArray old=array(state,"folders"),next=new JSONArray();for(int n=0;n<old.length();n++)if(!id.equals(old.getJSONObject(n).optString("id")))next.put(old.getJSONObject(n));state.put("folders",next);for(int n=0;n<next.length();n++)if(id.equals(next.getJSONObject(n).optString("parent")))next.getJSONObject(n).put("parent","");JSONObject entries=state.optJSONObject("entries");if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject entry=entries.optJSONObject(keys.next());if(entry!=null&&id.equals(entry.optString("folder")))entry.remove("folder");}}write(state);}}
     public void delete(String key) throws Exception {
         synchronized(LOCK){
+            requireBookScope(read(),key);
             if(bookKeyOnline(key)){JSONObject state=read();JSONArray old=array(state,"online"),next=new JSONArray();for(int n=0;n<old.length();n++)if(!key.equals(old.getJSONObject(n).optString("key")))next.put(old.getJSONObject(n));state.put("online",next);JSONObject entries=state.optJSONObject("entries");if(entries!=null)entries.remove(key);write(state);return;}
             if(key.startsWith("download:")){String id=key.substring(9);if(DownloadService.running&&id.equals(DownloadService.activeId))throw new IOException("请先暂停下载");new Store(context).delete(id);}
             else if(key.startsWith("import:")){String uuid=key.substring(7);deleteTree(importDir(uuid),root);}

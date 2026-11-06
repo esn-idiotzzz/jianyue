@@ -94,4 +94,10 @@ class PrivacyShelfTest {
         assertTrue(library(state).isFavorite(JSONObject().put("key","download:1")))
         assertTrue(state.getJSONObject("entries").getJSONObject("download:1").getBoolean("privacy"))
     }
+    @Test fun `public delete actions cannot remove a private book or its media`(){
+        val state=state();state.getJSONObject("entries").put("download:1",JSONObject().put("privacy",true))
+        val lib=library(state)
+        assertThrows(java.io.IOException::class.java){lib.delete("download:1")}
+        verify(exactly=0){lib["write"](any<JSONObject>())}
+    }
 }

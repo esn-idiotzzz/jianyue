@@ -14,6 +14,7 @@ import java.security.SecureRandom;
 /** A process-session privacy gate; it does not encrypt comic media. */
 public final class PrivacyVault {
     private static boolean unlocked;
+    public static void resetSession(){unlocked=false;}
     private static SharedPreferences prefs(Context c){return c.getSharedPreferences("privacy_shelf",0);}
     public static void enter(Activity a,Runnable done){if(unlocked||prefs(a).getString("hash","").isEmpty()){unlocked=true;done.run();}else keypad(a,false,done);}
     public static void settings(Activity a){enter(a,()->keypad(a,true,()->{}));}
