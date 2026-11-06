@@ -18,12 +18,13 @@ public final class PrivacyVault {
     private static SharedPreferences prefs(Context c){return c.getSharedPreferences("privacy_shelf",0);}
     public static void enter(Activity a,Runnable done){if(unlocked||prefs(a).getString("hash","").isEmpty()){unlocked=true;done.run();}else keypad(a,false,done);}
     public static void settings(Activity a){enter(a,()->keypad(a,true,()->{}));}
-    public static void beforeFirstMove(Activity a,Runnable move){
+    public static void beforeFirstUse(Activity a,Runnable move){
         if(prefs(a).getBoolean("introduced",false)){move.run();return;}
         PredictiveBack.dialog(a).setTitle("隐私书架").setMessage("在书架界面下拉进入隐私书架，是否设置隐私密码？后续可自行点击仓库界面右上角小字设置")
             .setNegativeButton("暂不设置",(d,n)->{save(a,"");prefs(a).edit().putBoolean("introduced",true).apply();move.run();})
             .setPositiveButton("设置密码",(d,n)->keypad(a,true,()->{prefs(a).edit().putBoolean("introduced",true).apply();move.run();})).show();
     }
+    public static void enterFromShelf(Activity a,Runnable done){beforeFirstUse(a,()->enter(a,done));}
     private static String digest(String salt,String pin){try{byte[] bytes=MessageDigest.getInstance("SHA-256").digest((salt+":"+pin).getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:bytes)out.append(String.format(java.util.Locale.ROOT,"%02x",b&255));return out.toString();}catch(Exception e){throw new IllegalStateException(e);}}
     private static void save(Activity a,String pin){byte[] bytes=new byte[24];new SecureRandom().nextBytes(bytes);String salt=android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP);prefs(a).edit().putString("salt",salt).putString("hash",pin.isEmpty()?"":digest(salt,pin)).apply();unlocked=true;}
     private static void keypad(Activity a,boolean setting,Runnable done){
