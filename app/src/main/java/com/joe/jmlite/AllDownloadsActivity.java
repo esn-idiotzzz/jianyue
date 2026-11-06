@@ -66,7 +66,7 @@ public final class AllDownloadsActivity extends Activity {
                 LinearLayout text=ui.column();TextView name=ui.text("",14,ui.ink,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(name);ui.space(text,7);TextView info=ui.text("",11,ui.muted,false);text.addView(info);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(ui.dp(14),0,0,0);body.addView(text,lp);row=new Row(outer,image,name,info);outer.setTag(row);
             }
             row.name.setText(book.optString("title","未命名"));row.info.setText((book.has("sourceId")&&!OnlineHistory.isJm(book)?book.optString("sourceName","全网漫画"):"JM"+book.optString("id"))+" · "+DownloadRecordActions.summary(book));
-            if(book.has("sourceId")&&!OnlineHistory.isJm(book)&&book.optString("thumbnail").startsWith("https://")){covers.clear(row.image);RemoteCovers.load(row.image,book.optString("thumbnail"),book.optLong("sourceId"));}else{RemoteCovers.load(row.image,"",0L);covers.load(row.image,book);}
+            if(book.has("sourceId")&&!OnlineHistory.isJm(book)){covers.clear(row.image);RemoteCovers.load(row.image,book.optString("thumbnail"),book.optLong("sourceId"));}else{RemoteCovers.load(row.image,"",0L);covers.load(row.image,book);}
             return row.root;
         }
     }
