@@ -87,6 +87,10 @@ public final class MainActivity extends Activity {
     private float dragX,dragY;
     private ValueAnimator actionAnimator;
     private AppUpdate appUpdate;
+    private FirstRunGuide firstRunGuide;
+    private PredictiveBack predictiveBack;
+    private TextView localComicHint;
+    private Runnable localComicHintDismiss;
     private final Runnable poll=new Runnable(){public void run(){refresh();if(resumed&&DownloadService.running)handler.postDelayed(this,1800);}};
     private final Runnable downloadRefresh=()->{boolean force=forceDownloadRefresh;forceDownloadRefresh=false;if(resumed)refresh(force);};
     private final BroadcastReceiver downloadChanges=new BroadcastReceiver(){
@@ -116,6 +120,9 @@ public final class MainActivity extends Activity {
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);nav.setVisibility(keyboard?View.GONE:View.VISIBLE);});
         buildTab();
         appUpdate=new AppUpdate(this);
+        firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();if(resumed&&appUpdate!=null)appUpdate.onResume();});
+        predictiveBack=new PredictiveBack(this,root,()->(firstRunGuide==null||!firstRunGuide.isShowing())&&((shelfSearch!=null&&shelfSearch.isExpanded())||(tab==1&&!folderId.isEmpty())),this::onBackPressed);
+        shelfSearch.setOnExpansionChanged(()->{if(predictiveBack!=null)predictiveBack.refresh();});
     }
     private final class NavItem extends LinearLayout {
         final Ui.Icon icon;final TextView label;final int index;
@@ -135,6 +142,7 @@ public final class MainActivity extends Activity {
         repoHint.setVisibility(tab==3?View.VISIBLE:View.GONE);repositoryNav.active(tab==3);downloadNav.active(tab==0);localNav.active(tab==1);onlineNav.active(tab==2);
         if(tab==0)buildDownload();else if(tab==1)buildShelf();else if(tab==3)content.addView(RepositoryPanel.create(this),new LinearLayout.LayoutParams(-1,-1));else buildOnline();render();
         if(tab==2&&resumed)refresh(true);
+        if(predictiveBack!=null)predictiveBack.refresh();
     }
     private void buildDownload(){
         list=new ListView(this);list.setDivider(null);list.setSelector(android.R.color.transparent);list.setClipToPadding(false);list.setPadding(u.dp(20),0,u.dp(20),u.dp(88));
@@ -261,7 +269,7 @@ public final class MainActivity extends Activity {
         reading=true;
         disk.execute(()->{
             try{
-                List<JSONObject> result=store.list(),local=library.books(),folders=library.folders(),online=new OnlineHistory(this,jm).list(),downloads=new DownloadHistory(this).list(3);
+                List<JSONObject> result=store.list(),local=library.books(result),folders=library.folders(),online=new OnlineHistory(this,jm).list(),downloads=new DownloadHistory(this).list(3);
                 runOnUiThread(()->{
                     if(isDestroyed()||generation!=refreshGeneration)return;
                     // This generation owns the latch even if the JM/全网 tab changed while it ran.
@@ -407,9 +415,9 @@ public final class MainActivity extends Activity {
     private interface Named {void run(String name);}
     private interface DiskAction {void run()throws Exception;}
     private void nameDialog(String caption,String value,Named done){EditText edit=new EditText(this);edit.setSingleLine(true);edit.setTextSize(16);edit.setText(value);edit.setSelectAllOnFocus(true);Ui.clearable(edit);LinearLayout box=u.column();box.setPadding(u.dp(24),u.dp(8),u.dp(24),0);box.addView(edit);AlertDialog d=new AlertDialog.Builder(this).setTitle(caption).setView(box).setNegativeButton("取消",null).setPositiveButton("确定",null).create();d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{String name=edit.getText().toString().trim();if(name.isEmpty()){edit.setError("请输入名称");return;}if(name.length()>100){edit.setError("名称最多 100 个字");return;}d.dismiss();done.run(name);}));d.show();edit.requestFocus();}
-    private void classify(JSONObject b){ArrayList<String> names=new ArrayList<>(),ids=new ArrayList<>();for(JSONObject f:bookFolders){names.add(f.optString("title"));ids.add(f.optString("id"));}names.add("＋ 创建书籍夹");if(!b.optString("folder").isEmpty())names.add("移回书架");new AlertDialog.Builder(this).setTitle("书籍分类").setItems(names.toArray(new String[0]),(d,n)->{if(n<ids.size())mutate(()->library.move(b.optString("key"),ids.get(n)));else if(n==ids.size())nameDialog("创建书籍夹","",name->mutate(()->library.move(b.optString("key"),library.createFolder(name,folderId))));else mutate(()->library.move(b.optString("key"),""));}).show();}
+    private void classify(JSONObject b){ArrayList<String> names=new ArrayList<>(),ids=new ArrayList<>();for(JSONObject f:bookFolders){names.add(f.optString("title"));ids.add(f.optString("id"));}names.add("＋ 创建书籍夹");if(!b.optString("folder").isEmpty())names.add("移回书架");new AlertDialog.Builder(this).setTitle("书籍分类").setItems(names.toArray(new String[0]),(d,n)->{if(n<ids.size())mutate(()->library.move(b.optString("key"),ids.get(n)));else if(n==ids.size())nameDialog("创建书籍夹","",name->mutate(()->library.moveToNewFolder(b.optString("key"),name,folderId)));else mutate(()->library.move(b.optString("key"),""));}).show();}
     private void confirmDelete(JSONObject b,boolean history){boolean tree="tree".equals(b.optString("type"));new AlertDialog.Builder(this).setTitle(history?"删除已下载图片？":tree?"移除这本书？":"删除这本书？").setMessage(tree?"原始文件夹和图片会保留。":"将删除本书及内置目录中的图片。").setNegativeButton("取消",null).setPositiveButton("确定",(d,n)->mutate(()->{if(DownloadService.running&&b.optString("id").equals(DownloadService.activeId))throw new IllegalStateException("请先暂停下载");library.delete(b.optString("key","download:"+b.optString("id")));})).show();}
-    private void mutate(DiskAction action){if(operation){toast("请等待当前操作完成");return;}operation=true;disk.execute(()->{String error=null;try{action.run();}catch(Exception e){error=e.getMessage();}String msg=error;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);refresh();});});}
+    private void mutate(DiskAction action){if(operation){toast("请等待当前操作完成");return;}operation=true;disk.execute(()->{String error=null;boolean localComic=false;try{action.run();}catch(Library.LocalComicException e){localComic=true;}catch(Exception e){error=e.getMessage();}String msg=error;boolean rejectedLocal=localComic;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(rejectedLocal)showLocalComicHint();else if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);refresh();});});}
     private void share(JSONObject b){if(b.has("sourceId")){toast("在线漫画不提供分享");return;}if(Build.VERSION.SDK_INT<29&&checkSelfPermission("android.permission.WRITE_EXTERNAL_STORAGE")!=PackageManager.PERMISSION_GRANTED){pendingShare=b;requestPermissions(new String[]{"android.permission.WRITE_EXTERNAL_STORAGE"},44);return;}if(operation){toast("请等待当前操作完成");return;}toast("正在打包 CBZ…");operation=true;disk.execute(()->{try{Uri uri=library.exportCbz(b);runOnUiThread(()->{operation=false;if(isDestroyed())return;toast("已保存到 Download/jmshare");Intent send=new Intent(Intent.ACTION_SEND).setType("application/vnd.comicbook+zip").putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);send.setClipData(ClipData.newRawUri("CBZ",uri));try{startActivity(Intent.createChooser(send,"分享漫画"));}catch(Exception e){toast("CBZ 已保存到 Download/jmshare");}refresh();});}catch(Exception e){runOnUiThread(()->{operation=false;if(!isDestroyed())toast("分享失败："+e.getMessage());});}});}
     @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);if(r==44){JSONObject b=pendingShare;pendingShare=null;if(b!=null&&g.length>0&&g[0]==PackageManager.PERMISSION_GRANTED)share(b);else toast("保存分享文件需要存储权限");}}
     private void importMenu(){new AlertDialog.Builder(this).setTitle("添加到书架").setItems(new String[]{"导入漫画压缩包","导入图片文件夹","创建书籍夹"},(d,n)->{if(n==0){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivityForResult(i,43);}else if(n==1){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,41);}else nameDialog("创建书籍夹","",name->mutate(()->library.createFolder(name,folderId)));}).show();}
@@ -459,7 +467,7 @@ public final class MainActivity extends Activity {
             child.animate().translationX(0).translationY(0).scaleX(1).scaleY(1).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
         }
     }
-    private Bitmap snapshotFace(View view){Bitmap image=Bitmap.createBitmap(Math.max(1,view.getWidth()),Math.max(1,view.getHeight()),Bitmap.Config.ARGB_8888);view.draw(new Canvas(image));return image;}
+    private Bitmap snapshotFace(View view){int width=Math.max(1,view.getWidth()),height=Math.max(1,view.getHeight());Bitmap image=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(image);android.graphics.Path clip=new android.graphics.Path();clip.addRoundRect(new android.graphics.RectF(0,0,width,height),u.dp(12),u.dp(12),android.graphics.Path.Direction.CW);canvas.clipPath(clip);view.draw(canvas);return image;}
     private void drop(JSONObject target,JSONObject source,int zone){
         if(source==null||target==null||Library.key(source).equals(Library.key(target)))return;
         if(source.optBoolean("book_folder")){
@@ -470,13 +478,21 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){new AlertDialog.Builder(this).setTitle("JM 简阅 3.5.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL},(d,n)->{if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){new AlertDialog.Builder(this).setTitle("JM 简阅 3.6.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL},(d,n)->{if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);new AlertDialog.Builder(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
-    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(appUpdate!=null)appUpdate.onResume();}
+    private void showLocalComicHint(){
+        clearLocalComicHint();if(isFinishing()||isDestroyed())return;
+        FrameLayout host=findViewById(android.R.id.content);final TextView hint=u.text("本地漫画",14,Color.WHITE,true);hint.setGravity(Gravity.CENTER);hint.setPadding(u.dp(24),u.dp(12),u.dp(24),u.dp(12));hint.setBackground(u.shape(0xf02a3445,28));hint.setElevation(u.dp(8));
+        FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(host);params.bottomMargin=u.dp(90)+(insets==null?0:insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom);host.addView(hint,params);localComicHint=hint;
+        hint.setAlpha(0);hint.setTranslationY(u.dp(8));hint.animate().alpha(1).translationY(0).setDuration(160).start();
+        localComicHintDismiss=()->hint.animate().alpha(0).translationY(u.dp(8)).setDuration(160).withEndAction(()->{if(localComicHint==hint)clearLocalComicHint();}).start();handler.postDelayed(localComicHintDismiss,3000-160);
+    }
+    private void clearLocalComicHint(){if(localComicHintDismiss!=null){handler.removeCallbacks(localComicHintDismiss);localComicHintDismiss=null;}if(localComicHint!=null){TextView hint=localComicHint;localComicHint=null;hint.animate().cancel();if(hint.getParent() instanceof ViewGroup)((ViewGroup)hint.getParent()).removeView(hint);}}
+    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);boolean showingGuide=firstRunGuide!=null&&firstRunGuide.showIfNeeded();if(predictiveBack!=null)predictiveBack.refresh();if(!showingGuide&&appUpdate!=null)appUpdate.onResume();}
     @Override protected void onPause(){super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);if(appUpdate!=null)appUpdate.onPause();}
-    @Override protected void onDestroy(){resumed=false;if(appUpdate!=null)appUpdate.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
-    @Override public void onBackPressed(){if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&!folderId.isEmpty())leaveFolder();else super.onBackPressed();}
+    @Override protected void onDestroy(){resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();if(appUpdate!=null)appUpdate.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
+    @Override public void onBackPressed(){if(firstRunGuide!=null&&firstRunGuide.isShowing())return;if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&!folderId.isEmpty())leaveFolder();else super.onBackPressed();}
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("draft",input==null?draft:input.getText().toString());b.putString("search",searchInput==null?searchDraft:searchInput.getText().toString());b.putString("folder",folderId);b.putString("task_id",taskId);}
     private final class OnlineAdapter extends BaseAdapter {
         public int getCount(){return onlineBooks.size();}public Object getItem(int p){return onlineBooks.get(p);}public long getItemId(int p){return p;}
@@ -535,7 +551,7 @@ public final class MainActivity extends Activity {
     private void retryMissingCovers(View view){if(view instanceof ImageView){ImageView image=(ImageView)view;if(image.getDrawable()==null&&image.getTag() instanceof JSONObject){JSONObject b=(JSONObject)image.getTag();if(!b.has("sourceId")||(OnlineHistory.isJm(b)&&!b.optString("thumbnail").isEmpty()))covers.load(image,b);}}else if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int n=0;n<group.getChildCount();n++)retryMissingCovers(group.getChildAt(n));}}
     private static final class TileShadow extends View.DragShadowBuilder {
         private final Bitmap snapshot;private final Point touch=new Point();
-        TileShadow(View view,int x,int y){super(view);int w=Math.max(1,view.getWidth()),h=Math.max(1,view.getHeight());snapshot=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);view.draw(new Canvas(snapshot));touch.set(Math.max(0,Math.min(w,x)),Math.max(0,Math.min(h,y)));}
+        TileShadow(View view,int x,int y){super(view);int w=Math.max(1,view.getWidth()),h=Math.max(1,view.getHeight());snapshot=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(snapshot);float radius=12f*view.getResources().getDisplayMetrics().density;int coverHeight=view instanceof ShelfTile?((ShelfTile)view).face.getHeight():h;coverHeight=Math.max(1,Math.min(h,coverHeight));android.graphics.Path clip=new android.graphics.Path();clip.addRoundRect(new android.graphics.RectF(0,0,w,coverHeight),radius,radius,android.graphics.Path.Direction.CW);if(coverHeight<h)clip.addRect(0,coverHeight,w,h,android.graphics.Path.Direction.CW);canvas.clipPath(clip);view.draw(canvas);touch.set(Math.max(0,Math.min(w,x)),Math.max(0,Math.min(h,y)));}
         @Override public void onProvideShadowMetrics(Point size,Point touchPoint){size.set(snapshot.getWidth(),snapshot.getHeight());touchPoint.set(touch.x,touch.y);}
         @Override public void onDrawShadow(Canvas canvas){canvas.drawBitmap(snapshot,0,0,null);}
     }

@@ -42,5 +42,5 @@ $taskVariant=if($Debug){'debug'}else{'release'}
 $taskApk=Join-Path $PSScriptRoot "mihon\app\build\outputs\apk\$taskVariant\app-$taskVariant.apk"
 if(!(Test-Path -LiteralPath $taskApk)){throw 'arm64-v8a APK was not generated.'}
 New-Item -ItemType Directory -Force (Join-Path $PSScriptRoot 'build') | Out-Null
-Copy-Item -LiteralPath $taskApk -Destination (Join-Path $PSScriptRoot 'build\JM-Lite-3.5.0-arm64-v8a.apk') -Force
-Get-Item -LiteralPath (Join-Path $PSScriptRoot 'build\JM-Lite-3.5.0-arm64-v8a.apk') | Select-Object FullName,Length
+Copy-Item -LiteralPath $taskApk -Destination (Join-Path $PSScriptRoot 'build\JM-Lite-3.6.0-arm64-v8a.apk') -Force
+Get-Item -LiteralPath (Join-Path $PSScriptRoot 'build\JM-Lite-3.6.0-arm64-v8a.apk') | Select-Object FullName,Length

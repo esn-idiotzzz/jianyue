@@ -50,6 +50,7 @@
         <activity
             android:name=".ui.reader.ReaderActivity"
             android:exported="false"
+            android:enableOnBackInvokedCallback="false"
             android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="com.samsung.android.support.REMOTE_ACTION" />
@@ -109,10 +110,10 @@
             android:name="android.webkit.WebView.MetricsOptOut"
             android:value="true" />
 
-            <activity android:name="com.joe.jmlite.MainActivity" android:exported="true" android:enableOnBackInvokedCallback="false" android:windowSoftInputMode="adjustResize" android:theme="@style/AppTheme">
+            <activity android:name="com.joe.jmlite.MainActivity" android:exported="true" android:enableOnBackInvokedCallback="true" android:windowSoftInputMode="adjustResize" android:theme="@style/AppTheme">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
-        <activity android:name="com.joe.jmlite.MihonEntryActivity" android:exported="false" android:theme="@style/Theme.Tachiyomi" />
+        <activity android:name="com.joe.jmlite.MihonEntryActivity" android:exported="false" android:enableOnBackInvokedCallback="false" android:theme="@style/Theme.Tachiyomi" />
         <activity android:name="com.joe.jmlite.BookInfoActivity" android:exported="false" android:theme="@style/AppTheme" />
         <activity android:name="com.joe.jmlite.AllDownloadsActivity" android:exported="false" android:theme="@style/AppTheme" android:windowSoftInputMode="adjustResize" />
         <activity android:name="com.joe.jmlite.OnlineSearchActivity" android:exported="false" android:theme="@style/AppTheme" android:windowSoftInputMode="adjustResize" />

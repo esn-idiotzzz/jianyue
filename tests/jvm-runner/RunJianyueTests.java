@@ -23,6 +23,11 @@ public class RunJianyueTests {
                         DiscoverySelectors.selectClass("com.joe.jmlite.DownloadTransitionTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.OnlineDownloadCompletionTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.DownloadPrivacyTest"),
+                        DiscoverySelectors.selectClass("com.joe.jmlite.FirstRunGuideTest"),
+                        DiscoverySelectors.selectClass("com.joe.jmlite.FolderPlacementTest"),
+                        DiscoverySelectors.selectClass("com.joe.jmlite.LibrarySnapshotTest"),
+                        DiscoverySelectors.selectClass("com.joe.jmlite.OnlineResumeHintTest"),
+                        DiscoverySelectors.selectClass("com.joe.jmlite.PredictiveBackTest"),
                         DiscoverySelectors.selectClass("eu.kanade.tachiyomi.data.download.DownloadProviderTest"),
                         DiscoverySelectors.selectClass("mihon.core.migration.MigratorTest"))
                 .build();
@@ -34,7 +39,7 @@ public class RunJianyueTests {
         var output = new PrintWriter(System.out, true);
         summary.printTo(output);
         summary.printFailuresTo(output);
-        if (summary.getTestsFoundCount() != 133 || summary.getTestsSucceededCount() != 133 ||
+        if (summary.getTestsFoundCount() != 169 || summary.getTestsSucceededCount() != 169 ||
                 summary.getTestsFailedCount() != 0 || summary.getTestsAbortedCount() != 0) {
             System.exit(1);
         }

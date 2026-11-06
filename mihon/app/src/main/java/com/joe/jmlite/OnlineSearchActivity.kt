@@ -49,6 +49,7 @@ class OnlineSearchActivity : Activity() {
     private var activeQuery=""
     private val itemKeys=HashSet<String>()
     private var searchExpanded=false
+    private var predictiveBack:PredictiveBack?=null
     private var searchAnimation:android.animation.ValueAnimator?=null
     private var toggleSearch:((Boolean)->Unit)?=null
     private val queryTask=Runnable { loadSource(true) }
@@ -84,6 +85,7 @@ class OnlineSearchActivity : Activity() {
             box.addView(editor,FrameLayout.LayoutParams(-1,-1))
             toggleSearch={ expand ->
                 searchAnimation?.cancel();searchExpanded=expand
+                predictiveBack?.refresh()
                 title.visibility=View.VISIBLE
                 editor.visibility=View.VISIBLE;icon.visibility=View.VISIBLE
                 val target=if(expand)(header.width-header.paddingLeft-header.paddingRight-ui.dp(44)).coerceAtLeast(ui.dp(120)) else ui.dp(44)
@@ -195,6 +197,7 @@ class OnlineSearchActivity : Activity() {
         }
         applyOnlineInsets(this, root, ui.dark)
         setContentView(root)
+        predictiveBack=PredictiveBack(this,root,{searchExpanded},{toggleSearch?.invoke(false)})
     }
 
     private fun startSearch() {
@@ -302,9 +305,10 @@ class OnlineSearchActivity : Activity() {
     private fun refreshResults(){ if(!refreshScheduled){refreshScheduled=true;grid.postDelayed(refreshTask,80)} }
     override fun onResume(){super.onResume();if(::adapter.isInitialized){results.removeAll{ChapterAvailability.empty(this,it.sourceId,it.url)};adapter.notifyDataSetChanged()}}
     override fun onDestroy() {
+        predictiveBack?.close()
         grid.removeCallbacks(refreshTask)
         grid.removeCallbacks(queryTask)
-        searchAnimation?.cancel()
+        searchAnimation?.run { removeAllListeners();removeAllUpdateListeners();cancel() }
         scope.cancel()
         super.onDestroy()
     }

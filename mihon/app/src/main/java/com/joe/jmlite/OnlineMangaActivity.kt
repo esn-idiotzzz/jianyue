@@ -46,6 +46,7 @@ class OnlineMangaActivity : Activity() {
     private lateinit var adapter: ChapterAdapter
     private lateinit var startButton: TextView
     private lateinit var resumeButton: TextView
+    private lateinit var resumeHint: TextView
     private lateinit var downloadButton: TextView
     private lateinit var favoriteHeart: Ui.Icon
     private lateinit var favoriteButton: FrameLayout
@@ -62,6 +63,7 @@ class OnlineMangaActivity : Activity() {
     private var mangaDescription: String? = null
     private var sourceName = ""
     private var lastChapterUrl = ""
+    private var lastChapterName = ""
     private var chapterProgress = org.json.JSONObject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -180,6 +182,12 @@ class OnlineMangaActivity : Activity() {
         resumeButton.visibility = View.GONE
         header.addView(actions)
 
+        resumeHint=ui.text("",12,ui.muted).apply {
+            gravity=Gravity.CENTER;maxLines=2;ellipsize=TextUtils.TruncateAt.END
+            setPadding(ui.dp(4),0,ui.dp(4),ui.dp(10));visibility=View.GONE
+        }
+        header.addView(resumeHint,LinearLayout.LayoutParams(-1,-2))
+
         downloadButton = ui.button("下载章节", false).apply {
             setTextSize(13f)
             minHeight = ui.dp(44)
@@ -291,6 +299,7 @@ class OnlineMangaActivity : Activity() {
         resumeButton.visibility = if (count > 0) View.VISIBLE else View.GONE
         downloadButton.visibility = if (count > 0) View.VISIBLE else View.GONE
         downloadButton.text = "下载章节"
+        updateResumeHint()
         adapter.notifyDataSetChanged()
         chaptersList.visibility = View.VISIBLE
         if (count == 0) {
@@ -308,6 +317,13 @@ class OnlineMangaActivity : Activity() {
         return list.find { it.url==lastChapterUrl } ?: list.firstOrNull { it.lastPageRead > 0 && !it.read } ?: list.lastOrNull()
     }
 
+    private fun updateResumeHint(){
+        if(!::resumeHint.isInitialized)return
+        val label=OnlineResumeHint.text(chapters(),lastChapterUrl,lastChapterName,chapterProgress)
+        if(resumeHint.text.toString()!=label)resumeHint.text=label
+        resumeHint.visibility=if(label.isEmpty())View.GONE else View.VISIBLE
+    }
+
     private fun read(chapter: Chapter?, fromStart: Boolean) {
         val result = details ?: return
         if (chapter == null) {
@@ -315,6 +331,8 @@ class OnlineMangaActivity : Activity() {
             return
         }
         lastChapterUrl=chapter.url
+        lastChapterName=chapter.name
+        updateResumeHint()
         adapter.notifyDataSetChanged()
         scope.launch {
             try {
@@ -542,6 +560,7 @@ class OnlineMangaActivity : Activity() {
                     val current = details ?: return@launch
                     details = current.copy(chapters = chapters)
                     adapter.notifyDataSetChanged()
+                    updateResumeHint()
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -565,8 +584,10 @@ class OnlineMangaActivity : Activity() {
         }
         if (record != null) {
             lastChapterUrl=record.optString("lastChapterUrl")
+            lastChapterName=record.optString("lastChapterName")
             chapterProgress=record.optJSONObject("chapterProgress")?:org.json.JSONObject()
         }
+        updateResumeHint()
     }
     private inner class ChapterAdapter : BaseAdapter() {
         override fun getCount(): Int = (chapters().size+2)/3

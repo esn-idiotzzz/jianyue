@@ -32,6 +32,7 @@ public final class HeaderSearch {
     private ValueAnimator animation;
     private boolean expanded,visible=true;
     private int transition;
+    private Runnable expansionChanged;
 
     public HeaderSearch(Activity activity,LinearLayout header,TextView title,View companion,String hint,Consumer<String> onQuery){
         this.activity=activity;this.header=header;this.title=title;this.companion=companion;ui=new Ui(activity);
@@ -48,6 +49,8 @@ public final class HeaderSearch {
     }
 
     public boolean isExpanded(){return expanded||animation!=null;}
+    public void setOnExpansionChanged(Runnable changed){expansionChanged=changed;}
+    private void notifyExpansionChanged(){if(expansionChanged!=null)expansionChanged.run();}
     public void collapse(){if(expanded)toggle(false);}
     public void setVisible(boolean show){
         visible=show;
@@ -57,6 +60,7 @@ public final class HeaderSearch {
             title.setAlpha(1f);title.setVisibility(View.VISIBLE);editor.setVisibility(View.GONE);icon.setAlpha(1f);icon.setVisibility(View.VISIBLE);ui.round(box,Color.TRANSPARENT,20);box.getLayoutParams().width=ui.dp(44);box.requestLayout();
         }
         box.setVisibility(show?View.VISIBLE:View.GONE);
+        notifyExpansionChanged();
     }
 
     private void toggle(boolean expand){
@@ -67,9 +71,10 @@ public final class HeaderSearch {
         int target=expand?Math.max(ui.dp(120),header.getWidth()-header.getPaddingLeft()-header.getPaddingRight()-fixed):ui.dp(44);
         animation=ValueAnimator.ofInt(Math.max(ui.dp(44),box.getWidth()),target);animation.setDuration(220);animation.setInterpolator(new DecelerateInterpolator());
         animation.addUpdateListener(a->{box.getLayoutParams().width=(int)a.getAnimatedValue();box.requestLayout();float f=a.getAnimatedFraction(),progress=expand?f:1f-f;title.setAlpha(1f-progress);editor.setAlpha(progress);icon.setAlpha(1f-progress);});
-        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setVisibility(expand?View.GONE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}}});
+        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setVisibility(expand?View.GONE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}notifyExpansionChanged();}});
         ui.round(box,expand?ui.tint:Color.TRANSPARENT,20);
         if(!expand){input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);}
         animation.start();
+        notifyExpansionChanged();
     }
 }
