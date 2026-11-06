@@ -114,10 +114,10 @@
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
         <activity android:name="com.joe.jmlite.MihonEntryActivity" android:exported="false" android:enableOnBackInvokedCallback="false" android:theme="@style/Theme.Tachiyomi" />
-        <activity android:name="com.joe.jmlite.BookInfoActivity" android:exported="false" android:theme="@style/AppTheme" />
-        <activity android:name="com.joe.jmlite.AllDownloadsActivity" android:exported="false" android:theme="@style/AppTheme" android:windowSoftInputMode="adjustResize" />
-        <activity android:name="com.joe.jmlite.OnlineSearchActivity" android:exported="false" android:theme="@style/AppTheme" android:windowSoftInputMode="adjustResize" />
-        <activity android:name="com.joe.jmlite.OnlineMangaActivity" android:exported="false" android:theme="@style/AppTheme" />
+        <activity android:name="com.joe.jmlite.BookInfoActivity" android:exported="false" android:enableOnBackInvokedCallback="true" android:theme="@style/AppTheme" />
+        <activity android:name="com.joe.jmlite.AllDownloadsActivity" android:exported="false" android:enableOnBackInvokedCallback="true" android:theme="@style/AppTheme" android:windowSoftInputMode="adjustResize" />
+        <activity android:name="com.joe.jmlite.OnlineSearchActivity" android:exported="false" android:enableOnBackInvokedCallback="true" android:theme="@style/AppTheme" android:windowSoftInputMode="adjustResize" />
+        <activity android:name="com.joe.jmlite.OnlineMangaActivity" android:exported="false" android:enableOnBackInvokedCallback="true" android:theme="@style/AppTheme" />
         <service android:name="com.joe.jmlite.DownloadService" android:exported="false" android:foregroundServiceType="dataSync" />
     </application>
 

@@ -1,7 +1,6 @@
 package com.joe.jmlite;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.widget.Toast;
 import org.json.JSONObject;
@@ -31,7 +30,7 @@ final class DownloadRecordActions {
         }catch(Exception e){activity.runOnUiThread(()->{if(!activity.isDestroyed())Toast.makeText(activity,"无法打开下载记录",Toast.LENGTH_SHORT).show();});}});
     }
     static void confirmRemove(Activity activity,JSONObject record,ExecutorService disk,Runnable changed){
-        new AlertDialog.Builder(activity).setTitle("删除下载记录？").setMessage("仅删除此记录，书架中的漫画和已下载内容保留。")
+        PredictiveBack.dialog(activity).setTitle("删除下载记录？").setMessage("仅删除此记录，书架中的漫画和已下载内容保留。")
             .setNegativeButton("取消",null).setPositiveButton("删除",(d,n)->disk.execute(()->{try{
                 new DownloadHistory(activity).remove(Library.key(record));
                 activity.runOnUiThread(()->{if(!activity.isFinishing()&&!activity.isDestroyed())changed.run();});

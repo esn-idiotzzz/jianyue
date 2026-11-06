@@ -35,6 +35,7 @@ public final class BookInfoActivity extends Activity {
     private TextView nameView,heartLabel,pages,downloadButton;
     private ImageView coverImage;
     private FrameLayout heartButton;
+    private PredictiveBack predictiveBack;
 
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
@@ -91,13 +92,15 @@ public final class BookInfoActivity extends Activity {
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         Ui.insets(this,root,u.dark);
         setContentView(root);
+        predictiveBack=new PredictiveBack(this,root,()->true,()->true,this::finish);
         heartButton.setOnClickListener(v->toggleFavorite());
         if(onlineJm)refreshOnlineRecord();else loadPageCount();
         refreshFavorite();
     }
 
     @Override protected void onResume(){super.onResume();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
-    @Override protected void onDestroy(){disk.shutdownNow();covers.close();super.onDestroy();}
+    @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
+    @Override protected void onDestroy(){if(predictiveBack!=null)predictiveBack.close();disk.shutdownNow();covers.close();super.onDestroy();}
 
     private static String plate(JSONObject b){
         String type=b.optString("type");

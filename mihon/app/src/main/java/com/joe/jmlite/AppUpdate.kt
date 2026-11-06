@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -16,7 +17,6 @@ import java.util.concurrent.TimeUnit
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.Response
 
 /** Background release checks on opening the app; no account or token is required. */
@@ -28,32 +28,49 @@ class AppUpdate(private val activity: Activity) {
     private var resumed = false
     private var closed = false
     private var shownVersion: String? = null
+    private val checks = AppUpdateChecks()
+    private val recheck = Runnable { check() }
+
+    private fun scheduleCheck() {
+        handler.removeCallbacks(recheck)
+        if (resumed && !closed) handler.postDelayed(recheck, checks.delay(SystemClock.elapsedRealtime()))
+    }
 
     private fun check() {
-        if (closed || call != null) return
+        if (closed || !resumed || call != null) return
+        if (checks.delay(SystemClock.elapsedRealtime()) > 0) {
+            scheduleCheck()
+            return
+        }
         val current = activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: return
-        val request = Request.Builder().url(AppRelease.API_URL)
-            .header("Accept", "application/vnd.github+json")
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "Jianyue/$current")
-            .build()
+        val request = checks.request(current)
         call = client.newCall(request).also { check ->
             check.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
-                    handler.post { this@AppUpdate.call = null }
+                    handler.post {
+                        if (closed || this@AppUpdate.call !== call) return@post
+                        this@AppUpdate.call = null
+                        checks.completed(SystemClock.elapsedRealtime())
+                        scheduleCheck()
+                    }
                 }
 
                 override fun onResponse(call: Call, response: Response) {
+                    var status: Int? = response.code
+                    val headers = response.headers
                     val release = try {
                         response.use { AppRelease.parse(it.code, it.body.string(), current) }
                     } catch (_: IOException) {
+                        if (status == 200 || status == 304) status = null
                         null
                     }
                     handler.post {
-                        if (!closed) {
+                        if (!closed && this@AppUpdate.call === call) {
                             this@AppUpdate.call = null
+                            checks.completed(SystemClock.elapsedRealtime(), status, headers, System.currentTimeMillis())
                             if (release != null && release.version != shownVersion) pending = release
                             showPending()
+                            scheduleCheck()
                         }
                     }
                 }
@@ -69,6 +86,7 @@ class AppUpdate(private val activity: Activity) {
 
     fun onPause() {
         resumed = false
+        handler.removeCallbacks(recheck)
     }
 
     private fun showPending() {
@@ -82,7 +100,7 @@ class AppUpdate(private val activity: Activity) {
             setTextIsSelectable(true)
         }
         val scroll = ScrollView(activity).apply { addView(notes) }
-        dialog = AlertDialog.Builder(activity)
+        dialog = PredictiveBack.dialog(activity)
             .setTitle("发现新版本")
             .setView(scroll)
             .setNegativeButton("取消更新", null)
@@ -104,6 +122,7 @@ class AppUpdate(private val activity: Activity) {
     fun close() {
         closed = true
         call?.cancel()
+        call = null
         handler.removeCallbacksAndMessages(null)
         pending = null
         dialog?.dismiss()

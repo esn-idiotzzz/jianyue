@@ -6,6 +6,7 @@ import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -22,9 +23,9 @@ import java.util.function.Consumer;
 public final class HeaderSearch {
     private final Activity activity;
     private final Ui ui;
-    private final LinearLayout header;
     private final TextView title;
     private final View companion;
+    private final View searchSpace;
     private final FrameLayout box;
     private final LinearLayout editor;
     private final Ui.Icon icon;
@@ -35,8 +36,15 @@ public final class HeaderSearch {
     private Runnable expansionChanged;
 
     public HeaderSearch(Activity activity,LinearLayout header,TextView title,View companion,String hint,Consumer<String> onQuery){
-        this.activity=activity;this.header=header;this.title=title;this.companion=companion;ui=new Ui(activity);
-        box=new FrameLayout(activity);header.addView(box,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
+        this.activity=activity;this.title=title;this.companion=companion;ui=new Ui(activity);
+        int position=header.indexOfChild(title);LinearLayout.LayoutParams titleParams=(LinearLayout.LayoutParams)title.getLayoutParams();
+        header.removeView(title);if(companion!=null)header.removeView(companion);
+        // Keep the title row measured once; search expands by clipping its overlay.
+        FrameLayout slot=new FrameLayout(activity);header.addView(slot,position,titleParams);
+        LinearLayout resting=ui.row();slot.addView(resting,new FrameLayout.LayoutParams(-1,-1));resting.addView(title,new LinearLayout.LayoutParams(0,-1,1));
+        if(companion!=null)resting.addView(companion,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
+        searchSpace=new View(activity);resting.addView(searchSpace,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
+        box=new FrameLayout(activity);slot.addView(box,new FrameLayout.LayoutParams(-1,ui.dp(44),Gravity.CENTER_VERTICAL));
         icon=ui.icon("search",Ui.BLUE);icon.setContentDescription(hint);box.addView(icon,new FrameLayout.LayoutParams(ui.dp(44),-1,Gravity.END));
         editor=ui.row();editor.setVisibility(View.GONE);
         input=new EditText(activity);input.setHint(hint);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(ui.ink);input.setHintTextColor(ui.muted);input.setBackgroundColor(Color.TRANSPARENT);input.setPadding(ui.dp(12),0,ui.dp(6),0);Ui.clearable(input);
@@ -57,21 +65,22 @@ public final class HeaderSearch {
         if(!show){
             transition++;if(animation!=null){animation.cancel();animation=null;}expanded=false;
             input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
-            title.setAlpha(1f);title.setVisibility(View.VISIBLE);editor.setVisibility(View.GONE);icon.setAlpha(1f);icon.setVisibility(View.VISIBLE);ui.round(box,Color.TRANSPARENT,20);box.getLayoutParams().width=ui.dp(44);box.requestLayout();
+            title.setAlpha(1f);title.setVisibility(View.VISIBLE);editor.setVisibility(View.GONE);icon.setAlpha(1f);icon.setVisibility(View.VISIBLE);ui.round(box,Color.TRANSPARENT,20);box.setClipBounds(null);
         }
         box.setVisibility(show?View.VISIBLE:View.GONE);
+        searchSpace.setVisibility(show?View.VISIBLE:View.GONE);
         notifyExpansionChanged();
     }
 
     private void toggle(boolean expand){
+        int width=box.getWidth();Rect clip=box.getClipBounds();int current=clip!=null?clip.width():expanded?width:ui.dp(44);
         expanded=expand;final int token=++transition;if(animation!=null)animation.cancel();
         title.setVisibility(View.VISIBLE);editor.setVisibility(View.VISIBLE);icon.setVisibility(View.VISIBLE);
-        if(companion!=null)companion.setVisibility(View.GONE);
-        int fixed=0;for(int n=0;n<header.getChildCount();n++){View child=header.getChildAt(n);if(child!=title&&child!=companion&&child!=box&&child.getVisibility()!=View.GONE)fixed+=child.getWidth();}
-        int target=expand?Math.max(ui.dp(120),header.getWidth()-header.getPaddingLeft()-header.getPaddingRight()-fixed):ui.dp(44);
-        animation=ValueAnimator.ofInt(Math.max(ui.dp(44),box.getWidth()),target);animation.setDuration(220);animation.setInterpolator(new DecelerateInterpolator());
-        animation.addUpdateListener(a->{box.getLayoutParams().width=(int)a.getAnimatedValue();box.requestLayout();float f=a.getAnimatedFraction(),progress=expand?f:1f-f;title.setAlpha(1f-progress);editor.setAlpha(progress);icon.setAlpha(1f-progress);});
-        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setVisibility(expand?View.GONE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}notifyExpansionChanged();}});
+        if(companion!=null)companion.setVisibility(View.INVISIBLE);
+        int target=expand?width:ui.dp(44);
+        animation=ValueAnimator.ofInt(current,target);animation.setDuration(220);animation.setInterpolator(new DecelerateInterpolator());
+        animation.addUpdateListener(a->{int reveal=(int)a.getAnimatedValue();box.setClipBounds(new Rect(Math.max(0,box.getWidth()-reveal),0,box.getWidth(),box.getHeight()));float f=a.getAnimatedFraction(),progress=expand?f:1f-f;title.setAlpha(1f-progress);editor.setAlpha(progress);icon.setAlpha(1f-progress);});
+        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setVisibility(expand?View.INVISIBLE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);box.setClipBounds(expand?null:new Rect(Math.max(0,box.getWidth()-ui.dp(44)),0,box.getWidth(),box.getHeight()));if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}notifyExpansionChanged();}});
         ui.round(box,expand?ui.tint:Color.TRANSPARENT,20);
         if(!expand){input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);}
         animation.start();

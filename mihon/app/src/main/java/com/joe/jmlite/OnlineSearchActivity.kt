@@ -168,7 +168,7 @@ class OnlineSearchActivity : Activity() {
                 override fun afterTextChanged(s:android.text.Editable?){}
                 override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){grid.removeCallbacks(queryTask);grid.postDelayed(queryTask,350)}
             })
-            status.setOnClickListener{if(!searching)loadSource(currentPage==0)}
+            status.setOnClickListener{if(!searching)loadSource(currentPage==0||results.isEmpty(),retry=true)}
             grid.setOnScrollListener(object:android.widget.AbsListView.OnScrollListener{
                 override fun onScrollStateChanged(view:android.widget.AbsListView?,state:Int){}
                 override fun onScroll(view:android.widget.AbsListView?,first:Int,count:Int,total:Int){
@@ -197,7 +197,7 @@ class OnlineSearchActivity : Activity() {
         }
         applyOnlineInsets(this, root, ui.dark)
         setContentView(root)
-        predictiveBack=PredictiveBack(this,root,{searchExpanded},{toggleSearch?.invoke(false)})
+        predictiveBack=PredictiveBack(this,root,{true},{!searchExpanded},{onBackPressed()})
     }
 
     private fun startSearch() {
@@ -266,11 +266,13 @@ class OnlineSearchActivity : Activity() {
         }
     }
 
-    private fun loadSource(reset:Boolean){
+    private fun loadSource(reset:Boolean,retry:Boolean=false){
         if(!reset&&(searching||!hasNext))return
+        val query=queryInput.text.toString().trim()
+        if(reset&&!retry&&query.isEmpty()&&activeQuery.isEmpty()&&(searching||currentPage>0))return
         if(reset){
             searchJob?.cancel();generation++;currentPage=0;hasNext=true
-            activeQuery=queryInput.text.toString().trim();completionSummary=null
+            activeQuery=query;completionSummary=null
             results.clear();scores.clear();itemKeys.clear();grid.removeCallbacks(refreshTask);refreshScheduled=false
             adapter.notifyDataSetChanged()
         }
@@ -301,6 +303,7 @@ class OnlineSearchActivity : Activity() {
         }
     }
     override fun onBackPressed(){if(searchExpanded)toggleSearch?.invoke(false) else super.onBackPressed()}
+    override fun onStop(){predictiveBack?.onStop();super.onStop()}
     private val refreshTask=Runnable { refreshScheduled=false;adapter.notifyDataSetChanged();completionSummary?.let{if(it.succeeded>0)status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}"} }
     private fun refreshResults(){ if(!refreshScheduled){refreshScheduled=true;grid.postDelayed(refreshTask,80)} }
     override fun onResume(){super.onResume();if(::adapter.isInitialized){results.removeAll{ChapterAvailability.empty(this,it.sourceId,it.url)};adapter.notifyDataSetChanged()}}

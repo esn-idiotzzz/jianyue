@@ -48,13 +48,17 @@ JSON state tests use the test-only JSON-java dependency; it is not included in t
 online-folder restrictions without partial writes, reused download snapshots, saved chapter hints,
 and gesture cancellation, lifecycle cleanup, and stale navigation guards.
 
-It exits unsuccessfully unless all 169 cases pass. Output is saved beside the script as `results.log`.
+3.6.1 adds `SourceSearchTriggerTest` (7), `AppUpdateChecksTest` (9), and `AppUpdateLifecycleTest` (4).
+`PredictiveBackTest` now has 14 cases, including immediate navigation at the gesture position,
+duplicate-commit prevention, temporary layer cleanup, and per-dialog window registration.
+
+It exits unsuccessfully unless all 196 cases pass. Output is saved beside the script as `results.log`.
 These JVM tests do not prove Android UI, real extension loading, website availability, or device reading.
 
 The direct runner works around this machine's Gradle test-worker startup failure (`ClassNotFoundException: Test`).
 The precise worker command-line cause has not been established. The classpath-export task and this
 runner were both executed successfully for the previous 3.1.0 source: 53 tests passed, 0 failed.
-Re-run against the current source to verify all 169 cases, including the 3.6.0 regressions.
+Re-run against the current source to verify all 196 cases, including the 3.6.1 regressions.
 The exported classpath came from the actual AGP `testDebugUnitTest` task inputs.
 
 FeatureLogicTest adds 12 cases for ranking, confirmed-empty versus network errors/timeouts, and source popular browsing.

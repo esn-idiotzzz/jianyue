@@ -3,16 +3,21 @@ package com.joe.jmlite
 import android.animation.Animator
 import android.animation.ValueAnimator
 import android.app.Activity
+import android.app.AlertDialog
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.view.Window
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import io.mockk.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.function.BooleanSupplier
 
 class PredictiveBackTest {
     @AfterEach fun cleanup() = unmockkAll()
@@ -25,6 +30,7 @@ class PredictiveBackTest {
         var translationX = 11f
         var translationY = -7f
         var alpha = .84f
+        var layer = View.LAYER_TYPE_NONE
         var clipped = false
         var provider: ViewOutlineProvider? = outline
 
@@ -38,6 +44,8 @@ class PredictiveBackTest {
             every { view.outlineProvider } answers { provider }
             every { view.width } returns 1000
             every { view.height } returns 1600
+            every { view.layerType } answers { layer }
+            every { view.isHardwareAccelerated } returns true
             every { view.setScaleX(any()) } answers { scaleX = firstArg() }
             every { view.setScaleY(any()) } answers { scaleY = firstArg() }
             every { view.setTranslationX(any()) } answers { translationX = firstArg() }
@@ -45,6 +53,7 @@ class PredictiveBackTest {
             every { view.setAlpha(any()) } answers { alpha = firstArg() }
             every { view.setClipToOutline(any()) } answers { clipped = firstArg() }
             every { view.setOutlineProvider(any()) } answers { provider = firstArg() }
+            every { view.setLayerType(any(), any()) } answers { layer = firstArg() }
         }
 
         fun assertRestored() {
@@ -55,6 +64,7 @@ class PredictiveBackTest {
             assertEquals(.84f, alpha)
             assertFalse(clipped)
             assertSame(outline, provider)
+            assertEquals(View.LAYER_TYPE_NONE, layer)
         }
     }
 
@@ -62,11 +72,19 @@ class PredictiveBackTest {
         val surface = Surface()
         val enabled = AtomicBoolean(true)
         val actions = AtomicInteger()
+        val exits = AtomicBoolean(false)
         val activity = mockk<Activity>(relaxed = true)
-        val owner = PredictiveBack(activity, surface.view, { enabled.get() }, { actions.incrementAndGet() })
+        val window = mockk<Window>(relaxed = true)
+        var actionHook: (() -> Unit)? = null
+        val owner: PredictiveBack
         val callback: OnBackAnimationCallback
 
         init {
+            every { activity.window } returns window
+            owner = PredictiveBack(activity, surface.view, { enabled.get() }, { exits.get() }, {
+                actions.incrementAndGet()
+                actionHook?.invoke()
+            })
             val api = PredictiveBack::class.java.declaredClasses.single { it.simpleName == "Api34" }
             val method = api.getDeclaredMethod("callback", PredictiveBack::class.java).apply { isAccessible = true }
             callback = method.invoke(null, owner) as OnBackAnimationCallback
@@ -142,6 +160,18 @@ class PredictiveBackTest {
         verify(exactly = 0) { fixture.surface.view.setScaleX(any()) }
     }
 
+    @Test fun `duplicate ordinary exit callbacks navigate once and stop rearms the owner`() {
+        val fixture = Fixture()
+        fixture.exits.set(true)
+        fixture.callback.onBackInvoked()
+        fixture.callback.onBackInvoked()
+        assertEquals(1, fixture.actions.get())
+        fixture.owner.onStop()
+        fixture.callback.onBackInvoked()
+        assertEquals(2, fixture.actions.get())
+        fixture.surface.assertRestored()
+    }
+
     @Test fun `a changed navigation target cancels a gesture before invocation`() {
         val fixture = Fixture()
         fixture.start()
@@ -151,15 +181,77 @@ class PredictiveBackTest {
         assertEquals(0, fixture.actions.get())
     }
 
-    @Test fun `a changed navigation target during settling cannot run the old action`() {
+    @Test fun `commit navigates immediately at the preview position then restores the new page`() {
+        val fixture = Fixture()
+        val animation = Animation()
+        var scaleAtNavigation = 1f
+        var shiftAtNavigation = 0f
+        fixture.actionHook = {
+            scaleAtNavigation = fixture.surface.scaleX
+            shiftAtNavigation = fixture.surface.translationX
+        }
+        fixture.start()
+        fixture.callback.onBackInvoked()
+        assertEquals(1, fixture.actions.get())
+        assertEquals(.91f * PredictiveBack.previewScale(.6f), scaleAtNavigation)
+        assertEquals(11f + PredictiveBack.previewShift(1000, .6f, true), shiftAtNavigation)
+        assertEquals(scaleAtNavigation, fixture.surface.scaleX)
+        verify(exactly = 1) { animation.animator.start() }
+        animation.finish()
+        fixture.surface.assertRestored()
+        assertEquals(1, fixture.actions.get())
+    }
+
+    @Test fun `duplicate invocation and progress after commit do not navigate twice`() {
         val fixture = Fixture()
         val animation = Animation()
         fixture.start()
         fixture.callback.onBackInvoked()
-        fixture.enabled.set(false)
+        val scale = fixture.surface.scaleX
+        fixture.callback.onBackInvoked()
+        fixture.callback.onBackStarted(mockk<BackEvent>(relaxed = true))
+        fixture.callback.onBackProgressed(mockk<BackEvent>(relaxed = true))
+        fixture.callback.onBackCancelled()
+        assertEquals(scale, fixture.surface.scaleX)
+        assertEquals(1, fixture.actions.get())
+        verify(exactly = 1) { animation.animator.start() }
         animation.finish()
         fixture.surface.assertRestored()
-        assertEquals(0, fixture.actions.get())
+    }
+
+    @Test fun `a departing page holds the preview until stop then releases its hardware layer`() {
+        val fixture = Fixture()
+        val animation = Animation()
+        fixture.exits.set(true)
+        fixture.start()
+        fixture.callback.onBackInvoked()
+        fixture.callback.onBackInvoked()
+        assertEquals(1, fixture.actions.get())
+        assertTrue(fixture.surface.scaleX < .91f)
+        assertEquals(View.LAYER_TYPE_HARDWARE, fixture.surface.layer)
+        verify(exactly = 0) { animation.animator.start() }
+        fixture.owner.onStop()
+        fixture.surface.assertRestored()
+    }
+
+    @Test fun `an existing software layer is preserved instead of being replaced`() {
+        val fixture = Fixture()
+        fixture.surface.layer = View.LAYER_TYPE_SOFTWARE
+        fixture.start()
+        assertEquals(View.LAYER_TYPE_SOFTWARE, fixture.surface.layer)
+        fixture.owner.onStop()
+        assertEquals(View.LAYER_TYPE_SOFTWARE, fixture.surface.layer)
+        verify(exactly = 0) { fixture.surface.view.setLayerType(View.LAYER_TYPE_HARDWARE, any()) }
+    }
+
+    @Test fun `a software rendered window does not allocate a hardware layer`() {
+        val fixture = Fixture()
+        every { fixture.surface.view.isHardwareAccelerated } returns false
+        fixture.start()
+        assertEquals(View.LAYER_TYPE_NONE, fixture.surface.layer)
+        fixture.owner.onStop()
+        fixture.surface.assertRestored()
+        verify(exactly = 0) { fixture.surface.view.setLayerType(View.LAYER_TYPE_HARDWARE, any()) }
     }
 
     @Test fun `closing a settling gesture ignores stale animation callbacks`() {
@@ -173,6 +265,45 @@ class PredictiveBackTest {
         fixture.surface.assertRestored()
         verify(exactly = 1) { animation.animator.removeAllListeners() }
         verify(exactly = 1) { animation.animator.cancel() }
+        assertEquals(1, fixture.actions.get())
+    }
+
+    @Test fun `a dialog callback registers with its own window and cancels that dialog`() {
+        val activity = mockk<Activity>(relaxed = true)
+        val activityWindow = mockk<Window>(relaxed = true)
+        val dialogWindow = mockk<Window>(relaxed = true)
+        val dispatcher = mockk<OnBackInvokedDispatcher>(relaxed = true)
+        val callback = slot<OnBackInvokedCallback>()
+        val dialog = mockk<AlertDialog>(relaxed = true)
+        every { activity.window } returns activityWindow
+        every { dialogWindow.onBackInvokedDispatcher } returns dispatcher
+        every { dialog.isShowing } returns true
+        every { dispatcher.registerOnBackInvokedCallback(any(), capture(callback)) } just Runs
+        val constructor = PredictiveBack::class.java.getDeclaredConstructor(
+            Activity::class.java, Window::class.java, View::class.java,
+            BooleanSupplier::class.java, BooleanSupplier::class.java, Runnable::class.java,
+        ).apply { isAccessible = true }
+        val owner = constructor.newInstance(activity, dialogWindow, Surface().view,
+            BooleanSupplier { dialog.isShowing }, BooleanSupplier { true }, Runnable { dialog.cancel() })
+        val api = PredictiveBack::class.java.declaredClasses.single { it.simpleName == "Api33" }
+        val register = api.getDeclaredMethod("register", PredictiveBack::class.java).apply { isAccessible = true }
+        val unregister = register.invoke(null, owner) as Runnable
+        callback.captured.onBackInvoked()
+        verify(exactly = 1) { dialog.cancel() }
+        verify(exactly = 0) { activityWindow.onBackInvokedDispatcher }
+        unregister.run()
+        verify(exactly = 1) { dispatcher.unregisterOnBackInvokedCallback(callback.captured) }
+        owner.close()
+    }
+
+    @Test fun `a disabled owner cannot preview or navigate behind a blocking manual`() {
+        val fixture = Fixture()
+        fixture.enabled.set(false)
+        fixture.start()
+        fixture.callback.onBackInvoked()
         assertEquals(0, fixture.actions.get())
+        fixture.surface.assertRestored()
+        verify(exactly = 0) { fixture.surface.view.setScaleX(any()) }
+        verify(exactly = 0) { fixture.surface.view.setLayerType(any(), any()) }
     }
 }

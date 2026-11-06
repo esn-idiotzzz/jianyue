@@ -48,7 +48,7 @@ object FavoriteActions {
             val favorite=withContext(Dispatchers.IO){library.hasOnline(record.optString("key"))}
             if(activity.isDestroyed||activity.isFinishing)return@launch
             val folder=if(OnlineHistory.isJm(record)) "在线JM漫画" else "在线全网漫画"
-            android.app.AlertDialog.Builder(activity).setTitle(record.optString("title")).setItems(arrayOf(if(favorite) "♥ 取消收藏" else "♡ 收藏")){_,_->scope.launch{
+            PredictiveBack.dialog(activity).setTitle(record.optString("title")).setItems(arrayOf(if(favorite) "♥ 取消收藏" else "♡ 收藏")){_,_->scope.launch{
                 withContext(Dispatchers.IO){library.favoriteOnline(record,!favorite)}
                 if(!activity.isDestroyed)android.widget.Toast.makeText(activity,if(favorite) "已取消收藏" else "已加入书架 · $folder",0).show()
             }}.show()

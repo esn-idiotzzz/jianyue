@@ -1,7 +1,6 @@
 package com.joe.jmlite
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
@@ -64,6 +63,7 @@ class OnlineMangaActivity : Activity() {
     private var sourceName = ""
     private var lastChapterUrl = ""
     private var lastChapterName = ""
+    private var predictiveBack: PredictiveBack? = null
     private var chapterProgress = org.json.JSONObject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,6 +115,7 @@ class OnlineMangaActivity : Activity() {
         root.addView(stage, LinearLayout.LayoutParams(-1, 0, 1f))
         applyOnlineInsets(this, root, ui.dark)
         setContentView(root)
+        predictiveBack=PredictiveBack(this,root,{true},{true},{finish()})
 
         load()
         paintFavorite()
@@ -411,7 +412,7 @@ class OnlineMangaActivity : Activity() {
             for (i in checked.indices) checked[i] = on
             chapterAdapter.notifyDataSetChanged()
         }
-        val dialog = AlertDialog.Builder(this)
+        val dialog = PredictiveBack.dialog(this)
             .setTitle("下载章节")
             .setView(box)
             .setNegativeButton("取消", null)
@@ -570,9 +571,12 @@ class OnlineMangaActivity : Activity() {
     }
 
     override fun onDestroy() {
+        predictiveBack?.close()
         scope.cancel()
         super.onDestroy()
     }
+
+    override fun onStop(){predictiveBack?.onStop();super.onStop()}
 
     private suspend fun readHistory(){
         val record=try {
@@ -614,7 +618,7 @@ class OnlineMangaActivity : Activity() {
                 }
                 cell.addView(ui.text(label,10,if(chapter.url==lastChapterUrl)OnlineUi.BLUE else ui.muted))
                 cell.setOnClickListener{read(chapter,false)}
-                cell.setOnLongClickListener {AlertDialog.Builder(this@OnlineMangaActivity).setTitle(chapter.name).setItems(arrayOf("从头开始阅读","上次位置阅读")){_,n->read(chapter,n==0)}.show();true}
+                cell.setOnLongClickListener {PredictiveBack.dialog(this@OnlineMangaActivity).setTitle(chapter.name).setItems(arrayOf("从头开始阅读","上次位置阅读")){_,n->read(chapter,n==0)}.show();true}
             }
             return row
         }
