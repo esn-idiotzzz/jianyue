@@ -57,6 +57,7 @@ class OnlineSearchActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PageMotion.enter(this)
         ui = OnlineUi(this)
         val root = ui.column()
         root.setBackgroundColor(ui.bg)
