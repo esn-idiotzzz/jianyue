@@ -68,7 +68,7 @@ class PredictiveBackTest {
         }
     }
 
-    private class Fixture {
+    private class Fixture(val preview: AtomicBoolean = AtomicBoolean(true)) {
         val surface = Surface()
         val enabled = AtomicBoolean(true)
         val actions = AtomicInteger()
@@ -81,7 +81,7 @@ class PredictiveBackTest {
 
         init {
             every { activity.window } returns window
-            owner = PredictiveBack(activity, surface.view, { enabled.get() }, { exits.get() }, {
+            owner = PredictiveBack(activity, surface.view, { enabled.get() }, { exits.get() }, { preview.get() }, {
                 actions.incrementAndGet()
                 actionHook?.invoke()
             })
@@ -158,6 +158,39 @@ class PredictiveBackTest {
         assertEquals(1, fixture.actions.get())
         fixture.surface.assertRestored()
         verify(exactly = 0) { fixture.surface.view.setScaleX(any()) }
+    }
+
+    @Test fun `root gesture has no preview and navigates only when committed`() {
+        val fixture = Fixture(AtomicBoolean(false))
+        fixture.exits.set(true)
+        fixture.start()
+        fixture.callback.onBackCancelled()
+        assertEquals(0, fixture.actions.get())
+        fixture.surface.assertRestored()
+        fixture.start()
+        fixture.callback.onBackInvoked()
+        fixture.callback.onBackInvoked()
+        assertEquals(1, fixture.actions.get())
+        verify(exactly = 0) { fixture.surface.view.setScaleX(any()) }
+        verify(exactly = 0) { fixture.surface.view.setLayerType(any(), any()) }
+        fixture.surface.assertRestored()
+    }
+
+    @Test fun `same callback previews a child then stops previewing after returning to root`() {
+        val fixture = Fixture(AtomicBoolean(false))
+        val animation = Animation()
+        fixture.preview.set(true)
+        fixture.start()
+        assertTrue(fixture.surface.scaleX < .91f)
+        fixture.callback.onBackCancelled()
+        animation.finish()
+        fixture.surface.assertRestored()
+        fixture.preview.set(false)
+        clearMocks(fixture.surface.view, answers = false)
+        fixture.start()
+        fixture.callback.onBackCancelled()
+        verify(exactly = 0) { fixture.surface.view.setScaleX(any()) }
+        fixture.surface.assertRestored()
     }
 
     @Test fun `duplicate ordinary exit callbacks navigate once and stop rearms the owner`() {

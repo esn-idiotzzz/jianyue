@@ -72,3 +72,5 @@ SourceBrowserTest adds 12 cases for selected-source resolution, popular browsing
 PrivacyRecoveryTest adds 6 cases for exact-code validation without unintended writes, clearing the PIN, preserving the first-use decision, and entry after recovery/session reset.
 
 FolderCoverIndexTest adds 5 cases for cached folder membership, visible-cover invalidation, count changes, immutable membership and cross-shelf snapshot isolation.
+
+3.8.0 adds MainNavigationTest (5 cases) for four root tabs moving the task to the background and search closing first, plus two PredictiveBackTest cases for disabled root previews and child/root state changes. The runner now requires 246 successful tests. Actual Android desktop and IME gestures still require device verification.

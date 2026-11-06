@@ -22,6 +22,7 @@ public final class PredictiveBack implements AutoCloseable {
     private final Window window;
     private final BooleanSupplier canHandle;
     private final BooleanSupplier exits;
+    private final BooleanSupplier preview;
     private final Runnable action;
     private Runnable unregister;
     private ValueAnimator settling;
@@ -39,8 +40,14 @@ public final class PredictiveBack implements AutoCloseable {
     public PredictiveBack(Activity activity,View surface,BooleanSupplier canHandle,BooleanSupplier exits,Runnable action){
         this(activity,activity.getWindow(),surface,canHandle,exits,action);
     }
+    public PredictiveBack(Activity activity,View surface,BooleanSupplier canHandle,BooleanSupplier exits,BooleanSupplier preview,Runnable action){
+        this(activity,activity.getWindow(),surface,canHandle,exits,preview,action);
+    }
     private PredictiveBack(Activity activity,Window window,View surface,BooleanSupplier canHandle,BooleanSupplier exits,Runnable action){
-        this.activity=activity;this.window=window;this.surface=surface;this.canHandle=canHandle;this.exits=exits;this.action=action;
+        this(activity,window,surface,canHandle,exits,()->true,action);
+    }
+    private PredictiveBack(Activity activity,Window window,View surface,BooleanSupplier canHandle,BooleanSupplier exits,BooleanSupplier preview,Runnable action){
+        this.activity=activity;this.window=window;this.surface=surface;this.canHandle=canHandle;this.exits=exits;this.preview=preview;this.action=action;
         if(Build.VERSION.SDK_INT>=33)surface.getViewTreeObserver().addOnGlobalLayoutListener(keyboardLayout);
         refresh();
     }
@@ -53,7 +60,7 @@ public final class PredictiveBack implements AutoCloseable {
         else if(!enabled&&unregister!=null){unregister.run();unregister=null;reset();}
     }
     private void start(boolean fromLeft){
-        if(committed||!canHandle.getAsBoolean())return;
+        if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
         reset();gesturing=true;left=fromLeft;progress=0;
         width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
