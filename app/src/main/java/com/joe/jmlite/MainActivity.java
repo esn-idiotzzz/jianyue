@@ -186,6 +186,7 @@ public final class MainActivity extends Activity {
         Ui.magicWandHint(searchInput);Ui.clearable(searchInput);
         searchInput.setOnClickListener(v->v.requestFocus());
         searchInput.setOnEditorActionListener((v,actionId,event)->{if(actionId==EditorInfo.IME_ACTION_SEARCH){searchOnline();return true;}return false;});
+        if(tabletDevice){View.OnFocusChangeListener keepJmInputVisible=(v,hasFocus)->{if(!hasFocus||list==null)return;list.post(()->{if(list!=null)list.setSelectionFromTop(0,0);});list.postDelayed(()->{if(list!=null&&v.hasFocus())list.setSelectionFromTop(0,0);},180);};input.setOnFocusChangeListener(keepJmInputVisible);}
         searchCard.addView(searchInput,new LinearLayout.LayoutParams(0,u.dp(54),1));
         TextView searchGo=u.text("搜索",13,Color.WHITE,true);searchGo.setGravity(Gravity.CENTER);u.round(searchGo,Ui.BLUE,14);searchGo.setPadding(u.dp(14),0,u.dp(14),0);searchGo.setOnClickListener(v->searchOnline());
         LinearLayout.LayoutParams searchGoParams=new LinearLayout.LayoutParams(u.dp(56),u.dp(36));searchGoParams.setMargins(0,0,u.dp(2),0);searchCard.addView(searchGo,searchGoParams);
@@ -917,7 +918,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 5.2.3").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 5.3.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){

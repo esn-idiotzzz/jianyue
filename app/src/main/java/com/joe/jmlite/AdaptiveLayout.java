@@ -69,7 +69,14 @@ public final class AdaptiveLayout {
      * split-screen is still a tablet but follows the narrower window width.
      */
     public static boolean isTabletDevice(android.content.Context context) {
-        return context.getResources().getConfiguration().smallestScreenWidthDp >= TABLET_MIN_WIDTH_DP;
+        android.content.res.Configuration config = context.getResources().getConfiguration();
+        if (config.smallestScreenWidthDp >= TABLET_MIN_WIDTH_DP) return true;
+        // Some 10-12 inch tablets report a smallest width just under 600dp at high density.
+        // Android still classes them as LARGE screens; treat a large screen in a wide window as
+        // tablet so its pages use the same centred content width instead of stretching edge to edge.
+        int size = config.screenLayout & android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK;
+        return size >= android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE
+                && config.screenWidthDp >= TABLET_MIN_WIDTH_DP;
     }
 
     /** The exact phone shelf rule, used for every window below the tablet breakpoint. */
@@ -159,6 +166,14 @@ public final class AdaptiveLayout {
         // on every layout pass.
         int base = Math.round(basePaddingDp * density);
         int max = Math.round(maxContentWidthDp * density);
+        // Apply the cap immediately so a newly opened page never flashes at its uncapped width.
+        if (view.getContext() instanceof Activity) {
+            int window = windowWidthPx((Activity) view.getContext());
+            int horizontal = base + centeredInsetPx(window, base, max);
+            if (view.getPaddingLeft() != horizontal || view.getPaddingRight() != horizontal) {
+                view.setPadding(horizontal, view.getPaddingTop(), horizontal, view.getPaddingBottom());
+            }
+        }
         view.addOnLayoutChangeListener((v, left, top, right, bottom,
                                         oldLeft, oldTop, oldRight, oldBottom) -> {
             int width = right - left;
