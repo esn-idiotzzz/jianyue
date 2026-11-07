@@ -111,7 +111,9 @@ public final class PredictiveBack implements AutoCloseable {
     static float previewScale(float progress){return 1f-.06f*Math.max(0f,Math.min(1f,progress));}
     static float previewShift(int width,float progress,boolean left){return Math.max(0,width)*.075f*Math.max(0f,Math.min(1f,progress))*(left?1f:-1f);}
 
-    public static AlertDialog.Builder dialog(Activity activity){return new AlertDialog.Builder(activity){
+    public static AlertDialog.Builder dialog(Activity activity){return dialog(activity,false);}
+    /** Shelf menus fade their scrim in with the card so opening never flashes a dark frame. */
+    public static AlertDialog.Builder dialog(Activity activity,final boolean fadeScrim){return new AlertDialog.Builder(activity){
         private boolean cancelable=true;
         @Override public AlertDialog.Builder setCancelable(boolean value){cancelable=value;return super.setCancelable(value);}
         @Override public AlertDialog create(){
@@ -125,9 +127,26 @@ public final class PredictiveBack implements AutoCloseable {
             decor.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),ui.dp(16));}});decor.setClipToOutline(true);
             if(!cancelable)return dialog;
             decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
-                private PredictiveBack back;
-                @Override public void onViewAttachedToWindow(View view){view.post(()->{if(!view.isAttachedToWindow())return;view.setAlpha(0);view.setScaleX(.97f);view.setScaleY(.97f);view.animate().alpha(1).scaleX(1).scaleY(1).setDuration(150).withEndAction(()->{if(view.isAttachedToWindow()&&back==null)back=new PredictiveBack(activity,window,view,dialog::isShowing,()->true,dialog::cancel);}).start();});}
-                @Override public void onViewDetachedFromWindow(View view){if(back!=null){back.close();back=null;}}
+                private PredictiveBack back;private ValueAnimator scrim;private float scrimTarget;
+                @Override public void onViewAttachedToWindow(View view){
+                    if(fadeScrim){
+                        scrimTarget=window.getAttributes().dimAmount;
+                        if(scrimTarget>0f)window.setDimAmount(0f);
+                    }
+                    view.setAlpha(0);view.setScaleX(fadeScrim ? .96f : .97f);view.setScaleY(fadeScrim ? .96f : .97f);
+                    view.post(()->{
+                        if(!view.isAttachedToWindow())return;
+                        if(scrimTarget>0f){
+                            ValueAnimator animation=ValueAnimator.ofFloat(0f,scrimTarget);
+                            scrim=animation;animation.setDuration(200);animation.setInterpolator(new android.view.animation.DecelerateInterpolator());
+                            animation.addUpdateListener(a->{if(scrim==animation)window.setDimAmount((float)a.getAnimatedValue());});
+                            animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(scrim==animation)window.setDimAmount(scrimTarget);}});
+                            animation.start();
+                        }
+                        view.animate().alpha(1).scaleX(1).scaleY(1).setDuration(fadeScrim ? 180 : 150).setInterpolator(fadeScrim ? new android.view.animation.DecelerateInterpolator() : new android.view.animation.AccelerateDecelerateInterpolator()).withEndAction(()->{if(view.isAttachedToWindow()&&back==null)back=new PredictiveBack(activity,window,view,dialog::isShowing,()->true,dialog::cancel);}).start();
+                    });
+                }
+                @Override public void onViewDetachedFromWindow(View view){if(scrim!=null){scrim.cancel();scrim=null;}if(back!=null){back.close();back=null;}}
             });return dialog;
         }
     };}

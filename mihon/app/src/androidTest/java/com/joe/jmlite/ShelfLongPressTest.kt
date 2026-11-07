@@ -50,7 +50,7 @@ class ShelfLongPressTest {
             instrumentation.runOnMainSync{assertNotNull("300 ms hold must enter the original drag state",field("draggingBook"))}
             assertTrue(instrumentation.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("删除书籍夹").isEmpty())
             touch(MotionEvent.ACTION_UP);pointerDown=false
-            SystemClock.sleep(250)
+            SystemClock.sleep(400)
             instrumentation.waitForIdleSync()
             assertFalse(instrumentation.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("删除书籍夹").isEmpty())
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
