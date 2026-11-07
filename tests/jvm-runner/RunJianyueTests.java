@@ -23,6 +23,7 @@ public class RunJianyueTests {
                         DiscoverySelectors.selectClass("com.joe.jmlite.CoverDiskCacheTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.CoverBindingTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.DownloadHeaderTest"),
+                        DiscoverySelectors.selectClass("com.joe.jmlite.FailedSourcesTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.ShelfOrderTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.BookSearchTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.DownloadHistoryTest"),
@@ -55,7 +56,7 @@ public class RunJianyueTests {
         var output = new PrintWriter(System.out, true);
         summary.printTo(output);
         summary.printFailuresTo(output);
-        if (summary.getTestsFoundCount() != 285 || summary.getTestsSucceededCount() != 285 ||
+        if (summary.getTestsFoundCount() != 290 || summary.getTestsSucceededCount() != 290 ||
                 summary.getTestsFailedCount() != 0 || summary.getTestsAbortedCount() != 0) {
             System.exit(1);
         }

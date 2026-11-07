@@ -87,3 +87,5 @@ DownloadInputFocusTest is a separate Android instrumentation test. It alternates
 
 - `CoverBindingTest`: 3 cases for preserving a visible local cover, clearing recycled images, and retrying missing covers.
 - `DownloadHeaderTest`: 3 cases for dispatching remembered input focus; Android focus propagation and real keyboard resize remain device tests.
+
+4.2.0 adds FailedSourcesTest (5), taking the direct JVM runner to 290 tests. It covers exact IDs, runtime aliases, package isolation, language isolation and ambiguous mappings. FailedSourcesDialogTest checks actual row visibility, constrained dialog layout and filtering; ShelfLongPressTest checks the shorter hold and release-to-menu behavior on Android.

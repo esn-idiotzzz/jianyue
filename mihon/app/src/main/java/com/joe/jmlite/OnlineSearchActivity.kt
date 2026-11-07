@@ -356,11 +356,7 @@ class OnlineSearchActivity : Activity() {
         text.setSpan(object:ClickableSpan(){
             override fun updateDrawState(paint:TextPaint){paint.color=OnlineUi.BLUE;paint.isUnderlineText=false}
             override fun onClick(view:View){
-                val panel=RepositoryPanel.create(this@OnlineSearchActivity,summary.failedSourceIds.toSet())
-                val host=FrameLayout(this@OnlineSearchActivity).apply{
-                    addView(panel,FrameLayout.LayoutParams(-1,(resources.displayMetrics.heightPixels*.65f).toInt()))
-                }
-                PredictiveBack.dialog(this@OnlineSearchActivity).setTitle("失败的图源 · ${summary.failed}").setView(host).setPositiveButton("关闭",null).show()
+                RepositoryPanel.showFailures(this@OnlineSearchActivity,summary.failedSourceIds.toSet(),summary.failed)
             }
         },text.length-4,text.length,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         status.text=text
