@@ -24,7 +24,7 @@ public final class PredictiveBack implements AutoCloseable {
     private final BooleanSupplier exits;
     private final BooleanSupplier preview;
     private final Runnable action;
-    private Runnable unregister;
+    private Runnable unregister;private Runnable previewStart;
     private ValueAnimator settling;
     private boolean closed,gesturing,left,committed;
     private float progress;
@@ -51,6 +51,8 @@ public final class PredictiveBack implements AutoCloseable {
         if(Build.VERSION.SDK_INT>=33)surface.getViewTreeObserver().addOnGlobalLayoutListener(keyboardLayout);
         refresh();
     }
+    /** Installs the blurred destination preview when a gesture begins. */
+    public PredictiveBack setPreview(Runnable preview){previewStart=preview;return this;}
     public void refresh(){
         if(Build.VERSION.SDK_INT<33||closed)return;
         WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(surface);
@@ -61,6 +63,7 @@ public final class PredictiveBack implements AutoCloseable {
     }
     private void start(boolean fromLeft){
         if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
+        if(previewStart!=null)previewStart.run();
         reset();gesturing=true;left=fromLeft;progress=0;
         width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();

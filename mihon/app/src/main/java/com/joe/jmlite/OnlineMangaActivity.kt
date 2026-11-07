@@ -51,6 +51,7 @@ class OnlineMangaActivity : Activity() {
     private lateinit var favoriteButton: FrameLayout
     private var favorited = false
     private var favoriteBusy = false
+    private var backPreview = false
 
     private var details: OnlineRepository.Details? = null
     private var loading = false
@@ -116,6 +117,7 @@ class OnlineMangaActivity : Activity() {
         stage.addView(progress, FrameLayout.LayoutParams(ui.dp(36), ui.dp(36), Gravity.CENTER))
         root.addView(stage, LinearLayout.LayoutParams(-1, 0, 1f))
         applyOnlineInsets(this, root, ui.dark)
+        backPreview = BackPreview.install(this)
         setContentView(root)
         predictiveBack=PredictiveBack(this,root,{true},{true},{finish()})
 
@@ -577,6 +579,7 @@ class OnlineMangaActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if(backPreview&&isFinishing&&!isChangingConfigurations)BackPreview.pop()
         predictiveBack?.close()
         scope.cancel()
         super.onDestroy()

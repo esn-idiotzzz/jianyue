@@ -9,7 +9,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-internal data class AppRelease(val version: String, val notes: String, val url: String) {
+internal data class AppRelease(val version: String, val notes: String, val url: String, val versionCode: Long? = null) {
     data class Check(val valid: Boolean, val release: AppRelease?)
     companion object {
         const val PROJECT = "esn-idiotzzz/jianyue"
@@ -17,6 +17,9 @@ internal data class AppRelease(val version: String, val notes: String, val url: 
         const val API_URL = "https://api.github.com/repos/$PROJECT/releases/latest"
         const val MANIFEST_URL = "$PROJECT_URL/releases/latest/download/update.json"
         private val versionPattern = Regex("[vV]?[0-9]+(?:\\.[0-9]+){1,3}")
+        private val bodyCodePattern = Regex("jianyue-version-code\\s*:\\s*([0-9]+)")
+
+        fun bodyVersionCode(body: String?): Long? = body?.let { bodyCodePattern.find(it)?.groupValues?.getOrNull(1)?.toLongOrNull() }
 
         fun isNewer(candidate: String, current: String): Boolean {
             if (!versionPattern.matches(candidate) || !versionPattern.matches(current)) return false
@@ -30,13 +33,15 @@ internal data class AppRelease(val version: String, val notes: String, val url: 
             return false
         }
 
-        fun check(status: Int, body: String, current: String): Check {
+        fun check(status: Int, body: String, current: String, currentCode: Long = 0): Check {
             if (status == 304) return Check(true, null)
-            val candidate = parse(status, body, "0.0.0") ?: return Check(false, null)
-            return Check(true, candidate.takeIf { isNewer(it.version, current) })
+            val candidate = parse(status, body, "0.0.0", 0) ?: return Check(false, null)
+            val newer = candidate.versionCode?.let { code -> currentCode > 0 && code > currentCode }
+                ?: isNewer(candidate.version, current)
+            return Check(true, candidate.takeIf { newer })
         }
 
-        fun parse(status: Int, body: String, current: String): AppRelease? {
+        fun parse(status: Int, body: String, current: String, currentCode: Long = 0): AppRelease? {
             if (status != 200) return null
             return try {
                 val release = Json.parseToJsonElement(body) as? JsonObject ?: return null
@@ -44,7 +49,14 @@ internal data class AppRelease(val version: String, val notes: String, val url: 
                     release["prerelease"]?.jsonPrimitive?.booleanOrNull != false
                 ) return null
                 val tag = release["tag_name"]?.jsonPrimitive?.contentOrNull ?: return null
-                if (!isNewer(tag, current)) return null
+                val explicitCode = release["version_code"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                    ?: bodyVersionCode(release["body"]?.jsonPrimitive?.contentOrNull)
+                val newer = if (explicitCode != null && currentCode > 0) {
+                    explicitCode > currentCode
+                } else {
+                    isNewer(tag, current)
+                }
+                if (!newer) return null
                 val link = release["html_url"]?.jsonPrimitive?.contentOrNull ?: return null
                 val uri = URI(link)
                 if (uri.scheme != "https" || uri.host != "github.com" || uri.port != -1 ||
@@ -61,7 +73,7 @@ internal data class AppRelease(val version: String, val notes: String, val url: 
                         item?.get("state")?.jsonPrimitive?.contentOrNull == "uploaded"
                 }) return null
                 val notes = release["body"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-                AppRelease(tag.removePrefix("v").removePrefix("V"), notes.ifEmpty { "此版本未提供更新说明。" }, link)
+                AppRelease(tag.removePrefix("v").removePrefix("V"), notes.ifEmpty { "此版本未提供更新说明。" }, link, explicitCode)
             } catch (_: Exception) {
                 null
             }

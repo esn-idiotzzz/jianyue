@@ -1,6 +1,7 @@
 package com.joe.jmlite
 
 import android.app.Activity
+import android.os.Build
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -36,7 +37,10 @@ class AppUpdate(private var activity: Activity) {
     private fun check(endpoint: AppUpdateChecks.Endpoint = AppUpdateChecks.Endpoint.MANIFEST) {
         if (closed || call != null) return
         if(endpoint==AppUpdateChecks.Endpoint.API&&checks.delay(SystemClock.elapsedRealtime(),endpoint)>0)return
-        val current = activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: return
+        val info = activity.packageManager.getPackageInfo(activity.packageName, 0)
+        val current = info.versionName ?: return
+        @Suppress("DEPRECATION")
+        val currentCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
         val request = checks.request(current, endpoint)
         call = client.newCall(request).also { requestCall ->
             requestCall.enqueue(object : Callback {
@@ -53,7 +57,7 @@ class AppUpdate(private var activity: Activity) {
                     var status: Int? = response.code
                     val headers = response.headers
                     val result = try {
-                        response.use { AppRelease.check(it.code, if (it.code == 304) "" else it.body.string(), current) }
+                        response.use { AppRelease.check(it.code, if (it.code == 304) "" else it.body.string(), current, currentCode) }
                     } catch (_: IOException) {
                         if (status == 200 || status == 304) status = null
                         AppRelease.Check(false, null)
@@ -64,7 +68,7 @@ class AppUpdate(private var activity: Activity) {
                             this@AppUpdate.call = null
                             checks.completed(SystemClock.elapsedRealtime(), status, headers, System.currentTimeMillis(), endpoint)
                             if(status==200&&result.valid)checks.remember(endpoint,result.release)
-                            val release = result.release ?: if(status==304)checks.known(endpoint)?.takeIf{AppRelease.isNewer(it.version,current)} else null
+                            val release = result.release ?: if(status==304)checks.known(endpoint)?.takeIf{it.versionCode?.let{code->code>currentCode} ?: AppRelease.isNewer(it.version,current)} else null
                             if (release != null && release.version != shownVersion) pending = release
                             showPending()
                             if (endpoint == AppUpdateChecks.Endpoint.MANIFEST && !result.valid) check(AppUpdateChecks.Endpoint.API)

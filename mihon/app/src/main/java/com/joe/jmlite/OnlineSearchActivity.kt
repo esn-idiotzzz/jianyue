@@ -56,6 +56,7 @@ class OnlineSearchActivity : Activity() {
     private var activeQuery=""
     private val itemKeys=HashSet<String>()
     private var searchExpanded=false
+    private var backPreview=false
     private val tabletDevice:Boolean by lazy { AdaptiveLayout.isTabletDevice(this) }
     private var predictiveBack:PredictiveBack?=null
     private var searchAnimation:android.animation.ValueAnimator?=null
@@ -195,6 +196,7 @@ class OnlineSearchActivity : Activity() {
 
         grid.setOnItemClickListener { _, _, position, _ ->
             val item = results.getOrNull(position) ?: return@setOnItemClickListener
+            BackPreview.capture(window.decorView)
             startActivity(
                 Intent(this, OnlineMangaActivity::class.java)
                     .putExtra("sourceId", item.sourceId)
@@ -212,6 +214,7 @@ class OnlineSearchActivity : Activity() {
             FavoriteActions.show(this,record);true
         }
         applyOnlineInsets(this, root, ui.dark)
+        backPreview=BackPreview.install(this)
         setContentView(root)
         predictiveBack=PredictiveBack(this,root,{true},{!searchExpanded},{onBackPressed()})
     }
@@ -369,6 +372,7 @@ class OnlineSearchActivity : Activity() {
     private fun refreshResults(){ if(!refreshScheduled){refreshScheduled=true;grid.postDelayed(refreshTask,80)} }
     override fun onResume(){super.onResume();if(::adapter.isInitialized){results.removeAll{ChapterAvailability.empty(this,it.sourceId,it.url)};adapter.notifyDataSetChanged()}}
     override fun onDestroy() {
+        if(backPreview&&isFinishing&&!isChangingConfigurations)BackPreview.pop()
         clearLoginHint()
         predictiveBack?.close()
         grid.removeCallbacks(refreshTask)

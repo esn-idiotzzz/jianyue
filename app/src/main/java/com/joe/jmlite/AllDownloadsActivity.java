@@ -34,11 +34,11 @@ public final class AllDownloadsActivity extends Activity {
     private RecordsAdapter adapter;
     private String query="";
     private int generation;
-    private boolean receiverRegistered,active;
+    private boolean receiverRegistered,active,backPreview;
     private final BroadcastReceiver changes=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){String status=intent.getStringExtra(DownloadService.EXTRA_STATUS);if("complete".equals(status)||"removed".equals(status))reload();}};
 
     @Override protected void onCreate(Bundle state){
-        super.onCreate(state);ui=new Ui(this);covers=new CoverLoader(this);
+        super.onCreate(state);PageMotion.enter(this);ui=new Ui(this);covers=new CoverLoader(this);
         LinearLayout root=ui.column();root.setBackgroundColor(ui.bg);Ui.insets(this,root,ui.dark);
         LinearLayout header=ui.row();header.setPadding(ui.dp(12),ui.dp(8),ui.dp(12),ui.dp(12));
         Ui.Icon back=ui.icon("back",ui.ink);back.setContentDescription("返回下载");back.setOnClickListener(v->{if(search.isExpanded())search.collapse();else finish();});header.addView(back,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
@@ -46,7 +46,7 @@ public final class AllDownloadsActivity extends Activity {
         search=new HeaderSearch(this,header,title,null,"搜索下载编号或名称",value->{query=value;filter();});root.addView(header);
         predictiveBack=new PredictiveBack(this,root,()->true,()->!search.isExpanded(),this::onBackPressed);search.setOnExpansionChanged(predictiveBack::refresh);
         FrameLayout frame=new FrameLayout(this);ListView list=new ListView(this);list.setDivider(null);list.setSelector(android.R.color.transparent);list.setClipToPadding(false);list.setPadding(ui.dp(20),0,ui.dp(20),ui.dp(20));AdaptiveLayout.capContentWidth(list,20,AdaptiveLayout.RECORDS_LIST_MAX_WIDTH_DP);adapter=new RecordsAdapter();list.setAdapter(adapter);frame.addView(list,new FrameLayout.LayoutParams(-1,-1));
-        empty=ui.text("正在读取下载记录…",15,ui.muted,false);empty.setGravity(Gravity.CENTER);frame.addView(empty,new FrameLayout.LayoutParams(-1,-1));root.addView(frame,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
+        empty=ui.text("正在读取下载记录…",15,ui.muted,false);empty.setGravity(Gravity.CENTER);frame.addView(empty,new FrameLayout.LayoutParams(-1,-1));root.addView(frame,new LinearLayout.LayoutParams(-1,0,1));backPreview=BackPreview.install(this);setContentView(root);
         list.setOnItemClickListener((p,v,index,id)->DownloadRecordActions.open(this,shown.get(index),disk));
         list.setOnItemLongClickListener((p,v,index,id)->{DownloadRecordActions.confirmRemove(this,shown.get(index),disk,this::reload);return true;});
     }
@@ -58,7 +58,7 @@ public final class AllDownloadsActivity extends Activity {
     @Override protected void onResume(){super.onResume();active=true;IntentFilter filter=new IntentFilter(DownloadService.ACTION_CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(changes,filter,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(changes,filter);receiverRegistered=true;reload();}
     @Override protected void onPause(){active=false;generation++;if(receiverRegistered){unregisterReceiver(changes);receiverRegistered=false;}super.onPause();}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
-    @Override protected void onDestroy(){active=false;generation++;if(predictiveBack!=null)predictiveBack.close();covers.close();disk.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){if(backPreview&&isFinishing()&&!isChangingConfigurations())BackPreview.pop();active=false;generation++;if(predictiveBack!=null)predictiveBack.close();covers.close();disk.shutdownNow();super.onDestroy();}
     @Override public void onBackPressed(){if(search.isExpanded())search.collapse();else super.onBackPressed();}
     private final class RecordsAdapter extends BaseAdapter {
         public int getCount(){return shown.size();}public Object getItem(int p){return shown.get(p);}public long getItemId(int p){return p;}

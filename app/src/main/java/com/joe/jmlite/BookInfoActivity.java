@@ -30,7 +30,7 @@ public final class BookInfoActivity extends Activity {
     private CoverLoader covers;
     private JSONObject book;
     private String key;
-    private boolean favorite,onlineJm;
+    private boolean favorite,onlineJm,backPreview;
     private Ui.Icon heart;
     private TextView nameView,heartLabel,pages,downloadButton;
     private ImageView coverImage;
@@ -92,6 +92,7 @@ public final class BookInfoActivity extends Activity {
         AdaptiveLayout.capContentWidth(content,24,AdaptiveLayout.BOOK_DETAIL_MAX_WIDTH_DP);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         Ui.insets(this,root,u.dark);
+        backPreview=BackPreview.install(this);
         setContentView(root);
         predictiveBack=new PredictiveBack(this,root,()->true,()->true,this::finish);
         heartButton.setOnClickListener(v->toggleFavorite());
@@ -101,7 +102,7 @@ public final class BookInfoActivity extends Activity {
 
     @Override protected void onResume(){super.onResume();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
-    @Override protected void onDestroy(){if(predictiveBack!=null)predictiveBack.close();disk.shutdownNow();covers.close();super.onDestroy();}
+    @Override protected void onDestroy(){if(backPreview&&isFinishing()&&!isChangingConfigurations())BackPreview.pop();if(predictiveBack!=null)predictiveBack.close();disk.shutdownNow();covers.close();super.onDestroy();}
 
     private static String plate(JSONObject b){
         String type=b.optString("type");
