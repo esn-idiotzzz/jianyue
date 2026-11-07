@@ -24,12 +24,8 @@ import java.util.concurrent.TimeUnit
  */
 class TranslateBridge(private val context: Context, private val webView: WebView) {
     private val preferences = context.getSharedPreferences("source_translate", Context.MODE_PRIVATE)
-    private val executor = Executors.newFixedThreadPool(6)
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(40, TimeUnit.SECONDS)
-        .writeTimeout(40, TimeUnit.SECONDS)
-        .build()
+    private val executor get() = EXECUTOR
+    private val client get() = CLIENT
 
     @JavascriptInterface
     fun getValue(key: String): String? = try {
@@ -134,6 +130,12 @@ class TranslateBridge(private val context: Context, private val webView: WebView
     }
 
     companion object {
+        private val EXECUTOR = Executors.newFixedThreadPool(6)
+        private val CLIENT = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(40, TimeUnit.SECONDS)
+            .writeTimeout(40, TimeUnit.SECONDS)
+            .build()
         private const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Mobile Safari/537.36"
         private val HOSTS = listOf(

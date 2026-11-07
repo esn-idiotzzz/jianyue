@@ -27,9 +27,9 @@ object TranslateAssets {
         }
         return listOf(
             bootstrap(highlight),
-            assets.jquery,
-            assets.crypto,
-            assets.script,
+            assets.jquery + "\n;window.__jyJQuery=window.jQuery;window.\$=window.__jyPageDollar;window.jQuery=window.__jyPageJQuery;",
+            assets.crypto + "\n;window.__jyCrypto=window.CryptoJS;window.CryptoJS=window.__jyPageCrypto;",
+            "(function(\$,jQuery,CryptoJS){\n" + assets.script + "\n})(window.__jyJQuery,window.__jyJQuery,window.__jyCrypto);",
         )
     }
 
@@ -40,6 +40,7 @@ object TranslateAssets {
         (function(){
           if(window.__jyTranslateLoaded)return;
           window.__jyTranslateLoaded=true;
+          window.__jyPageDollar=window.$;window.__jyPageJQuery=window.jQuery;window.__jyPageCrypto=window.CryptoJS;
           window.unsafeWindow=window;
           window.GM_addStyle=function(css){try{var s=document.createElement('style');s.textContent=css;document.documentElement.appendChild(s);}catch(e){}};
           window.GM_registerMenuCommand=function(){};
