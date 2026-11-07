@@ -10,7 +10,6 @@ import android.os.Looper
 object ForegroundUpdates : Application.ActivityLifecycleCallbacks {
     private var installed=false
     private var started=0
-    private var backgrounded=false
     private var current:Activity?=null
     private var update:AppUpdate?=null
     private val handler=Handler(Looper.getMainLooper())
@@ -18,7 +17,8 @@ object ForegroundUpdates : Application.ActivityLifecycleCallbacks {
     @JvmStatic fun install(app:Application){
         if(!installed){
             installed=true
-            // A cold start always begins with bright source globes.
+            // A fresh process start (including after the task was removed from recents) starts
+            // with bright source globes. Returning from the background keeps the visited marks.
             SourceVisits.reset(app)
             app.registerActivityLifecycleCallbacks(this)
         }
@@ -26,19 +26,13 @@ object ForegroundUpdates : Application.ActivityLifecycleCallbacks {
     @JvmStatic fun checkAfterGuide(){val activity=current?:return;if(!activity.getSharedPreferences("settings",0).getBoolean("first_run_guide_acknowledged",false))return;val existing=update;if(existing!=null)existing.attach(activity) else {update=AppUpdate(activity).also{it.onResume()}}}
     override fun onActivityStarted(activity:Activity){
         handler.removeCallbacks(background)
-        // Re-entering the app (launcher, recents, or after another app) clears every visited mark.
-        // A rotation keeps isChangingConfigurations true, so it is not treated as a re-entry.
-        if(backgrounded){backgrounded=false;SourceVisits.reset(activity.applicationContext)}
         started++
     }
     override fun onActivityResumed(activity:Activity){if(activity !is eu.kanade.tachiyomi.ui.reader.ReaderActivity)EdgeNavigation.style(activity,(activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);current=activity;checkAfterGuide()}
     override fun onActivityPaused(activity:Activity){if(current===activity){update?.onPause();current=null}}
     override fun onActivityStopped(activity:Activity){
         started--
-        if(started==0){
-            if(!activity.isChangingConfigurations)backgrounded=true
-            handler.postDelayed(background,500)
-        }
+        if(started==0)handler.postDelayed(background,500)
     }
     override fun onActivityDestroyed(activity:Activity){}
     override fun onActivityCreated(activity:Activity,state:Bundle?){}

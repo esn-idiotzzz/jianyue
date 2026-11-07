@@ -1,6 +1,7 @@
 package eu.kanade.presentation.webview
 
 import android.content.pm.ApplicationInfo
+import android.os.Build
 import android.graphics.Bitmap
 import android.os.Message
 import android.view.ViewGroup
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -366,7 +368,15 @@ fun WebViewScreenContent(
                 captureBackPresses = false,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(contentPadding),
+                    .padding(contentPadding)
+                    .then(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                            // Android 15+ draws edge-to-edge and no longer resizes for the IME.
+                            Modifier.imePadding()
+                        } else {
+                            Modifier
+                        },
+                    ),
                 navigator = navigator,
                 onCreated = { webView ->
                     webView.setDefaultSettings()
