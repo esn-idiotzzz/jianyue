@@ -89,6 +89,7 @@ public final class BookInfoActivity extends Activity {
         }
 
         scroll.addView(content,new ScrollView.LayoutParams(-1,-2));
+        AdaptiveLayout.capContentWidth(content,24,AdaptiveLayout.BOOK_DETAIL_MAX_WIDTH_DP);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         Ui.insets(this,root,u.dark);
         setContentView(root);

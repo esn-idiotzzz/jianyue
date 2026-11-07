@@ -96,13 +96,6 @@ Junrar 的 UnRAR 限制许可不等同于 MIT 或 Apache-2.0；这里只用于�
 
 框架版本目录还保留了 Firebase、Google Services 和 Shizuku 等可选条目；简阅当前发布脚本传入 `include-telemetry=false`，原生 Mihon 更新器传入 `enable-updater=false`。简阅的版本检查直接面向本项目 GitHub Releases，不使用上游 Mihon 的更新仓库。目录中保留条目不表示启用了对应服务。
 
-## 内置浏览器翻译
-
-- [网页中英双显互译](https://greasyfork.org/zh-CN/scripts/469073)：内置浏览器“译”面板使用的用户脚本，作者夜雨，MIT；随包文件为 `app/src/main/assets/translate/translation.user.js`，脚本自带的悬浮面板隐藏，由简阅的原生面板驱动。
-- [jQuery 3.4.0](https://jquery.com/)：该脚本的 DOM 依赖，MIT，随包文件为 `app/src/main/assets/translate/jquery.min.js`。
-- [CryptoJS 4.1.1](https://cryptojs.gitbook.io/docs/)：该脚本的签名/编码依赖，MIT，随包文件为 `app/src/main/assets/translate/crypto-js.min.js`。
-- 以上三项的许可与来源摘录同时保留在 `app/src/main/assets/translate/NOTICE.txt`。
-
 ## 随包保留的原文
 
 - [Mihon 许可证](app/src/main/assets/LICENSE-Mihon.txt)

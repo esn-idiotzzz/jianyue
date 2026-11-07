@@ -139,12 +139,12 @@ class OnlineSearchActivity : Activity() {
             root.addView(sourceLoginNotice)
         }
 
-        grid = GridView(this).apply {
-            numColumns = 3
-            horizontalSpacing = ui.dp(10)
+        grid = AdaptiveGridView(this, AdaptiveLayout::searchColumns).apply {
+            numColumns = AdaptiveLayout.searchColumns(AdaptiveLayout.windowWidthDp(this@OnlineSearchActivity))
+            horizontalSpacing = ui.dp(AdaptiveLayout.SEARCH_SPACING_DP)
             verticalSpacing = ui.dp(16)
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
-            setPadding(ui.dp(18), ui.dp(4), ui.dp(18), ui.dp(24))
+            setPadding(ui.dp(AdaptiveLayout.SEARCH_PAGE_PADDING_DP), ui.dp(4), ui.dp(AdaptiveLayout.SEARCH_PAGE_PADDING_DP), ui.dp(24))
             clipToPadding = false
             selector = ColorDrawable(Color.TRANSPARENT)
         }
@@ -377,7 +377,6 @@ class OnlineSearchActivity : Activity() {
     }
 
     private inner class ResultAdapter : BaseAdapter() {
-        private inner class Tile(val root:LinearLayout,val image:ImageView,val title:TextView,val source:TextView)
         override fun getCount(): Int = results.size
         override fun getItem(position: Int): Any = results[position]
         override fun getItemId(position: Int): Long = position.toLong()
@@ -389,42 +388,66 @@ class OnlineSearchActivity : Activity() {
                 val empty=ChapterAvailability.probe(this@OnlineSearchActivity,item)
                 if(empty==true){results.removeAll{it.sourceId==item.sourceId&&it.url==item.url};refreshResults()}
             }
-            val holder=convertView?.tag as? Tile ?: createTile()
+            val holder=convertView as? ResultTile ?: ResultTile()
             holder.title.text=item.title
             holder.source.text=item.sourceName
             RemoteCovers.load(holder.image,item.thumbnail,item.sourceId)
-            return holder.root
+            return holder
         }
+    }
 
-        private fun createTile():Tile {
-            val tile = ui.column()
-            val coverFrame = FrameLayout(this@OnlineSearchActivity)
+    /**
+     * One search result tile. On tablets the cover height follows the measured tile width so the
+     * phone's 1.36 height/width ratio is kept; phones keep their original fixed 138dp cover.
+     */
+    private inner class ResultTile : LinearLayout(this@OnlineSearchActivity) {
+        val image: ImageView
+        val title: TextView
+        val source: TextView
+        private val coverFrame: FrameLayout
+        private var coverHeight = 0
+
+        init {
+            orientation = VERTICAL
+            coverFrame = FrameLayout(this@OnlineSearchActivity)
             coverFrame.background = ui.shape(ui.tint, 12)
             coverFrame.clipToOutline = true
             coverFrame.addView(
                 ui.text("JM", 16, OnlineUi.BLUE, true).apply { gravity = Gravity.CENTER },
                 FrameLayout.LayoutParams(-1, -1),
             )
-            val image = ImageView(this@OnlineSearchActivity).apply {
+            image = ImageView(this@OnlineSearchActivity).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
             }
             coverFrame.addView(image, FrameLayout.LayoutParams(-1, -1))
-            tile.addView(coverFrame, LinearLayout.LayoutParams(-1, ui.dp(138)))
-            val title=ui.text("", 12, ui.ink, true).apply {
-                    maxLines = 2
-                    minLines = 2
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setPadding(ui.dp(2), ui.dp(6), ui.dp(2), 0)
-                }
-            tile.addView(title,LinearLayout.LayoutParams(-1, -2))
-            val source=ui.text("", 10, ui.muted).apply {
-                    maxLines = 1
-                    minLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setPadding(ui.dp(2), ui.dp(2), ui.dp(2), 0)
-                }
-            tile.addView(source,LinearLayout.LayoutParams(-1, -2))
-            return Tile(tile,image,title,source).also{tile.tag=it}
+            addView(coverFrame, LinearLayout.LayoutParams(-1, ui.dp(138)))
+            title = ui.text("", 12, ui.ink, true).apply {
+                maxLines = 2
+                minLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setPadding(ui.dp(2), ui.dp(6), ui.dp(2), 0)
+            }
+            addView(title, LinearLayout.LayoutParams(-1, -2))
+            source = ui.text("", 10, ui.muted).apply {
+                maxLines = 1
+                minLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setPadding(ui.dp(2), ui.dp(2), ui.dp(2), 0)
+            }
+            addView(source, LinearLayout.LayoutParams(-1, -2))
+        }
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val measured = View.MeasureSpec.getSize(widthMeasureSpec)
+            val density = resources.displayMetrics.density
+            val content = grid.width - grid.paddingLeft - grid.paddingRight
+            val tablet = content > 0 && AdaptiveLayout.isTabletWidth(Math.round(content / density))
+            val wanted = if (tablet) AdaptiveLayout.searchCoverHeightPx(measured) else ui.dp(138)
+            if (wanted != coverHeight) {
+                coverHeight = wanted
+                (coverFrame.layoutParams as? LinearLayout.LayoutParams)?.height = wanted
+            }
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         }
     }
 }

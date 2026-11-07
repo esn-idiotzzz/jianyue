@@ -11,10 +11,24 @@ object ForegroundUpdates : Application.ActivityLifecycleCallbacks {
     private var installed=false
     private var started=0
     private var current:Activity?=null
+    private var application:Application?=null
     private var update:AppUpdate?=null
     private val handler=Handler(Looper.getMainLooper())
-    private val background=Runnable { if(started==0){update?.close();update=null;current=null} }
-    @JvmStatic fun install(app:Application){if(!installed){installed=true;app.registerActivityLifecycleCallbacks(this)}}
+    // Runs only after the whole app has been in the background for a moment, so a quick rotation
+    // never clears the visited-source marks. A fresh start or a re-entry always starts clean.
+    private val background=Runnable {
+        if(started==0){
+            update?.close();update=null;current=null
+            application?.let{SourceVisits.reset(it)}
+        }
+    }
+    @JvmStatic fun install(app:Application){
+        if(!installed){
+            installed=true;application=app
+            SourceVisits.reset(app)
+            app.registerActivityLifecycleCallbacks(this)
+        }
+    }
     @JvmStatic fun checkAfterGuide(){val activity=current?:return;if(!activity.getSharedPreferences("settings",0).getBoolean("first_run_guide_acknowledged",false))return;val existing=update;if(existing!=null)existing.attach(activity) else {update=AppUpdate(activity).also{it.onResume()}}}
     override fun onActivityStarted(activity:Activity){handler.removeCallbacks(background);started++}
     override fun onActivityResumed(activity:Activity){if(activity !is eu.kanade.tachiyomi.ui.reader.ReaderActivity)EdgeNavigation.style(activity,(activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);current=activity;checkAfterGuide()}

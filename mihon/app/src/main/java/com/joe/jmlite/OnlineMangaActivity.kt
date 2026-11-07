@@ -100,6 +100,7 @@ class OnlineMangaActivity : Activity() {
             setPadding(ui.dp(16), 0, ui.dp(16), ui.dp(24))
             clipToPadding = false
         }
+        AdaptiveLayout.capContentWidth(chaptersList, 16, AdaptiveLayout.MANGA_DETAIL_MAX_WIDTH_DP)
         adapter = ChapterAdapter()
         chaptersList.addHeaderView(buildHeader(), null, false)
         chaptersList.adapter = adapter

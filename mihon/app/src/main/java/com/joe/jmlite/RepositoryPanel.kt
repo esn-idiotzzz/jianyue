@@ -61,6 +61,11 @@ object RepositoryPanel {
         }
         var all=if(sourceIds==null)entries else failedEntries(entries,sourceIds,emptyMap())
         val root=ui.column().apply{isFocusableInTouchMode=sourceIds!=null}
+        // Keep the source rows readable on wide tablets; phones keep their original margins.
+        root.addOnLayoutChangeListener { view,l,_,r,_,_,_,_,_->
+            val inset=AdaptiveLayout.centeredInsetPx(r-l,ui.dp(18),ui.dp(AdaptiveLayout.REPOSITORY_LIST_MAX_WIDTH_DP))
+            if(view.paddingLeft!=inset||view.paddingRight!=inset)view.setPadding(inset,0,inset,0)
+        }
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
         fun visited(item:JSONObject)=visits.getBoolean(item.getString("id"),false)
         fun paintGlobe(row:Row,item:JSONObject){
