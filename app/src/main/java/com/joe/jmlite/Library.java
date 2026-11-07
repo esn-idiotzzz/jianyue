@@ -28,9 +28,13 @@ public final class Library {
     private final boolean privateShelf;
     private final File root;
     private final AtomicFile metadata;
+    /** The folder currently open on screen; its auto-collapse waits until the user leaves it. */
+    private String preservedFolder="";
 
     public Library(Context context){this(context,false);}
     public Library(Context context,boolean privateShelf){this.privateShelf=privateShelf;this.context=context.getApplicationContext();root=new File(this.context.getFilesDir(),"imports");metadata=new AtomicFile(new File(this.context.getFilesDir(),"library.json"));}
+    /** Keep the currently open folder from collapsing until the user actually leaves it. */
+    public void preserveFolder(String id){preservedFolder=id==null?"":id;}
     public static String key(JSONObject book){return book.optString("key",book.has("uri")?"tree:"+book.optString("uri"):"download:"+book.optString("id"));}
     public static String title(JSONObject book){return book.optString("title","未命名");}
     public static String folder(JSONObject book){return book.optString("folder","");}
@@ -243,24 +247,28 @@ public final class Library {
      * A regular folder that just lost books collapses: 0 books removes it, 1 book moves to the end of
      * its parent directory. System folders and folders holding a protected descendant are left alone.
      */
-    private void collapseSmallFolder(JSONObject state,String folderId) throws Exception {
-        if(folderId==null||folderId.isEmpty())return;
-        JSONArray folders=state.optJSONArray("folders");if(folders==null)return;
+    private boolean collapseSmallFolder(JSONObject state,String folderId) throws Exception {
+        if(folderId==null||folderId.isEmpty()||folderId.equals(preservedFolder))return false;
+        JSONArray folders=state.optJSONArray("folders");if(folders==null)return false;
         String parent="";boolean found=false;
         for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(folderId.equals(f.optString("id"))){parent=f.optString("parent");found=true;break;}}
-        if(!found)return;
+        if(!found)return false;
         HashSet<String> removed=new HashSet<>();removed.add(folderId);
         boolean grew=true;
         while(grew){grew=false;for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(removed.contains(f.optString("parent"))&&removed.add(f.optString("id")))grew=true;}}
-        for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(removed.contains(f.optString("id"))&&isProtectedFolder(f))return;}
+        for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(removed.contains(f.optString("id"))&&isProtectedFolder(f))return false;}
         JSONObject entries=state.optJSONObject("entries");ArrayList<String> books=new ArrayList<>();
         if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){String key=keys.next();JSONObject e=entries.optJSONObject(key);if(e!=null&&removed.contains(e.optString("folder")))books.add(key);}}
-        if(books.size()>1)return;
+        if(books.size()>1)return false;
         if(books.size()==1){JSONObject e=entries.optJSONObject(books.get(0));if(parent.isEmpty())e.remove("folder");else e.put("folder",parent);if(inFavorites(state,parent))e.put("favorite",true);appendBookOrder(state,books.get(0),parent);}
         JSONArray next=new JSONArray();for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(!removed.contains(f.optString("id")))next.put(f);}
-        state.put("folders",next);
+        state.put("folders",next);return true;
     }
-    /** Put the key at the saved-order end so the collapsed book becomes the last in its directory. */
+    /** Persist the deferred collapse of the folder the user has just left. */
+    public boolean releasePreservedFolder(String folderId) throws Exception {synchronized(LOCK){
+        if(folderId!=null&&folderId.equals(preservedFolder))preservedFolder="";
+        JSONObject state=read();boolean changed=collapseSmallFolder(state,folderId);if(changed)write(state);return changed;
+    }}
     /** Put the key after every sibling so the collapsed book becomes the last in its directory. */
     private void appendBookOrder(JSONObject state,String key,String parent) throws Exception {
         JSONArray old=state.optJSONArray("bookOrder"),next=new JSONArray();

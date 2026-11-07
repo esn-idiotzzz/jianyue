@@ -82,6 +82,7 @@ public final class MainActivity extends Activity {
     private int dragGap=-1;
     private String dragHoverKey="";
     private final android.graphics.RectF dragHoverRect=new android.graphics.RectF();
+    private Runnable pendingCapsuleLeave;
     private String dragPreviewSignature="";
     private Bitmap dragCover;
     private final HashMap<String,Integer> dragPreviewPositions=new HashMap<>();
@@ -130,6 +131,7 @@ public final class MainActivity extends Activity {
         if(b==null&&isTaskRoot())PrivacyVault.resetSession();
         super.onCreate(b);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);
         if(b!=null){tab=b.getInt("tab",1);draft=b.getString("draft","");searchDraft=b.getString("search","");folderId=b.getString("folder","");taskId=b.getString("task_id","");}
+        library.preserveFolder(folderId);
         LinearLayout root=u.column();root.setBackgroundColor(u.bg);Ui.insets(this,root,u.dark);
         LinearLayout heading=u.row();heading.setPadding(u.dp(16),u.dp(8),u.dp(12),u.dp(12));
         back=u.icon("back",u.ink);back.setContentDescription("返回书架");heading.addView(back,new LinearLayout.LayoutParams(u.dp(40),u.dp(44)));back.setOnClickListener(v->leaveFolder());
@@ -158,7 +160,7 @@ public final class MainActivity extends Activity {
         }
         void active(boolean on){icon.color(on?Ui.BLUE:u.muted);label.setTextColor(on?Ui.BLUE:u.muted);u.round(this,on?u.tint:Color.TRANSPARENT,23);setSelected(on);}
     }
-    private void switchTab(int next){if(tab==next&&!privateShelf)return;privateShelf=false;library=new Library(this);if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();}
+    private void switchTab(int next){if(tab==next&&!privateShelf)return;final String leaving=folderId;final Library leavingLibrary=library;privateShelf=false;library=new Library(this);library.preserveFolder("");if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();releaseFolderInBackground(leavingLibrary,leaving,false);}
     private void buildTab(){
         cancelShelfMenu();shelfHoldActive=false;hideShelfDropPill();
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
@@ -237,17 +239,42 @@ public final class MainActivity extends Activity {
                     }else{
                         handler.removeCallbacks(dragEndSettle);clearShelfPreview();restoreShelfTile(item);
                     }
+                    Runnable capsuleLeave=pendingCapsuleLeave;pendingCapsuleLeave=null;
+                    if(capsuleLeave!=null){handler.removeCallbacks(capsuleLeave);capsuleLeave.run();}
                     return true;
                 default:return true;
             }
         });
     }
     private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return privateShelf?"隐私书架":"书架";}
-    private void leaveFolder(){if(folderId.isEmpty()&&privateShelf){setPrivateShelf(false);return;}String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");folderId=parent;buildTab();}
+    private void leaveFolder(){
+        if(folderId.isEmpty()&&privateShelf){setPrivateShelf(false);return;}
+        String leaving=folderId;String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");
+        folderId=parent;library.preserveFolder(parent);
+        boolean optimistic=collapseFolderInMemory(leaving);
+        buildTab();releaseFolderInBackground(library,leaving,optimistic);
+    }
+    /** Apply the pending collapse before the parent shelf is drawn, so the folder never flashes. */
+    private boolean collapseFolderInMemory(String folderId){
+        HashSet<String> ids=shelfFolderTree(folderId);if(ids==null)return false;
+        JSONObject root=null;for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id"))){root=f;break;}
+        if(root==null||Library.isProtectedFolder(root)||shelfFolderTreeProtected(ids))return false;
+        ArrayList<JSONObject> books=new ArrayList<>();for(JSONObject b:libraryBooks)if(ids.contains(b.optString("folder")))books.add(b);
+        if(books.size()>1)return false;
+        String parent=root.optString("parent");
+        if(books.size()==1){JSONObject b=books.get(0);try{b.put("folder",parent);}catch(Exception ignored){}libraryBooks.remove(b);libraryBooks.add(b);}
+        bookFolders.removeIf(f->ids.contains(f.optString("id")));
+        return true;
+    }
+    private void releaseFolderInBackground(Library lib,String folderId,boolean optimisticChanged){
+        if(folderId==null||folderId.isEmpty())return;
+        disk.execute(()->{boolean changed=false;try{changed=lib.releasePreservedFolder(folderId);}catch(Exception ignored){}
+            if(changed||optimisticChanged)runOnUiThread(()->{if(resumed&&!isDestroyed())refresh(true);});});
+    }
 
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleShelfJump(intent);}
-    private void handleShelfJump(Intent intent){String key=intent.getStringExtra("shelf_jump");if(key==null)return;intent.removeExtra("shelf_jump");String highlight=intent.getStringExtra("shelf_highlight");intent.removeExtra("shelf_highlight");if(highlight==null||highlight.isEmpty())clearShelfHighlight();Runnable jump=()->disk.execute(()->{try{JSONObject book=new Library(this).find(key);runOnUiThread(()->{if(book==null||isDestroyed())return;Runnable navigate=()->{tab=1;shelfSearch.collapse();shelfQuery="";setPrivateShelf(book.optBoolean("privacy"));folderId=book.optString("folder");highlightKey=highlight==null?"":highlight;highlightScrollPending=!highlightKey.isEmpty();buildTab();refresh(true);};if(book.optBoolean("privacy"))PrivacyVault.enter(this,navigate);else navigate.run();});}catch(Exception e){runOnUiThread(()->toast("书籍已不存在"));}});if(intent.getBooleanExtra("shelf_private",false))PrivacyVault.enter(this,jump);else jump.run();}
-    private void setPrivateShelf(boolean hidden){privateShelf=hidden;library=new Library(this,hidden);folderId="";shelfSearch.collapse();libraryBooks.clear();folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());bookFolders.clear();rowsSnapshot="";buildTab();refresh(true);}
+    private void handleShelfJump(Intent intent){String key=intent.getStringExtra("shelf_jump");if(key==null)return;intent.removeExtra("shelf_jump");String highlight=intent.getStringExtra("shelf_highlight");intent.removeExtra("shelf_highlight");if(highlight==null||highlight.isEmpty())clearShelfHighlight();Runnable jump=()->disk.execute(()->{try{JSONObject book=new Library(this).find(key);runOnUiThread(()->{if(book==null||isDestroyed())return;Runnable navigate=()->{tab=1;shelfSearch.collapse();shelfQuery="";setPrivateShelf(book.optBoolean("privacy"));folderId=book.optString("folder");library.preserveFolder(folderId);highlightKey=highlight==null?"":highlight;highlightScrollPending=!highlightKey.isEmpty();buildTab();refresh(true);};if(book.optBoolean("privacy"))PrivacyVault.enter(this,navigate);else navigate.run();});}catch(Exception e){runOnUiThread(()->toast("书籍已不存在"));}});if(intent.getBooleanExtra("shelf_private",false))PrivacyVault.enter(this,jump);else jump.run();}
+    private void setPrivateShelf(boolean hidden){privateShelf=hidden;library=new Library(this,hidden);library.preserveFolder("");folderId="";shelfSearch.collapse();libraryBooks.clear();folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());bookFolders.clear();rowsSnapshot="";buildTab();refresh(true);}
     private void transferPrivacy(JSONObject book,boolean folder){Runnable move=()->mutate(()->library.transfer(folder?book.optString("id"):Library.key(book),folder,!privateShelf));if(privateShelf)move.run();else PrivacyVault.beforeFirstUse(this,move);}
     private void attachPrivacyPull(PrivacyPullHost frame){
         final GridView pullGrid=grid;final TextView pullEmpty=emptyShelf;
@@ -472,7 +499,7 @@ public final class MainActivity extends Activity {
     private void text(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
 
     private void open(JSONObject b){
-        if(b.optBoolean("empty"))return;if(b.optBoolean("download_history")){DownloadRecordActions.open(this,b,disk);return;}if(b.has("sourceId")){openOnline(b);return;}if(b.optBoolean("book_folder")){folderId=b.optString("id");buildTab();PageMotion.folder(content);return;}
+        if(b.optBoolean("empty"))return;if(b.optBoolean("download_history")){DownloadRecordActions.open(this,b,disk);return;}if(b.has("sourceId")){openOnline(b);return;}if(b.optBoolean("book_folder")){folderId=b.optString("id");library.preserveFolder(folderId);buildTab();PageMotion.folder(content);return;}
         startActivity(new Intent(this,BookInfoActivity.class).putExtra("book",b.toString()));
     }
     private void manage(JSONObject b){
@@ -718,7 +745,7 @@ public final class MainActivity extends Activity {
     }
     /** The bottom capsule only becomes a drop target while dragging something that lives in a folder. */
     private boolean shelfCapsuleActive(){
-        return tab==1&&!privateShelf&&!folderId.isEmpty()&&draggingBook!=null&&(shelfSearch==null||!shelfSearch.isExpanded())&&!(draggingBook.optBoolean("book_folder")&&Library.isProtectedFolder(draggingBook));
+        return tab==1&&!folderId.isEmpty()&&draggingBook!=null&&(shelfSearch==null||!shelfSearch.isExpanded())&&!(draggingBook.optBoolean("book_folder")&&Library.isProtectedFolder(draggingBook));
     }
     private boolean shelfCapsuleDrag(DragEvent e){
         if(draggingBook==null)return false;
@@ -756,9 +783,59 @@ public final class MainActivity extends Activity {
             mutate(()->library.deleteFolder(item.optString("id")));
             return;
         }
-        String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");
-        String target=parent;
+        String parent="";JSONObject current=null;
+        for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id"))){parent=f.optString("parent");current=f;}
+        HashSet<String> ids=shelfFolderTree(folderId);
+        if(current!=null&&ids!=null&&!Library.isProtectedFolder(current)&&!shelfFolderTreeProtected(ids)&&shelfFolderTreeBooks(ids)==1){
+            moveLastBookOut(item,parent,folderId);
+            return;
+        }
+        final String target=parent;
         mutate(()->library.move(Library.key(item),target));
+
+    }
+    /** The dragged book is the last one in this folder: move it out, then leave and remove the folder. */
+    private void moveLastBookOut(JSONObject item,String parent,String leaving){
+        if(operation){toast("请等待当前操作完成");return;}
+        operation=true;final String key=Library.key(item);
+        disk.execute(()->{String error=null;boolean local=false;
+            try{library.move(key,parent);}catch(Library.LocalComicException e){local=true;}catch(Exception e){error=e.getMessage();}
+            String msg=error;boolean rejected=local;
+            runOnUiThread(()->{operation=false;if(isDestroyed())return;
+                if(rejected)showLocalComicHint();else if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);
+                if(rejected||msg!=null){refresh(true);return;}
+                leaveAfterCapsule(key,leaving,parent);
+            });
+        });
+    }
+    /** Return to the parent with the already-emptied folder removed, so no deleted folder flashes. */
+    private void leaveAfterCapsule(String key,String leaving,String parent){
+        final Runnable[] holder=new Runnable[1];
+        Runnable action=()->{
+            if(isDestroyed()||isFinishing())return;
+            if(draggingBook!=null){pendingCapsuleLeave=holder[0];handler.postDelayed(holder[0],60);return;}
+            pendingCapsuleLeave=null;
+            for(JSONObject b:libraryBooks)if(key.equals(b.optString("key"))){try{b.put("folder",parent);}catch(Exception ignored){}break;}
+            HashSet<String> ids=shelfFolderTree(leaving);if(ids!=null)bookFolders.removeIf(f->ids.contains(f.optString("id")));
+            folderId=parent;library.preserveFolder(parent);
+            buildTab();releaseFolderInBackground(library,leaving,false);
+        };
+        holder[0]=action;
+        if(draggingBook!=null){pendingCapsuleLeave=action;handler.postDelayed(action,120);}else action.run();
+    }
+    /** Folder ids of a folder and every folder nested below it; null when it is not on screen. */
+    private HashSet<String> shelfFolderTree(String folderId){
+        if(folderId==null||folderId.isEmpty())return null;
+        boolean found=false;for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id"))){found=true;break;}
+        if(!found)return null;
+        HashSet<String> ids=new HashSet<>();ids.add(folderId);boolean grew=true;
+        while(grew){grew=false;for(JSONObject f:bookFolders){if(ids.contains(f.optString("parent"))&&ids.add(f.optString("id")))grew=true;}}
+        return ids;
+    }
+    private int shelfFolderTreeBooks(HashSet<String> ids){int books=0;for(JSONObject b:libraryBooks)if(ids.contains(b.optString("folder")))books++;return books;}
+    private boolean shelfFolderTreeProtected(HashSet<String> ids){
+        for(JSONObject f:bookFolders)if(ids.contains(f.optString("id"))&&Library.isProtectedFolder(f))return true;
+        return false;
     }
     private void setShelfCapsuleHover(boolean hover){
         if(shelfCapsuleHover==hover)return;
@@ -833,7 +910,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 5.0.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 5.0.3").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){

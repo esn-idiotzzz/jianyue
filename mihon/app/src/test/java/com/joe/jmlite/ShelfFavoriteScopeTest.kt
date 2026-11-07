@@ -199,4 +199,27 @@ class ShelfFavoriteScopeTest {
         assertTrue(folderIds(state).isEmpty())
         assertFalse(entry(state,"download:1").has("folder"))
     }
+
+    @Test fun `a preserved folder waits to collapse until the user releases it`(){
+        val state=state(folder("pair"))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","pair"))
+        state.getJSONObject("entries").put("download:2",JSONObject().put("folder","pair"))
+        val lib=library(state)
+        lib.preserveFolder("pair")
+        lib.move("download:1","")
+        assertEquals(setOf("pair"),folderIds(state))
+        assertEquals("pair",entry(state,"download:2").getString("folder"))
+        lib.releasePreservedFolder("pair")
+        assertTrue(folderIds(state).isEmpty())
+        assertFalse(entry(state,"download:2").has("folder"))
+    }
+
+    @Test fun `the collapse rule also applies on the private shelf`(){
+        val state=state(folder("pair").put("privacy",true))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","pair").put("privacy",true))
+        state.getJSONObject("entries").put("download:2",JSONObject().put("folder","pair").put("privacy",true))
+        library(state,hidden=true).move("download:1","")
+        assertTrue(folderIds(state).isEmpty())
+        assertTrue(entry(state,"download:2").optString("folder").isEmpty())
+    }
 }
