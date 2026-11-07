@@ -200,15 +200,22 @@ public final class Library {
         JSONObject state=read();requireBookScope(state,key);requireScope(state,parent);requirePlacement(state,key,parent);String id=UUID.randomUUID().toString();
         array(state,"folders").put(new JSONObject().put("id",id).put("title",name).put("parent",parent).put("privacy",privateShelf));JSONObject entry=entry(state,key);entry.put("folder",id);if(inFavorites(state,parent))entry.put("favorite",true);write(state);return id;
     }}
+    /** Dismantles a folder and every nested folder; all of their books land in its parent list. */
     public void deleteFolder(String id) throws Exception {synchronized(LOCK){
-        JSONObject state=read();JSONArray old=array(state,"folders"),next=new JSONArray();
-        String parent="";for(int n=0;n<old.length();n++)if(id.equals(old.getJSONObject(n).optString("id"))){parent=old.getJSONObject(n).optString("parent");break;}
-        for(int n=0;n<old.length();n++)if(!id.equals(old.getJSONObject(n).optString("id")))next.put(old.getJSONObject(n));
+        JSONObject state=read();JSONArray old=array(state,"folders");
+        String parent="";boolean found=false;
+        for(int n=0;n<old.length();n++)if(id.equals(old.getJSONObject(n).optString("id"))){parent=old.getJSONObject(n).optString("parent");found=true;break;}
+        if(!found)return;
+        // Collect the whole subtree first: nested folders are dismantled with their parent instead of
+        // being lifted one level, so every book below them is reassigned in the same transaction.
+        HashSet<String> removed=new HashSet<>();removed.add(id);
+        boolean grew=true;
+        while(grew){grew=false;for(int n=0;n<old.length();n++){JSONObject f=old.getJSONObject(n);if(removed.contains(f.optString("parent"))&&removed.add(f.optString("id")))grew=true;}}
+        JSONArray next=new JSONArray();
+        for(int n=0;n<old.length();n++)if(!removed.contains(old.getJSONObject(n).optString("id")))next.put(old.getJSONObject(n));
         state.put("folders",next);
-        // Nested folders move up one level instead of jumping to the shelf root.
-        for(int n=0;n<next.length();n++)if(id.equals(next.getJSONObject(n).optString("parent")))next.getJSONObject(n).put("parent",parent);
         JSONObject entries=state.optJSONObject("entries");boolean favorite=inFavorites(state,parent);
-        if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject entry=entries.optJSONObject(keys.next());if(entry==null||!id.equals(entry.optString("folder")))continue;if(parent.isEmpty())entry.remove("folder");else entry.put("folder",parent);if(favorite)entry.put("favorite",true);}}
+        if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject entry=entries.optJSONObject(keys.next());if(entry==null||!removed.contains(entry.optString("folder")))continue;if(parent.isEmpty())entry.remove("folder");else entry.put("folder",parent);if(favorite)entry.put("favorite",true);}}
         write(state);
     }}
     public void delete(String key) throws Exception {

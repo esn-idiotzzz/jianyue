@@ -78,21 +78,27 @@ public final class MainActivity extends Activity {
     private final ArrayList<JSONObject> dragRows=new ArrayList<>();
     private JSONObject dragTarget;
     private int dragZone=ShelfOrder.NONE;
+    private int dragGap=-1;
+    private String dragHoverKey="";
+    private final android.graphics.RectF dragHoverRect=new android.graphics.RectF();
+    private String dragPreviewSignature="";
     private Bitmap dragCover;
     private final HashMap<String,Integer> dragPreviewPositions=new HashMap<>();
     private float dragPointerX,dragPointerY;
+    /** Constant-speed edge scrolling keeps the landing gap moving instead of jumping a row at a time. */
     private final Runnable shelfAutoScroll=new Runnable(){public void run(){
         if(draggingBook==null||grid==null||!resumed)return;
         int edge=u.dp(56),direction=dragPointerY<edge?-1:dragPointerY>grid.getHeight()-edge?1:0;
         if(direction==0||!grid.canScrollVertically(direction))return;
-        grid.smoothScrollBy(direction*u.dp(18),50);previewShelfDrag(dragPointerX,dragPointerY);handler.postDelayed(this,50);
+        grid.scrollBy(0,direction*u.dp(5));dragHoverKey="";dragHoverRect.setEmpty();previewShelfDrag(dragPointerX,dragPointerY);handler.postDelayed(this,16);
     }};
-    private boolean dragMoved,taskShown;
-    private float dragX,dragY;
+    private boolean taskShown;
     private Runnable pendingShelfMenu;
     private static final int SHELF_MENU_DELAY=90,SHELF_TILE_SETTLE=190;
     /** One timing and one scale for every drag hover so books and folders feel identical. */
-    private static final int DRAG_TARGET_MS=170,DRAG_PREVIEW_MS=190,DRAG_NAME_MS=120,FOLDER_PREVIEW_DEPTH=3;
+    private static final int DRAG_TARGET_MS=170,DRAG_PREVIEW_MS=190,DRAG_NAME_MS=120,FOLDER_PREVIEW_DEPTH=3,DRAG_END_SETTLE_MS=460;
+    private static final android.view.animation.DecelerateInterpolator DRAG_PREVIEW_INTERPOLATOR=new android.view.animation.DecelerateInterpolator(1.6f);
+    private final Runnable dragEndSettle=new Runnable(){public void run(){if(draggingBook==null)clearShelfPreview();}};
     private static final float DRAG_TARGET_SCALE=.96f,DRAG_PREVIEW_SCALE=.93f;
     private ValueAnimator actionAnimator;
     private FirstRunGuide firstRunGuide;
@@ -199,21 +205,26 @@ public final class MainActivity extends Activity {
             if(draggingBook==null)return false;
             switch(e.getAction()){
                 case DragEvent.ACTION_DRAG_LOCATION:
-                    if(Math.hypot(e.getX()-dragX,e.getY()-dragY)>u.dp(12))dragMoved=true;
                     dragPointerX=e.getX();dragPointerY=e.getY();previewShelfDrag(dragPointerX,dragPointerY);handler.removeCallbacks(shelfAutoScroll);handler.post(shelfAutoScroll);return true;
                 case DragEvent.ACTION_DRAG_EXITED:handler.removeCallbacks(shelfAutoScroll);clearShelfPreview();return true;
                 case DragEvent.ACTION_DROP:
                     previewShelfDrag(e.getX(),e.getY());
                     if(dragTarget==null||dragZone==ShelfOrder.NONE||operation)return false;
-                    dragMoved=true;drop(dragTarget,draggingBook,dragZone);return true;
+                    drop(dragTarget,draggingBook,dragZone);return true;
                 case DragEvent.ACTION_DRAG_ENDED:
                     handler.removeCallbacks(shelfAutoScroll);
                     hideShelfDropPill();
                     JSONObject item=draggingBook;
-                    if(!e.getResult()){clearShelfPreview();restoreShelfTile(item);}
-                    else{dragTarget=null;dragZone=ShelfOrder.NONE;rowsSnapshot="";}
-                    draggingBook=null;dragRows.clear();dragCover=null;dragPreviewPositions.clear();
-                    refresh(true);
+                    boolean placed=e.getResult();
+                    draggingBook=null;dragRows.clear();dragCover=null;dragPreviewPositions.clear();dragPreviewSignature="";dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();
+                    if(placed){
+                        // The mutation owns the refreshed layout; keep the landing preview a moment so the
+                        // already animated tiles never slide back to their old slots before the write lands.
+                        dragTarget=null;dragZone=ShelfOrder.NONE;rowsSnapshot="";
+                        handler.removeCallbacks(dragEndSettle);handler.postDelayed(dragEndSettle,DRAG_END_SETTLE_MS);
+                    }else{
+                        handler.removeCallbacks(dragEndSettle);clearShelfPreview();restoreShelfTile(item);
+                    }
                     return true;
                 default:return true;
             }
@@ -342,11 +353,27 @@ public final class MainActivity extends Activity {
     }
     private void render(){
         if(tab==3)return;
-        if(tab==2){rows.clear();rows.addAll(onlineBooks);String snap=new JSONArray(rows).toString();if(!snap.equals(rowsSnapshot)){rowsSnapshot=snap;if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}paintHistoryEmpty();return;}
+        if(tab==2){rows.clear();rows.addAll(onlineBooks);String snap=shelfSnapshot();if(!snap.equals(rowsSnapshot)){rowsSnapshot=snap;if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}paintHistoryEmpty();return;}
         rows.clear();if(tab==0){rows.addAll(downloadRecords.subList(0,Math.min(3,downloadRecords.size())));if(rows.isEmpty())rows.add(empty());}
         else{if(shelfQuery.trim().isEmpty())for(JSONObject f:bookFolders)if(folderId.equals(f.optString("parent"))){try{JSONObject row=new JSONObject(f.toString());row.put("book_folder",true);rows.add(row);}catch(Exception ignored){}}rows.addAll(BookSearch.shelf(libraryBooks,folderId,shelfQuery));title.setText(folderTitle());if(emptyShelf!=null){emptyShelf.setText(shelfQuery.trim().isEmpty()?"书架还空着":"没有匹配的书籍");emptyShelf.setVisibility(rows.isEmpty()?View.VISIBLE:View.GONE);}}
-        JSONArray visible=new JSONArray();for(JSONObject b:rows)visible.put(new JSONArray().put(b.optString("key")).put(b.optString("id")).put(b.optString("title")).put(b.optString("folder")).put(b.optInt("done")).put(b.optString("uri")).put(b.optBoolean("empty")).put(b.optBoolean("book_folder")).put(b.optLong("completedAt")).put(b.optInt("downloadedChapters")).put(b.optString("thumbnail")).put(b.optBoolean("book_folder")?folderCovers.signature(b.optString("id")):""));
-        String snapshot=visible.toString()+revealed;if(!snapshot.equals(rowsSnapshot)){rowsSnapshot=snapshot;if(adapter!=null)adapter.notifyDataSetChanged();if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}updateTask();
+        String snapshot=shelfSnapshot()+revealed;if(!snapshot.equals(rowsSnapshot)){rowsSnapshot=snapshot;if(adapter!=null)adapter.notifyDataSetChanged();if(shelfAdapter!=null)shelfAdapter.notifyDataSetChanged();}updateTask();
+    }
+    /** Cheap per-row fingerprint: one StringBuilder instead of a JSONArray and JSONObject per row/refresh. */
+    private String shelfSnapshot(){
+        StringBuilder out=new StringBuilder(rows.size()*48);
+        for(JSONObject b:rows){
+            out.append(b.optString("key")).append('\u0001').append(b.optString("id")).append('\u0001')
+                    .append(b.optString("title")).append('\u0001').append(b.optString("folder")).append('\u0001')
+                    .append(b.optInt("done")).append('\u0001').append(b.optString("uri")).append('\u0001')
+                    .append(b.optBoolean("empty")).append('\u0001').append(b.optBoolean("book_folder")).append('\u0001')
+                    .append(b.optLong("completedAt")).append('\u0001').append(b.optInt("downloadedChapters")).append('\u0001')
+                    .append(b.optString("thumbnail")).append('\u0001').append(b.optLong("sourceId")).append('\u0001')
+                    .append(b.optString("url")).append('\u0001').append(b.optString("lastChapterName")).append('\u0001')
+                    .append(b.optInt("chapterCount")).append('\u0001').append(b.optString("sourceName")).append('\u0001');
+            if(b.optBoolean("book_folder"))out.append(folderCovers.signature(b.optString("id")));
+            out.append('\u0002');
+        }
+        return out.toString();
     }
     private JSONObject empty(){JSONObject b=new JSONObject();try{b.put("empty",true);}catch(Exception ignored){}return b;}
     private void paintHistoryEmpty(){if(emptyShelf!=null)emptyShelf.setVisibility(historyLoaded&&onlineBooks.isEmpty()?View.VISIBLE:View.GONE);}
@@ -464,7 +491,7 @@ public final class MainActivity extends Activity {
     private void setFavorite(JSONObject b,boolean favorite){
         if(operation){toast("请等待当前操作完成");return;}operation=true;
         disk.execute(()->{String error=null;try{library.favorite(b.optString("key"),favorite);}catch(Exception e){error=e.getMessage();}
-            String message=error;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(message!=null){toast(message.isEmpty()?"操作失败":message);return;}toast(favorite?"已加入我的收藏":"已取消收藏");refresh();});});
+            String message=error;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(message!=null){toast(message.isEmpty()?"操作失败":message);return;}toast(favorite?"已加入我的收藏":"已取消收藏");refresh(true);});});
     }
     private void manageFolder(JSONObject f){
         String parent=f.optString("parent");int index=-1,count=0;
@@ -479,7 +506,7 @@ public final class MainActivity extends Activity {
             else if(action.equals("添加到隐私书架")||action.equals("从隐私书架移除"))transferPrivacy(f,true);
             else{
                 boolean nested=!f.optString("parent").isEmpty();
-                PredictiveBack.dialog(this).setTitle("删除书籍夹？").setMessage(nested?"夹内书籍会回到上一级书籍夹。":"夹内书籍会回到书架。").setNegativeButton("取消",null).setPositiveButton("删除",(x,y)->mutate(()->library.deleteFolder(f.optString("id")))).show();
+                PredictiveBack.dialog(this).setTitle("删除书籍夹？").setMessage(nested?"夹内书籍和子书籍夹中的书籍都会移到上一级，子书籍夹会被一并拆除。":"夹内书籍和子书籍夹中的书籍都会回到书架，子书籍夹会被一并拆除。").setNegativeButton("取消",null).setPositiveButton("删除",(x,y)->mutate(()->library.deleteFolder(f.optString("id")))).show();
             }
         }).show();
     }
@@ -488,7 +515,7 @@ public final class MainActivity extends Activity {
     private void nameDialog(String caption,String value,Named done){EditText edit=new EditText(this);edit.setSingleLine(true);edit.setTextSize(16);edit.setText(value);edit.setSelectAllOnFocus(true);Ui.clearable(edit);LinearLayout box=u.column();box.setPadding(u.dp(24),u.dp(8),u.dp(24),0);box.addView(edit);AlertDialog d=PredictiveBack.dialog(this).setTitle(caption).setView(box).setNegativeButton("取消",null).setPositiveButton("确定",null).create();d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{String name=edit.getText().toString().trim();if(name.isEmpty()){edit.setError("请输入名称");return;}if(name.length()>100){edit.setError("名称最多 100 个字");return;}d.dismiss();done.run(name);}));d.show();edit.requestFocus();}
     private void classify(JSONObject b){ArrayList<String> names=new ArrayList<>(),ids=new ArrayList<>();for(JSONObject f:bookFolders){names.add(f.optString("title"));ids.add(f.optString("id"));}names.add("＋ 创建书籍夹");if(!b.optString("folder").isEmpty())names.add(privateShelf?"移回隐私书架":"移回书架");PredictiveBack.dialog(this).setTitle("书籍分类").setItems(names.toArray(new String[0]),(d,n)->{if(n<ids.size())mutate(()->library.move(b.optString("key"),ids.get(n)));else if(n==ids.size())nameDialog("创建书籍夹","",name->mutate(()->library.moveToNewFolder(b.optString("key"),name,folderId)));else mutate(()->library.move(b.optString("key"),""));}).show();}
     private void confirmDelete(JSONObject b,boolean history){boolean tree="tree".equals(b.optString("type"));PredictiveBack.dialog(this).setTitle(history?"删除已下载图片？":tree?"移除这本书？":"删除这本书？").setMessage(tree?"原始文件夹和图片会保留。":"将删除本书及内置目录中的图片。").setNegativeButton("取消",null).setPositiveButton("确定",(d,n)->mutate(()->{if(DownloadService.running&&b.optString("id").equals(DownloadService.activeId))throw new IllegalStateException("请先暂停下载");library.delete(b.optString("key","download:"+b.optString("id")));})).show();}
-    private void mutate(DiskAction action){if(operation){toast("请等待当前操作完成");return;}operation=true;disk.execute(()->{String error=null;boolean localComic=false;try{action.run();}catch(Library.LocalComicException e){localComic=true;}catch(Exception e){error=e.getMessage();}String msg=error;boolean rejectedLocal=localComic;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(rejectedLocal)showLocalComicHint();else if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);refresh();});});}
+    private void mutate(DiskAction action){if(operation){toast("请等待当前操作完成");return;}operation=true;disk.execute(()->{String error=null;boolean localComic=false;try{action.run();}catch(Library.LocalComicException e){localComic=true;}catch(Exception e){error=e.getMessage();}String msg=error;boolean rejectedLocal=localComic;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(rejectedLocal)showLocalComicHint();else if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);refresh(true);});});}
     private void share(JSONObject b){if(b.has("sourceId")){toast("在线漫画不提供分享");return;}if(Build.VERSION.SDK_INT<29&&checkSelfPermission("android.permission.WRITE_EXTERNAL_STORAGE")!=PackageManager.PERMISSION_GRANTED){pendingShare=b;requestPermissions(new String[]{"android.permission.WRITE_EXTERNAL_STORAGE"},44);return;}if(operation){toast("请等待当前操作完成");return;}toast("正在打包 CBZ…");operation=true;disk.execute(()->{try{Uri uri=library.exportCbz(b);runOnUiThread(()->{operation=false;if(isDestroyed())return;toast("已保存到 Download/jmshare");Intent send=new Intent(Intent.ACTION_SEND).setType("application/vnd.comicbook+zip").putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);send.setClipData(ClipData.newRawUri("CBZ",uri));try{startActivity(Intent.createChooser(send,"分享漫画"));}catch(Exception e){toast("CBZ 已保存到 Download/jmshare");}refresh();});}catch(Exception e){runOnUiThread(()->{operation=false;if(!isDestroyed())toast("分享失败："+e.getMessage());});}});}
     @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);if(r==44){JSONObject b=pendingShare;pendingShare=null;if(b!=null&&g.length>0&&g[0]==PackageManager.PERMISSION_GRANTED)share(b);else toast("保存分享文件需要存储权限");}}
     private void importMenu(){PredictiveBack.dialog(this).setTitle("添加到书架").setItems(new String[]{"导入漫画压缩包","导入图片文件夹","创建书籍夹"},(d,n)->{if(n==0){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivityForResult(i,43);}else if(n==1){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,41);}else nameDialog("创建书籍夹","",name->mutate(()->library.createFolder(name,folderId)));}).show();}
@@ -496,46 +523,148 @@ public final class MainActivity extends Activity {
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();if(request==43){toast("正在导入漫画…");mutate(()->library.importComic(uri));return;}if(request!=41)return;try{getContentResolver().takePersistableUriPermission(uri,data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION);JSONArray all=folders();for(int n=0;n<all.length();n++)if(all.getJSONObject(n).optString("uri").equals(uri.toString())){toast("已添加此文件夹");return;}String name=android.provider.DocumentsContract.getTreeDocumentId(uri);int slash=name.lastIndexOf('/');if(slash>=0)name=name.substring(slash+1);all.put(new JSONObject().put("uri",uri.toString()).put("title",name).put("local",true));prefs.edit().putString("folders",all.toString()).apply();refresh();}catch(Exception e){toast("未获得文件夹读取权限，请重新选择");}}
     private static String shelfKey(JSONObject book){return book.optBoolean("book_folder")?"folder:"+book.optString("id"):Library.key(book);}
     private void previewShelfDrag(float x,float y){
-        ShelfTile hovered=null;
-        // Deliberately ignore translations: insertion animations must not change hit testing.
+        if(draggingBook==null||grid==null||rows.isEmpty())return;
+        String sourceKey=shelfKey(draggingBook);
+        boolean sourceFolder=draggingBook.optBoolean("book_folder");
+        ArrayList<String> order=new ArrayList<>();int folders=0;
+        for(JSONObject book:dragRows){order.add(shelfKey(book));if(book.optBoolean("book_folder"))folders++;}
+        int compactFolders=Math.max(0,folders-(sourceFolder?1:0));
+        List<String> compact=ShelfOrder.without(order,sourceKey);
+        ShelfTile origin=null;
         for(int n=0;n<grid.getChildCount();n++){
             View child=grid.getChildAt(n);
-            if(child instanceof ShelfTile&&x>=child.getLeft()-grid.getHorizontalSpacing()/2f&&x<=child.getRight()+grid.getHorizontalSpacing()/2f&&y>=child.getTop()-grid.getVerticalSpacing()/2f&&y<=child.getBottom()+grid.getVerticalSpacing()/2f){hovered=(ShelfTile)child;break;}
+            if(child instanceof ShelfTile&&((ShelfTile)child).book!=null&&sourceKey.equals(shelfKey(((ShelfTile)child).book))){origin=(ShelfTile)child;break;}
+        }
+        // While the finger still covers the lifted slot the row stays filled: no landing hole.
+        boolean atOrigin=origin!=null&&x>=origin.getLeft()&&x<origin.getRight()&&y>=origin.getTop()&&y<origin.getBottom();
+        ShelfTile hovered=null;float hitLeft=0,hitTop=0;
+        if(!atOrigin){
+            // A chosen merge/into target stays sticky until the finger leaves its original bounds;
+            // the auto-fill shift must never make the preview jump to the next book by itself.
+            if(!dragHoverKey.isEmpty()&&dragHoverRect.contains(x,y)){
+                for(int n=0;n<grid.getChildCount();n++){
+                    View child=grid.getChildAt(n);
+                    if(child instanceof ShelfTile&&((ShelfTile)child).book!=null&&dragHoverKey.equals(shelfKey(((ShelfTile)child).book))){hovered=(ShelfTile)child;hitLeft=dragHoverRect.left;hitTop=dragHoverRect.top;break;}
+                }
+            }
+            if(hovered==null){
+                dragHoverKey="";
+                for(int n=0;n<grid.getChildCount()&&hovered==null;n++){
+                    View child=grid.getChildAt(n);
+                    if(!(child instanceof ShelfTile))continue;
+                    ShelfTile tile=(ShelfTile)child;
+                    if(tile.book==null||sourceKey.equals(shelfKey(tile.book)))continue;
+                    Integer slot=dragPreviewPositions.get(shelfKey(tile.book));
+                    float left,top;
+                    if(slot!=null){Point point=shelfSlot(slot);left=point.x;top=point.y;}
+                    else{left=child.getLeft()+child.getTranslationX();top=child.getTop()+child.getTranslationY();}
+                    if(x>=left&&x<left+child.getWidth()&&y>=top&&y<top+child.getHeight()){hovered=tile;hitLeft=left;hitTop=top;break;}
+                }
+            }
         }
         JSONObject target=hovered==null?null:hovered.book;
-        int zone=target==null||shelfKey(target).equals(shelfKey(draggingBook))?ShelfOrder.NONE:ShelfOrder.zone(Math.max(0,Math.min(hovered.getWidth(),x-hovered.getLeft())),hovered.getWidth(),draggingBook.optBoolean("book_folder"),target.optBoolean("book_folder"));
-        if(zone==ShelfOrder.NONE)target=null;
-        if(zone==dragZone&&(target==null?dragTarget==null:dragTarget!=null&&shelfKey(target).equals(shelfKey(dragTarget))))return;
-        clearShelfPreview();
-        if(zone==ShelfOrder.NONE)return;
-        dragTarget=target;dragZone=zone;dragMoved=true;
-        if(zone==ShelfOrder.BEFORE||zone==ShelfOrder.AFTER){
-            ArrayList<String> order=new ArrayList<>();for(JSONObject book:dragRows)order.add(shelfKey(book));
-            List<String> next=ShelfOrder.insert(order,shelfKey(draggingBook),shelfKey(target),zone==ShelfOrder.AFTER);
-            for(int n=0;n<next.size();n++)dragPreviewPositions.put(next.get(n),n);
-            for(int n=0;n<grid.getChildCount();n++){
-                View child=grid.getChildAt(n);if(!(child instanceof ShelfTile))continue;
-                Integer position=dragPreviewPositions.get(shelfKey(((ShelfTile)child).book));if(position==null)continue;
-                Point slot=shelfSlot(position);child.animate().cancel();child.animate().translationX(slot.x-child.getLeft()).translationY(slot.y-child.getTop()).scaleX(1).scaleY(1).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
+        boolean targetFolder=target!=null&&target.optBoolean("book_folder");
+        int zone=ShelfOrder.NONE;
+        if(hovered!=null&&!sourceKey.equals(shelfKey(target))){
+            float width=Math.max(1,hovered.getWidth());
+            if(sourceFolder)zone=ShelfOrder.zone(Math.max(0,Math.min(width,x-hitLeft)),width,true,targetFolder);
+            else if(targetFolder)zone=ShelfOrder.INTO;
+            else zone=ShelfOrder.zone(Math.max(0,Math.min(width,x-hitLeft)),width,false,false);
+        }
+        List<String> next;JSONObject dropTarget=null;int dropZone=ShelfOrder.NONE;int gap=-1;
+        if(atOrigin||hovered==null||sourceKey.equals(shelfKey(target))){
+            next=compact;
+        }else if(zone==ShelfOrder.MERGE||zone==ShelfOrder.INTO){
+            next=compact;dropTarget=target;dropZone=zone;
+            if(!dragHoverKey.equals(shelfKey(target))){
+                dragHoverKey=shelfKey(target);
+                dragHoverRect.set(hitLeft,hitTop,hitLeft+hovered.getWidth(),hitTop+hovered.getHeight());
             }
-        }else if(zone==ShelfOrder.MERGE)hovered.showFolderPreview();
-        else hovered.showDropTarget();
+        }else{
+            dragHoverKey="";
+            int boundary;
+            if(hovered!=null){
+                int index=compact.indexOf(shelfKey(target));
+                boundary=index<0?ShelfOrder.compactIndex(order,sourceKey,shelfInsertionBoundary(x,y)):index+(zone==ShelfOrder.AFTER?1:0);
+            }else boundary=ShelfOrder.compactIndex(order,sourceKey,shelfInsertionBoundary(x,y));
+            gap=ShelfOrder.clampGap(boundary,compact.size(),compactFolders,sourceFolder);
+            next=ShelfOrder.landing(order,sourceKey,gap);
+            int targetIndex=ShelfOrder.dropTargetIndex(compact,gap,sourceFolder,compactFolders);
+            if(targetIndex>=0){
+                String targetKey=compact.get(targetIndex);
+                for(JSONObject book:dragRows)if(shelfKey(book).equals(targetKey)){dropTarget=book;break;}
+                if(dropTarget!=null)dropZone=ShelfOrder.dropAfter(gap,compact.size(),compactFolders,sourceFolder)?ShelfOrder.AFTER:ShelfOrder.BEFORE;
+            }
+        }
+        String signature=(gap<0?"compact":Integer.toString(gap))+'|'+zone+'|'+(dropTarget==null?"":shelfKey(dropTarget))+'|'+dropZone;
+        if(signature.equals(dragPreviewSignature))return;
+        dragPreviewSignature=signature;
+        dragTarget=dropTarget;dragZone=dropZone;dragGap=gap;
+        String keep=(zone==ShelfOrder.MERGE||zone==ShelfOrder.INTO)&&target!=null?shelfKey(target):null;
+        for(int n=0;n<grid.getChildCount();n++){
+            View child=grid.getChildAt(n);
+            if(!(child instanceof ShelfTile))continue;
+            ShelfTile tile=(ShelfTile)child;
+            if(keep!=null&&tile.book!=null&&keep.equals(shelfKey(tile.book)))continue;
+            tile.clearFolderPreview();tile.clearDropTarget();
+        }
+        if(zone==ShelfOrder.MERGE&&hovered!=null)hovered.showFolderPreview();
+        else if(zone==ShelfOrder.INTO&&hovered!=null)hovered.showDropTarget();
+        applyShelfPreview(next);
+    }
+    /** Adapter boundary nearest to the pointer when no tile sits directly under it. */
+    private int shelfInsertionBoundary(float x,float y){
+        View sample=grid.getChildAt(0);
+        if(sample==null)return rows.size();
+        int columns=Math.max(1,grid.getNumColumns());
+        int cellWidth=Math.max(1,sample.getWidth()+grid.getHorizontalSpacing());
+        int cellHeight=Math.max(1,sample.getHeight()+grid.getVerticalSpacing());
+        int first=grid.getFirstVisiblePosition();
+        int row=(int)Math.floor((y-sample.getTop())/(double)cellHeight);
+        if(row<0)return first;
+        int column=Math.max(0,Math.min(columns-1,(int)Math.floor((x-grid.getPaddingLeft())/(double)cellWidth)));
+        int slot=first+row*columns+column;
+        if(slot>=rows.size())return rows.size();
+        int childIndex=slot-first;
+        View cell=childIndex>=0&&childIndex<grid.getChildCount()?grid.getChildAt(childIndex):null;
+        float left=cell==null?grid.getPaddingLeft()+column*cellWidth:cell.getLeft();
+        float width=cell==null?sample.getWidth():cell.getWidth();
+        return slot+(x>=left+width/2f?1:0);
+    }
+    /** Pin every visible tile to the landing order so a vacated slot fills in the same animation. */
+    private void applyShelfPreview(List<String> next){
+        dragPreviewPositions.clear();
+        for(int n=0;n<next.size();n++)dragPreviewPositions.put(next.get(n),n);
+        if(grid==null)return;
+        for(int n=0;n<grid.getChildCount();n++){View child=grid.getChildAt(n);if(child instanceof ShelfTile)applyShelfTilePreview((ShelfTile)child);}
+    }
+    private void applyShelfTilePreview(ShelfTile tile){
+        if(tile.book==null||draggingBook==null)return;
+        Integer position=dragPreviewPositions.get(shelfKey(tile.book));
+        if(position==null){tile.slideTo(0,0);return;}
+        Point slot=shelfSlot(position);
+        tile.slideTo(slot.x-tile.getLeft(),slot.y-tile.getTop());
     }
     private Point shelfSlot(int position){
-        int childIndex=position-grid.getFirstVisiblePosition();
+        int columns=Math.max(1,grid.getNumColumns());
+        int first=grid.getFirstVisiblePosition();
+        int childIndex=position-first;
         if(childIndex>=0&&childIndex<grid.getChildCount()){View child=grid.getChildAt(childIndex);return new Point(child.getLeft(),child.getTop());}
-        View first=grid.getChildAt(0);int columns=grid.getNumColumns(),rowHeight=first.getHeight()+grid.getVerticalSpacing();
-        if(grid.getChildCount()>columns)rowHeight=grid.getChildAt(columns).getTop()-first.getTop();
-        return new Point(grid.getPaddingLeft()+(position%columns)*(first.getWidth()+grid.getHorizontalSpacing()),first.getTop()+(position/columns-grid.getFirstVisiblePosition()/columns)*rowHeight);
+        View firstChild=grid.getChildAt(0);
+        if(firstChild==null)return new Point(grid.getPaddingLeft(),grid.getPaddingTop());
+        int rowHeight=Math.max(1,firstChild.getHeight()+grid.getVerticalSpacing());
+        int firstRow=first/columns,row=position/columns,column=position%columns;
+        return new Point(grid.getPaddingLeft()+column*(firstChild.getWidth()+grid.getHorizontalSpacing()),firstChild.getTop()+(row-firstRow)*rowHeight);
     }
     private GradientDrawable dragOutline(){GradientDrawable border=u.shape(Color.TRANSPARENT,16);border.setStroke(u.dp(2),Ui.BLUE);return border;}
     private void clearShelfPreview(){
-        dragTarget=null;dragZone=ShelfOrder.NONE;dragPreviewPositions.clear();
+        dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();dragPreviewSignature="";dragPreviewPositions.clear();
         if(grid==null)return;
         for(int n=0;n<grid.getChildCount();n++){
-            View child=grid.getChildAt(n);child.animate().cancel();
-            if(child instanceof ShelfTile){ShelfTile tile=(ShelfTile)child;tile.clearFolderPreview();tile.clearDropTarget();}
-            child.animate().translationX(0).translationY(0).scaleX(1).scaleY(1).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
+            View child=grid.getChildAt(n);
+            if(!(child instanceof ShelfTile)){child.animate().cancel();child.setTranslationX(0);child.setTranslationY(0);continue;}
+            ShelfTile tile=(ShelfTile)child;
+            tile.clearFolderPreview();tile.clearDropTarget();tile.slideTo(0,0);
         }
     }
     /** The bottom capsule only becomes a drop target while dragging something that lives in a folder. */
@@ -573,7 +702,7 @@ public final class MainActivity extends Activity {
         JSONObject item=draggingBook;
         if(item==null||folderId.isEmpty()||operation)return;
         if(item.optBoolean("book_folder")){
-            // Dismantle: its books return to the list they are being dragged onto.
+            // Dismantle: its books and every nested folder's books return to the list it is dragged onto.
             mutate(()->library.deleteFolder(item.optString("id")));
             return;
         }
@@ -654,7 +783,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 4.5.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 5.0.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -673,21 +802,27 @@ public final class MainActivity extends Activity {
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("draft",input==null?draft:input.getText().toString());b.putString("search",searchInput==null?searchDraft:searchInput.getText().toString());b.putString("folder",privateShelf?"":folderId);b.putString("task_id",taskId);}
     private final class OnlineAdapter extends BaseAdapter {
         public int getCount(){return onlineBooks.size();}public Object getItem(int p){return onlineBooks.get(p);}public long getItemId(int p){return p;}
-        public View getView(int p,View old,ViewGroup parent){
-            JSONObject o=onlineBooks.get(p);
-            LinearLayout outer=u.column();outer.setPadding(0,0,0,u.dp(10));
-            LinearLayout r=u.row();r.setPadding(u.dp(14),u.dp(12),u.dp(14),u.dp(12));u.round(r,u.card,20);outer.addView(r,new LinearLayout.LayoutParams(-1,-2));
+        public View getView(int p,View old,ViewGroup parent){OnlineRow row=old instanceof OnlineRow?(OnlineRow)old:new OnlineRow();row.bind(onlineBooks.get(p));return row;}
+    }
+    /** Recycled like the shelf rows so scrolling history does not inflate a row per movement. */
+    private final class OnlineRow extends LinearLayout {
+        final ImageView cover;final TextView name,sub;
+        OnlineRow(){
+            super(MainActivity.this);setOrientation(VERTICAL);setPadding(0,0,0,u.dp(10));
+            LinearLayout body=u.row();body.setPadding(u.dp(14),u.dp(12),u.dp(14),u.dp(12));u.round(body,u.card,20);addView(body,new LinearLayout.LayoutParams(-1,-2));
             FrameLayout coverFrame=new FrameLayout(MainActivity.this);coverFrame.setBackground(u.shape(u.tint,12));coverFrame.setClipToOutline(true);
-            ImageView cover=new ImageView(MainActivity.this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);coverFrame.addView(cover,new FrameLayout.LayoutParams(-1,-1));
-            RemoteCovers.load(cover,o.optString("thumbnail"),o.optLong("sourceId"));r.addView(coverFrame,new LinearLayout.LayoutParams(u.dp(52),u.dp(72)));
-            LinearLayout details=u.column();LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-2,1);dp.setMargins(u.dp(14),0,u.dp(8),0);r.addView(details,dp);
-            TextView name=u.text(o.optString("title","未命名"),14,u.ink,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);details.addView(name);
+            cover=new ImageView(MainActivity.this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);coverFrame.addView(cover,new FrameLayout.LayoutParams(-1,-1));
+            body.addView(coverFrame,new LinearLayout.LayoutParams(u.dp(52),u.dp(72)));
+            LinearLayout details=u.column();LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-2,1);dp.setMargins(u.dp(14),0,u.dp(8),0);body.addView(details,dp);
+            name=u.text("",14,u.ink,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);details.addView(name);
             u.space(details,7);
-            String source=o.optString("sourceName","在线图源");
-            String last=o.optString("lastChapterName","");
-            String info=last.isEmpty()?source+" · 共"+o.optInt("chapterCount")+"章":source+" · "+last;
-            TextView sub=u.text(info,11,u.muted,false);sub.setMaxLines(1);sub.setEllipsize(android.text.TextUtils.TruncateAt.END);details.addView(sub);
-            return outer;
+            sub=u.text("",11,u.muted,false);sub.setMaxLines(1);sub.setEllipsize(android.text.TextUtils.TruncateAt.END);details.addView(sub);
+        }
+        void bind(JSONObject o){
+            RemoteCovers.load(cover,o.optString("thumbnail"),o.optLong("sourceId"));
+            text(name,o.optString("title","未命名"));
+            String source=o.optString("sourceName","在线图源"),last=o.optString("lastChapterName","");
+            text(sub,last.isEmpty()?source+" · 共"+o.optInt("chapterCount")+"章":source+" · "+last);
         }
     }
     private final class BookAdapter extends BaseAdapter {
@@ -701,7 +836,7 @@ public final class MainActivity extends Activity {
                 LinearLayout outer=u.column();outer.setPadding(0,0,0,u.dp(10));LinearLayout body=u.row();body.setPadding(u.dp(14),u.dp(12),u.dp(14),u.dp(12));u.round(body,u.card,20);outer.addView(body,new LinearLayout.LayoutParams(-1,-2));TextView empty=u.text("从一个编号开始",14,u.muted,false);empty.setGravity(Gravity.CENTER);empty.setPadding(0,u.dp(30),0,u.dp(30));body.addView(empty,new LinearLayout.LayoutParams(-1,-2));return outer;
             }
             BookRow row=old instanceof BookRow?(BookRow)old:new BookRow();
-            row.name.setText(DownloadRecordActions.displayTitle(book,revealed));row.info.setText(DownloadRecordActions.summary(book));row.cover.bind(book,revealed);
+            text(row.name,DownloadRecordActions.displayTitle(book,revealed));text(row.info,DownloadRecordActions.summary(book));row.cover.bind(book,revealed);
             return row;
         }
     }
@@ -772,17 +907,19 @@ public final class MainActivity extends Activity {
             if(book==null||operation||draggingBook!=null||(shelfSearch!=null&&shelfSearch.isExpanded()))return false;
             cancelShelfMenu();
             draggingBook=book;dragRows.clear();dragRows.addAll(rows);
-            dragTarget=null;dragZone=ShelfOrder.NONE;dragCover=snapshotFace(face);
-            dragMoved=true;dragX=getLeft()+touchX;dragY=getTop()+touchY;
-            holdReady=false;
+            dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();dragPreviewSignature="";dragCover=snapshotFace(face);
+            holdReady=false;handler.removeCallbacks(dragEndSettle);
             boolean started=startDragAndDrop(ClipData.newPlainText("book",Library.key(book)),new TileShadow(this,touchX,touchY),book,0);
-            if(!started){draggingBook=null;dragRows.clear();dragTarget=null;dragZone=ShelfOrder.NONE;dragCover=null;dragMoved=false;return false;}
+            if(!started){draggingBook=null;dragRows.clear();dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragPreviewSignature="";dragCover=null;return false;}
             holdReady=false;shelfHoldActive=false;
             setAlpha(0f);
+            // Lift the tile out of the flow at once so its slot closes under the drag shadow.
+            ArrayList<String> order=new ArrayList<>();for(JSONObject row:dragRows)order.add(shelfKey(row));
+            applyShelfPreview(ShelfOrder.without(order,shelfKey(book)));
             if(shelfCapsuleActive())showShelfDropPill(book.optBoolean("book_folder")?"拖动到此拆除书籍夹":"拖动到此移出书籍夹");
             return true;
         }
-        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private final int width,height;private int touchX,touchY;private View folderPreview;private BookCover bookCover;private boolean dropTarget;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
+        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private final int width,height;private int touchX,touchY;private View folderPreview;private BookCover bookCover;private boolean dropTarget;private float slideTargetX,slideTargetY;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
         ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);int columns=grid.getNumColumns();width=(getResources().getDisplayMetrics().widthPixels-u.dp(36)-u.dp(10)*(columns-1))/columns;height=(int)(width*1.40f);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,6);name=u.text("",12,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setPadding(u.dp(2),0,u.dp(2),0);addView(name,new LinearLayout.LayoutParams(-1,-2));info=u.text("",10,u.muted,false);info.setMaxLines(1);info.setMinLines(1);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setPadding(u.dp(2),u.dp(2),u.dp(2),0);info.setVisibility(View.INVISIBLE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);cancelShelfMenu();touchX=(int)e.getX();touchY=(int)e.getY();removeCallbacks(pressFeedback);postDelayed(pressFeedback,Math.max(0,(tab==1?Math.min(SHELF_HOLD_MILLIS,ViewConfiguration.getLongPressTimeout()):ViewConfiguration.getLongPressTimeout())-110));}else if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){removeCallbacks(pressFeedback);animate().cancel();if(getScaleX()!=1f||getScaleY()!=1f)animate().scaleX(1).scaleY(1).setDuration(150).start();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{
             if(holdReady)return true;
             if(book==null)return false;
@@ -819,8 +956,32 @@ public final class MainActivity extends Activity {
             }
             return super.onTouchEvent(event);
         }
-        @Override protected void onDetachedFromWindow(){removeCallbacks(shelfLongPress);removeCallbacks(pressFeedback);if(holdReady)endShelfHold();animate().cancel();setScaleX(1);setScaleY(1);super.onDetachedFromWindow();}
-        void bind(JSONObject b){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);removeCallbacks(pressFeedback);boolean rebound=book==null||!shelfKey(book).equals(shelfKey(b));if(draggingBook==null||rebound){animate().cancel();setTranslationX(0);setTranslationY(0);setScaleX(1);setScaleY(1);setForeground(null);clearFolderPreview();clearDropTarget();name.setAlpha(1f);if(bookCover!=null)bookCover.setAlpha(1f);}book=b;setAlpha(draggingBook!=null&&Library.key(draggingBook).equals(Library.key(b))?0f:1f);name.setText(b.optString("title","未命名"));setContentDescription(b.optString("title"));String detail=onlineDetail(b);info.setText(detail);info.setVisibility(detail.isEmpty()?View.INVISIBLE:View.VISIBLE);String identity=b.optBoolean("book_folder")?"folder:"+b.optString("id"):b.optString("key");if(b.optBoolean("book_folder")){identity+="/"+folderCovers.signature(b.optString("id"));}else if(b.has("sourceId"))identity+="|"+b.optString("thumbnail");if(b.optBoolean("book_folder")){if(!identity.equals(faceKey)){face.removeAllViews();face.addView(folderCover(b,width,height),new FrameLayout.LayoutParams(-1,-1));}else retryMissingCovers(face);}else{if(bookCover==null)bookCover=new BookCover();if(bookCover.getParent()!=face){face.removeAllViews();face.addView(bookCover,new FrameLayout.LayoutParams(-1,-1));}bookCover.bind(b,true);}faceKey=identity;if(rebound&&draggingBook!=null){String bound=shelfKey(b);post(()->{Integer position=dragPreviewPositions.get(bound);if(draggingBook!=null&&bound.equals(shelfKey(book))&&position!=null){Point slot=shelfSlot(position);animate().cancel();setTranslationX(slot.x-getLeft());setTranslationY(slot.y-getTop());}});}}
+        @Override protected void onDetachedFromWindow(){removeCallbacks(shelfLongPress);removeCallbacks(pressFeedback);if(holdReady)endShelfHold();animate().cancel();setScaleX(1);setScaleY(1);setTranslationX(0);setTranslationY(0);slideTargetX=0;slideTargetY=0;super.onDetachedFromWindow();}
+        void bind(JSONObject b){
+            if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);removeCallbacks(pressFeedback);
+            boolean rebound=book==null||!shelfKey(book).equals(shelfKey(b));
+            if(draggingBook==null||rebound){resetSlide();setScaleX(1);setScaleY(1);setForeground(null);clearFolderPreview();clearDropTarget();name.setAlpha(1f);if(bookCover!=null)bookCover.setAlpha(1f);}
+            book=b;
+            setAlpha(draggingBook!=null&&shelfKey(draggingBook).equals(shelfKey(b))?0f:1f);
+            text(name,b.optString("title","未命名"));setContentDescription(b.optString("title"));
+            String detail=onlineDetail(b);text(info,detail);
+            int wanted=detail.isEmpty()?View.INVISIBLE:View.VISIBLE;
+            if(info.getVisibility()!=wanted)info.setVisibility(wanted);
+            String identity=b.optBoolean("book_folder")?"folder:"+b.optString("id"):b.optString("key");
+            if(b.optBoolean("book_folder")){identity+="/"+folderCovers.signature(b.optString("id"));}else if(b.has("sourceId"))identity+="|"+b.optString("thumbnail");
+            if(b.optBoolean("book_folder")){if(!identity.equals(faceKey)){face.removeAllViews();face.addView(folderCover(b,width,height),new FrameLayout.LayoutParams(-1,-1));}else retryMissingCovers(face);}
+            else{if(bookCover==null)bookCover=new BookCover();if(bookCover.getParent()!=face){face.removeAllViews();face.addView(bookCover,new FrameLayout.LayoutParams(-1,-1));}bookCover.bind(b,true);}
+            faceKey=identity;
+            if(rebound&&draggingBook!=null)post(()->{if(draggingBook!=null&&book==b)applyShelfTilePreview(this);});
+        }
+        /** One retargetable animation per tile: repeated drag locations never restart unchanged tiles. */
+        void slideTo(float x,float y){
+            if(Math.abs(slideTargetX-x)<.5f&&Math.abs(slideTargetY-y)<.5f)return;
+            slideTargetX=x;slideTargetY=y;
+            animate().cancel();
+            animate().translationX(x).translationY(y).setDuration(DRAG_PREVIEW_MS).setInterpolator(DRAG_PREVIEW_INTERPOLATOR).start();
+        }
+        private void resetSlide(){animate().cancel();slideTargetX=0;slideTargetY=0;setTranslationX(0);setTranslationY(0);}
         void showDropTarget(){
             if(dropTarget)return;
             dropTarget=true;
@@ -841,7 +1002,7 @@ public final class MainActivity extends Activity {
             preview.animate().cancel();
             preview.animate().alpha(0f).scaleX(DRAG_PREVIEW_SCALE).scaleY(DRAG_PREVIEW_SCALE).setDuration(DRAG_PREVIEW_MS).setInterpolator(new DecelerateInterpolator()).withEndAction(()->face.removeView(preview)).start();
             if(bookCover!=null){bookCover.animate().cancel();bookCover.animate().alpha(1f).setDuration(DRAG_PREVIEW_MS).setInterpolator(new DecelerateInterpolator()).start();}
-            if(book!=null){name.animate().cancel();name.setText(book.optString("title","未命名"));name.setAlpha(0f);name.animate().alpha(1f).setDuration(DRAG_NAME_MS).start();}
+            if(book!=null){name.animate().cancel();text(name,book.optString("title","未命名"));name.setAlpha(0f);name.animate().alpha(1f).setDuration(DRAG_NAME_MS).start();}
         }
         /** A hovered book turns into the same folder face a real folder uses, then opens on release. */
         void showFolderPreview(){
