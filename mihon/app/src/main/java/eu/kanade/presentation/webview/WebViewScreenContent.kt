@@ -16,8 +16,16 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +33,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -45,7 +56,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import cafe.adriel.voyager.core.stack.mutableStateStackOf
 import com.kevinnzou.web.AccompanistWebChromeClient
@@ -56,6 +72,8 @@ import com.kevinnzou.web.WebView
 import com.kevinnzou.web.WebViewNavigator
 import com.kevinnzou.web.WebViewState
 import com.joe.jmlite.BrowserAdBlock
+import com.joe.jmlite.TranslateAssets
+import com.joe.jmlite.TranslateBridge
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.presentation.components.WarningBanner
@@ -78,6 +96,12 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.screens.LoadingScreen
 
+private enum class TranslateMode(val js: String, val label: String) {
+    OFF("off", "关闭"),
+    ZH("zh", "转中文"),
+    EN("en", "转外文"),
+    BOTH("both", "双显"),
+}
 class WebViewWindow(webContent: WebContent, val navigator: WebViewNavigator) {
     var state by mutableStateOf(WebViewState(webContent))
     var popupMessage: Message? = null
@@ -122,9 +146,74 @@ fun WebViewScreenContent(
     val blockingEnabled = remember { AtomicBoolean(adBlockEnabled) }
     var showUrl by remember { mutableStateOf(false) }
     var showAdBlockSettings by remember { mutableStateOf(false) }
-    var confirmDisableAdBlock by remember { mutableStateOf(false) }
+    var showAdBlockCode by remember { mutableStateOf(false) }
+    var adBlockCode by remember { mutableStateOf("") }
+    var adBlockCodeError by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    var translateOpen by remember { mutableStateOf(false) }
+    var translateMode by remember { mutableStateOf(TranslateMode.OFF) }
+    var translateInjected by remember { mutableStateOf(false) }
+    var translateBusy by remember { mutableStateOf(false) }
+    var translateAuto by remember { mutableStateOf(false) }
+    var translateSelect by remember { mutableStateOf(false) }
+    var translateHighlight by remember { mutableStateOf(preferences.getBoolean("translate_highlight", true)) }
+    var translateEpoch by remember { mutableStateOf(0) }
+    var translateWebView by remember { mutableStateOf<WebView?>(null) }
+    val translateScope = rememberCoroutineScope()
 
+    fun resetTranslation() {
+        translateEpoch++
+        translateMode = TranslateMode.OFF
+        translateAuto = false
+        translateSelect = false
+        translateInjected = false
+        translateBusy = false
+        translateOpen = false
+    }
+    fun ensureTranslate(view: WebView?) {
+        if (view == null || translateInjected || translateBusy) return
+        translateBusy = true
+        val epoch = translateEpoch
+        val highlight = translateHighlight
+        translateScope.launch {
+            try {
+                view.addJavascriptInterface(TranslateBridge(context, view), "JYTranslate")
+                val chunks = withContext(Dispatchers.IO) { TranslateAssets.chunks(context, highlight) }
+                for (chunk in chunks) {
+                    if (epoch != translateEpoch) return@launch
+                    view.evaluateJavascript(chunk, null)
+                }
+                if (epoch == translateEpoch) translateInjected = true
+            } catch (_: Exception) {
+                Toast.makeText(context, "翻译组件加载失败", Toast.LENGTH_SHORT).show()
+            } finally {
+                if (epoch == translateEpoch) translateBusy = false
+            }
+        }
+    }
+    fun applyTranslate(mode: TranslateMode) {
+        translateMode = mode
+        if (mode == TranslateMode.OFF) {
+            translateAuto = false
+            translateSelect = false
+        }
+        translateWebView?.evaluateJavascript("window.__jyApply&&window.__jyApply('${mode.js}')", null)
+    }
+    fun setTranslateAuto(on: Boolean) {
+        translateAuto = on
+        if (on) translateSelect = false
+        translateWebView?.evaluateJavascript("window.__jyWhenReady&&window.__jyWhenReady(function(){window.__jySetAuto($on)})", null)
+    }
+    fun setTranslateSelect(on: Boolean) {
+        translateSelect = on
+        if (on) translateAuto = false
+        translateWebView?.evaluateJavascript("window.__jyWhenReady&&window.__jyWhenReady(function(){window.__jySetSelect($on)})", null)
+    }
+    fun setTranslateHighlight(on: Boolean) {
+        translateHighlight = on
+        preferences.edit().putBoolean("translate_highlight", on).apply()
+        translateWebView?.evaluateJavascript("window.__jyWhenReady&&window.__jyWhenReady(function(){window.__jySetHighlight($on)})", null)
+    }
     val windowStack = remember {
         mutableStateStackOf(
             WebViewWindow(
@@ -186,6 +275,8 @@ fun WebViewScreenContent(
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                // Every page entry starts with translation off; the sheet is re-opened explicitly.
+                resetTranslation()
                 url?.let {
                     currentUrl = it
                     onUrlChange(it)
@@ -209,6 +300,13 @@ fun WebViewScreenContent(
                 isReload: Boolean,
             ) {
                 super.doUpdateVisitedHistory(view, url, isReload)
+                if (url != null && url != currentUrl) {
+                    translateMode = TranslateMode.OFF
+                    translateAuto = false
+                    translateSelect = false
+                    translateOpen = false
+                    view.evaluateJavascript("window.__jyApply&&window.__jyApply('off')", null)
+                }
                 url?.let {
                     currentUrl = it
                     onUrlChange(it)
@@ -358,7 +456,9 @@ fun WebViewScreenContent(
                         Switch(checked = adBlockEnabled, onCheckedChange = { enabled ->
                             if (enabled) setAdBlockEnabled(true) else {
                                 showAdBlockSettings = false
-                                confirmDisableAdBlock = true
+                                showAdBlockCode = true
+                                adBlockCode = ""
+                                adBlockCodeError = false
                             }
                         })
                     }
@@ -367,18 +467,156 @@ fun WebViewScreenContent(
             confirmButton = { TextButton(onClick = { showAdBlockSettings = false }) { Text("完成") } },
         )
     }
-    if (confirmDisableAdBlock) {
-        fun dismissConfirmation() { confirmDisableAdBlock = false; showAdBlockSettings = true }
+    if (showAdBlockCode) {
+        fun closeCode() { showAdBlockCode = false; showAdBlockSettings = true; adBlockCodeError = false }
         AlertDialog(
-            onDismissRequest = { dismissConfirmation() },
+            onDismissRequest = { closeCode() },
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            title = { Text("关闭去广告拓展？") },
-            text = { Text("关闭后将重新加载网页，网站广告可能重新显示。") },
-            confirmButton = { TextButton(onClick = { setAdBlockEnabled(false); dismissConfirmation() }) { Text("确认关闭") } },
-            dismissButton = { TextButton(onClick = { dismissConfirmation() }) { Text("取消") } },
+            title = { Text("输入恶臭数字关闭去广告插件") },
+            text = {
+                Column {
+                    Text("关闭后将重新加载网页，网站广告可能重新显示。")
+                    OutlinedTextField(
+                        value = adBlockCode,
+                        onValueChange = {
+                            adBlockCode = it.filter { c -> c.isDigit() }.take(6)
+                            adBlockCodeError = false
+                        },
+                        singleLine = true,
+                        isError = adBlockCodeError,
+                        label = { Text("恶臭数字") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    )
+                    if (adBlockCodeError) {
+                        Text(
+                            text = "数字不正确",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (adBlockCode == "114514") {
+                        setAdBlockEnabled(false)
+                        showAdBlockCode = false
+                        showAdBlockSettings = true
+                        adBlockCodeError = false
+                    } else {
+                        adBlockCodeError = true
+                    }
+                }) { Text("确认关闭") }
+            },
+            dismissButton = { TextButton(onClick = { closeCode() }) { Text("取消") } },
         )
     }
 
+    if (translateOpen) {
+        val ready = translateInjected && !translateBusy
+        AlertDialog(
+            onDismissRequest = { translateOpen = false },
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("译", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                    Spacer(Modifier.size(10.dp))
+                    Column {
+                        Text("网页翻译")
+                        Text(
+                            text = "网页中英双显互译 · 按需开启",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        text = "进入新页面时翻译默认关闭。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (translateBusy) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 10.dp))
+                        Text("正在准备翻译组件…", style = MaterialTheme.typography.bodySmall)
+                    } else if (!translateInjected) {
+                        Text(
+                            text = "翻译组件未就绪，请关闭后重试。",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("翻译方向", fontWeight = FontWeight.SemiBold)
+                    TranslateMode.values().forEach { mode ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = ready) { applyTranslate(mode) }
+                                .padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = translateMode == mode, onClick = null, enabled = ready)
+                            Text(mode.label, modifier = Modifier.padding(start = 6.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("高亮译文")
+                        Switch(checked = translateHighlight, onCheckedChange = { setTranslateHighlight(it) }, enabled = ready)
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("自动翻译")
+                        Switch(checked = translateAuto, onCheckedChange = { setTranslateAuto(it) }, enabled = ready)
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("选词翻译")
+                        Switch(checked = translateSelect, onCheckedChange = { setTranslateSelect(it) }, enabled = ready)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        TextButton(
+                            onClick = {
+                                translateOpen = false
+                                translateWebView?.evaluateJavascript("window.__jyWhenReady&&window.__jyWhenReady(function(){window.__jyClick('switchAPI')})", null)
+                            },
+                            enabled = ready,
+                        ) {
+                            Text("引擎设置")
+                        }
+                        TextButton(onClick = { applyTranslate(TranslateMode.OFF) }, enabled = ready) {
+                            Text("还原原文")
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { translateOpen = false }) { Text("完成") } },
+        )
+    }
     Scaffold(
         topBar = {
             Box {
@@ -388,6 +626,10 @@ fun WebViewScreenContent(
                         navigateUp = onNavigateUp,
                         navigationIcon = MaterialSymbols.Rounded.Close,
                         actions = {
+                            TranslateAction {
+                                translateOpen = true
+                                ensureTranslate(translateWebView)
+                            }
                             AppBarActions(
                                 listOf(
                                     AppBar.OverflowAction(
@@ -449,6 +691,7 @@ fun WebViewScreenContent(
                     .padding(contentPadding),
                 navigator = navigator,
                 onCreated = { webView ->
+                    translateWebView = webView
                     webView.setDefaultSettings()
                     CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
@@ -485,6 +728,29 @@ fun WebViewScreenContent(
                             }
                         }
                 },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TranslateAction(onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.semantics { contentDescription = "网页翻译" },
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "译",
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
             )
         }
     }

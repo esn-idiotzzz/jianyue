@@ -85,4 +85,7 @@
 
 # KotlinX Datetime
 -keep,allowoptimization class kotlinx.datetime.** { public protected *; }
-
+# WebView translation bridge: methods are called from JavaScript by name.
+-keepclassmembers class com.joe.jmlite.TranslateBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}

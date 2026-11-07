@@ -42,7 +42,7 @@ $taskVariant=if($Debug){'debug'}else{'release'}
 $taskApk=Join-Path $PSScriptRoot "mihon\app\build\outputs\apk\$taskVariant\app-$taskVariant.apk"
 if(!(Test-Path -LiteralPath $taskApk)){throw 'arm64-v8a APK was not generated.'}
 New-Item -ItemType Directory -Force (Join-Path $PSScriptRoot 'build') | Out-Null
-Copy-Item -LiteralPath $taskApk -Destination (Join-Path $PSScriptRoot 'build\JM-Lite-5.0.3-arm64-v8a.apk') -Force
+Copy-Item -LiteralPath $taskApk -Destination (Join-Path $PSScriptRoot 'build\JM-Lite-5.1.0-arm64-v8a.apk') -Force
 $taskVersion=[regex]::Match([IO.File]::ReadAllText((Join-Path $PSScriptRoot 'mihon\app\build.gradle.kts')),'versionName = "([0-9.]+)"').Groups[1].Value
 $taskProject='https://github.com/esn-idiotzzz/jianyue'
 $taskManifest=[ordered]@{
@@ -52,4 +52,4 @@ $taskManifest=[ordered]@{
     assets=@([ordered]@{name="JianYue-$taskVersion-arm64-v8a.apk";state='uploaded';browser_download_url="$taskProject/releases/download/v$taskVersion/JianYue-$taskVersion-arm64-v8a.apk";size=(Get-Item -LiteralPath $taskApk).Length;digest='sha256:'+((Get-FileHash -LiteralPath $taskApk).Hash.ToLowerInvariant())})
 }
 [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'build\update.json'),($taskManifest | ConvertTo-Json -Depth 4),[Text.UTF8Encoding]::new($false))
-Get-Item -LiteralPath (Join-Path $PSScriptRoot 'build\JM-Lite-5.0.3-arm64-v8a.apk') | Select-Object FullName,Length
+Get-Item -LiteralPath (Join-Path $PSScriptRoot 'build\JM-Lite-5.1.0-arm64-v8a.apk') | Select-Object FullName,Length
