@@ -1,9 +1,6 @@
 package eu.kanade.presentation.webview
 
 import android.content.pm.ApplicationInfo
-import android.content.Context
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.graphics.Bitmap
 import android.os.Message
 import android.view.ViewGroup
@@ -18,19 +15,13 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -47,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import cafe.adriel.voyager.core.stack.mutableStateStackOf
@@ -60,7 +50,6 @@ import com.kevinnzou.web.WebViewNavigator
 import com.kevinnzou.web.WebViewState
 import com.joe.jmlite.BrowserAdBlock
 import eu.kanade.presentation.components.AppBar
-import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.presentation.components.WarningBanner
 import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.util.system.getHtml
@@ -71,11 +60,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
-import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 import logcat.LogPriority
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.Close
+import mihon.icons.materialsymbols.rounded.Refresh
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -120,14 +109,6 @@ fun WebViewScreenContent(
         return
     }
     val blocker = adBlock!!
-    val preferences = remember { context.getSharedPreferences("source_browser", Context.MODE_PRIVATE) }
-    var adBlockEnabled by remember { mutableStateOf(preferences.getBoolean("adblock_enabled", true)) }
-    val blockingEnabled = remember { AtomicBoolean(adBlockEnabled) }
-    var showUrl by remember { mutableStateOf(false) }
-    var showAdBlockSettings by remember { mutableStateOf(false) }
-    var showAdBlockCode by remember { mutableStateOf(false) }
-    var adBlockCode by remember { mutableStateOf("") }
-    var adBlockCodeError by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val windowStack = remember {
         mutableStateStackOf(
@@ -161,7 +142,7 @@ fun WebViewScreenContent(
     val webClient = remember {
         object : AccompanistWebViewClient() {
             private fun hideAds(view: WebView, url: String?) {
-                if (!isActive || !blockingEnabled.get()) return
+                if (!isActive) return
                 val css = blocker.css(url ?: return)
                 view.evaluateJavascript(
                     "(function(){var s=document.getElementById('jianyue-adblock');" +
@@ -172,7 +153,7 @@ fun WebViewScreenContent(
             }
 
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                if (blockingEnabled.get() && request != null && blocker.blocks(
+                if (request != null && blocker.blocks(
                     request.url.toString(),
                     request.requestHeaders.entries.firstOrNull { it.key.equals("Referer", true) }?.value ?: currentUrl,
                     BrowserAdBlock.resourceType(request.url.toString(), request.requestHeaders),
@@ -323,103 +304,6 @@ fun WebViewScreenContent(
         }
     }
 
-    fun setAdBlockEnabled(enabled: Boolean) {
-        blockingEnabled.set(enabled)
-        adBlockEnabled = enabled
-        preferences.edit().putBoolean("adblock_enabled", enabled).apply()
-        windowStack.items.forEach { window ->
-            window.webView?.evaluateJavascript("document.getElementById('jianyue-adblock')?.remove()", null)
-            window.navigator.reload()
-        }
-    }
-
-    if (showUrl) {
-        AlertDialog(
-            onDismissRequest = { showUrl = false },
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            title = { Text("网址信息") },
-            text = { androidx.compose.foundation.text.selection.SelectionContainer { Text(currentUrl) } },
-            confirmButton = { TextButton(onClick = { showUrl = false }) { Text("完成") } },
-            dismissButton = {
-                TextButton(onClick = {
-                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                        .setPrimaryClip(ClipData.newPlainText("图源网址", currentUrl))
-                    showUrl = false
-                }) { Text("复制网址") }
-            },
-        )
-    }
-    if (showAdBlockSettings) {
-        AlertDialog(
-            onDismissRequest = { showAdBlockSettings = false },
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            title = { Text("去广告拓展") },
-            text = {
-                Column {
-                    Text("自用去广告规则 · 其他.prop")
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (adBlockEnabled) "已开启" else "已关闭")
-                        Switch(checked = adBlockEnabled, onCheckedChange = { enabled ->
-                            if (enabled) setAdBlockEnabled(true) else {
-                                showAdBlockSettings = false
-                                showAdBlockCode = true
-                                adBlockCode = ""
-                                adBlockCodeError = false
-                            }
-                        })
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showAdBlockSettings = false }) { Text("完成") } },
-        )
-    }
-    if (showAdBlockCode) {
-        fun closeCode() { showAdBlockCode = false; showAdBlockSettings = true; adBlockCodeError = false }
-        AlertDialog(
-            onDismissRequest = { closeCode() },
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            title = { Text("输入恶臭数字关闭去广告插件") },
-            text = {
-                Column {
-                    Text("关闭后将重新加载网页，网站广告可能重新显示。")
-                    OutlinedTextField(
-                        value = adBlockCode,
-                        onValueChange = {
-                            adBlockCode = it.filter { c -> c.isDigit() }.take(6)
-                            adBlockCodeError = false
-                        },
-                        singleLine = true,
-                        isError = adBlockCodeError,
-                        label = { Text("恶臭数字") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                    )
-                    if (adBlockCodeError) {
-                        Text(
-                            text = "数字不正确",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (adBlockCode == "114514") {
-                        setAdBlockEnabled(false)
-                        showAdBlockCode = false
-                        showAdBlockSettings = true
-                        adBlockCodeError = false
-                    } else {
-                        adBlockCodeError = true
-                    }
-                }) { Text("确认关闭") }
-            },
-            dismissButton = { TextButton(onClick = { closeCode() }) { Text("取消") } },
-        )
-    }
-
     Scaffold(
         topBar = {
             Box {
@@ -429,18 +313,13 @@ fun WebViewScreenContent(
                         navigateUp = onNavigateUp,
                         navigationIcon = MaterialSymbols.Rounded.Close,
                         actions = {
-                            AppBarActions(
-                                listOf(
-                                    AppBar.OverflowAction(
-                                        title = "网址信息",
-                                        onClick = { showUrl = true },
-                                    ),
-                                    AppBar.OverflowAction(
-                                        title = "去广告拓展",
-                                        onClick = { showAdBlockSettings = true },
-                                    ),
-                                ),
-                            )
+                            // Refreshes the page that is currently open; it never jumps back home.
+                            IconButton(onClick = { navigator.reload() }) {
+                                Icon(
+                                    imageVector = MaterialSymbols.Rounded.Refresh,
+                                    contentDescription = "刷新网页",
+                                )
+                            }
                         },
                     )
 
