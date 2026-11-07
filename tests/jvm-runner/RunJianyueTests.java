@@ -41,6 +41,7 @@ public class RunJianyueTests {
                         DiscoverySelectors.selectClass("com.joe.jmlite.PrivacyIntroductionTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.PrivacyRecoveryTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.FolderCoverIndexTest"),
+                        DiscoverySelectors.selectClass("com.joe.jmlite.ShelfFavoriteScopeTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.SystemFolderNamesTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.SourceSearchTriggerTest"),
                         DiscoverySelectors.selectClass("com.joe.jmlite.AppUpdateChecksTest"),
@@ -56,7 +57,7 @@ public class RunJianyueTests {
         var output = new PrintWriter(System.out, true);
         summary.printTo(output);
         summary.printFailuresTo(output);
-        if (summary.getTestsFoundCount() != 290 || summary.getTestsSucceededCount() != 290 ||
+        if (summary.getTestsFoundCount() != 306 || summary.getTestsSucceededCount() != 306 ||
                 summary.getTestsFailedCount() != 0 || summary.getTestsAbortedCount() != 0) {
             System.exit(1);
         }

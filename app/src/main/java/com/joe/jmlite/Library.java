@@ -49,6 +49,9 @@ public final class Library {
         JSONArray online=state.optJSONArray("online");if(online!=null)for(int n=0;n<online.length();n++)result.add(new JSONObject(online.getJSONObject(n).toString()).put("type","online"));
         JSONObject entries=state.optJSONObject("entries");
         if(entries!=null)for(JSONObject book:result){JSONObject entry=entries.optJSONObject(key(book));if(entry!=null){if(entry.has("title"))book.put("title",entry.getString("title"));book.put("folder",entry.optString("folder")).put("privacy",entry.optBoolean("privacy")).put("favorite",entry.optBoolean("favorite",book.has("sourceId")));}}
+        // Everything under 我的收藏 is a favorite, including books in folders nested inside it.
+        HashSet<String> favorites=favoriteFolders(state);
+        if(!favorites.isEmpty())for(JSONObject book:result)if(favorites.contains(folder(book)))book.put("favorite",true);
         JSONArray saved=state.optJSONArray("bookOrder");if(saved!=null){ArrayList<String> available=new ArrayList<>(),order=new ArrayList<>();HashMap<String,JSONObject> byKey=new HashMap<>();for(JSONObject book:result){String key=key(book);available.add(key);byKey.put(key,book);}for(int n=0;n<saved.length();n++)order.add(saved.optString(n));result.clear();for(String key:ShelfOrder.restore(available,order))result.add(byKey.get(key));}
         result.removeIf(book->book.optBoolean("privacy")!=privateShelf);
         return result;
@@ -120,8 +123,36 @@ public final class Library {
         }
     }
     public void favorite(String key,boolean on) throws Exception {synchronized(LOCK){JSONObject state=read();JSONObject entries=state.optJSONObject("entries");JSONObject existing=entries==null?null:entries.optJSONObject(key);if(existing!=null&&existing.optBoolean("privacy")!=privateShelf){new Library(context,existing.optBoolean("privacy")).favorite(key,on);return;}}if(on)move(key,favoriteFolderId(true));else move(key,"");synchronized(LOCK){JSONObject state=read();entry(state,key).put("favorite",on);write(state);}}
-    public boolean isFavorite(JSONObject book) throws Exception {synchronized(LOCK){JSONObject state=read(),entries=state.optJSONObject("entries"),e=entries==null?null:entries.optJSONObject(key(book));if(e!=null){if(e.has("favorite"))return e.optBoolean("favorite");JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(e.optString("folder").equals(f.optString("id"))&&"favorites".equals(f.optString("system")))return true;}}}String id=favoriteFolderId(false);return book.optBoolean("favorite")||(!id.isEmpty()&&id.equals(book.optString("folder")));}
+    public boolean isFavorite(JSONObject book) throws Exception {synchronized(LOCK){JSONObject state=read();JSONObject entries=state.optJSONObject("entries"),e=entries==null?null:entries.optJSONObject(key(book));if(e!=null){if(inFavorites(state,e.optString("folder")))return true;if(e.has("favorite"))return e.optBoolean("favorite");}String id=favoriteFolderId(false);return book.optBoolean("favorite")||(!id.isEmpty()&&(id.equals(book.optString("folder"))||inFavorites(state,book.optString("folder"))));}}
     public static final String FAVORITES="我的收藏";
+    /** The 我的收藏 directory and every folder nested inside it. */
+    static boolean isFavoriteFolder(JSONObject folder){return "favorites".equals(folder.optString("system"))||FAVORITES.equals(folder.optString("title"));}
+    static HashSet<String> favoriteFolders(JSONObject state){
+        HashSet<String> ids=new HashSet<>();JSONArray folders=state.optJSONArray("folders");
+        if(folders==null)return ids;
+        for(int n=0;n<folders.length();n++){JSONObject f=folders.optJSONObject(n);if(f!=null&&isFavoriteFolder(f))ids.add(f.optString("id"));}
+        boolean changed=true;
+        while(changed){changed=false;for(int n=0;n<folders.length();n++){JSONObject f=folders.optJSONObject(n);if(f!=null&&ids.contains(f.optString("parent"))&&ids.add(f.optString("id")))changed=true;}}
+        return ids;
+    }
+    /** True for 我的收藏 itself and any descendant, however deep the nesting. */
+    static boolean inFavorites(JSONObject state,String folderId){
+        if(folderId==null||folderId.isEmpty())return false;
+        JSONArray folders=state.optJSONArray("folders");if(folders==null)return false;
+        HashSet<String> seen=new HashSet<>();String cursor=folderId;
+        while(!cursor.isEmpty()&&seen.add(cursor)){
+            JSONObject folder=null;for(int n=0;n<folders.length();n++){JSONObject candidate=folders.optJSONObject(n);if(candidate!=null&&cursor.equals(candidate.optString("id"))){folder=candidate;break;}}
+            if(folder==null)return false;
+            if(isFavoriteFolder(folder))return true;
+            cursor=folder.optString("parent");
+        }
+        return false;
+    }
+    static String folderParent(JSONObject state,String folderId){
+        JSONArray folders=state.optJSONArray("folders");if(folders==null)return "";
+        for(int n=0;n<folders.length();n++){JSONObject f=folders.optJSONObject(n);if(f!=null&&folderId.equals(f.optString("id")))return f.optString("parent");}
+        return "";
+    }
     public static boolean isProtectedFolder(JSONObject folder){String system=folder.optString("system");return "favorites".equals(system)||"online_jm".equals(system)||"online_web".equals(system)||"online".equals(system)||FAVORITES.equals(folder.optString("title"));}
     public void renameFolder(String id,String name) throws Exception {name=name(name);synchronized(LOCK){JSONObject state=read();JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(id.equals(folders.getJSONObject(n).optString("id"))){if(isProtectedFolder(folders.getJSONObject(n)))throw new IOException("系统书籍夹不支持重命名");folders.getJSONObject(n).put("title",name);write(state);return;}throw new IOException("书籍夹不存在");}}
     /** Moves a folder one position among its siblings. */
@@ -159,16 +190,27 @@ public final class Library {
         List<JSONObject> all=books();ArrayList<String> siblings=new ArrayList<>();for(JSONObject book:all)if(parent.equals(folder(book)))siblings.add(key(book));
         List<String> members=ShelfOrder.mergeMembers(siblings,sourceKey,targetKey);
         state=read();String id=UUID.randomUUID().toString();array(state,"folders").put(new JSONObject().put("id",id).put("title","新建书夹").put("parent",parent).put("privacy",privateShelf));
-        for(String key:members)entry(state,key).put("folder",id);
+        boolean favorite=inFavorites(state,parent);
+        for(String key:members){JSONObject entry=entry(state,key);entry.put("folder",id);if(favorite)entry.put("favorite",true);}
         JSONArray saved=new JSONArray();int n=0;for(JSONObject book:all){String key=key(book);saved.put(members.contains(key)?members.get(n++):key);}saveScopedOrder(state,saved);
         write(state);return id;
     }}
-    public void move(String key,String folderId) throws Exception {synchronized(LOCK){JSONObject state=read();if(!folderId.isEmpty()){boolean found=false;JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(folderId.equals(folders.getJSONObject(n).optString("id")))found=true;if(!found)throw new IOException("书籍夹不存在");}requireBookScope(state,key);requireScope(state,folderId);requirePlacement(state,key,folderId);entry(state,key).put("folder",folderId);write(state);}}
+    public void move(String key,String folderId) throws Exception {synchronized(LOCK){JSONObject state=read();if(!folderId.isEmpty()){boolean found=false;JSONArray folders=array(state,"folders");for(int n=0;n<folders.length();n++)if(folderId.equals(folders.getJSONObject(n).optString("id")))found=true;if(!found)throw new IOException("书籍夹不存在");}requireBookScope(state,key);requireScope(state,folderId);requirePlacement(state,key,folderId);JSONObject entry=entry(state,key);entry.put("folder",folderId);if(inFavorites(state,folderId))entry.put("favorite",true);write(state);}}
     public String moveToNewFolder(String key,String name,String parent) throws Exception {name=name(name);synchronized(LOCK){
         JSONObject state=read();requireBookScope(state,key);requireScope(state,parent);requirePlacement(state,key,parent);String id=UUID.randomUUID().toString();
-        array(state,"folders").put(new JSONObject().put("id",id).put("title",name).put("parent",parent).put("privacy",privateShelf));entry(state,key).put("folder",id);write(state);return id;
+        array(state,"folders").put(new JSONObject().put("id",id).put("title",name).put("parent",parent).put("privacy",privateShelf));JSONObject entry=entry(state,key);entry.put("folder",id);if(inFavorites(state,parent))entry.put("favorite",true);write(state);return id;
     }}
-    public void deleteFolder(String id) throws Exception {synchronized(LOCK){JSONObject state=read();JSONArray old=array(state,"folders"),next=new JSONArray();for(int n=0;n<old.length();n++)if(!id.equals(old.getJSONObject(n).optString("id")))next.put(old.getJSONObject(n));state.put("folders",next);for(int n=0;n<next.length();n++)if(id.equals(next.getJSONObject(n).optString("parent")))next.getJSONObject(n).put("parent","");JSONObject entries=state.optJSONObject("entries");if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject entry=entries.optJSONObject(keys.next());if(entry!=null&&id.equals(entry.optString("folder")))entry.remove("folder");}}write(state);}}
+    public void deleteFolder(String id) throws Exception {synchronized(LOCK){
+        JSONObject state=read();JSONArray old=array(state,"folders"),next=new JSONArray();
+        String parent="";for(int n=0;n<old.length();n++)if(id.equals(old.getJSONObject(n).optString("id"))){parent=old.getJSONObject(n).optString("parent");break;}
+        for(int n=0;n<old.length();n++)if(!id.equals(old.getJSONObject(n).optString("id")))next.put(old.getJSONObject(n));
+        state.put("folders",next);
+        // Nested folders move up one level instead of jumping to the shelf root.
+        for(int n=0;n<next.length();n++)if(id.equals(next.getJSONObject(n).optString("parent")))next.getJSONObject(n).put("parent",parent);
+        JSONObject entries=state.optJSONObject("entries");boolean favorite=inFavorites(state,parent);
+        if(entries!=null){Iterator<String> keys=entries.keys();while(keys.hasNext()){JSONObject entry=entries.optJSONObject(keys.next());if(entry==null||!id.equals(entry.optString("folder")))continue;if(parent.isEmpty())entry.remove("folder");else entry.put("folder",parent);if(favorite)entry.put("favorite",true);}}
+        write(state);
+    }}
     public void delete(String key) throws Exception {
         synchronized(LOCK){
             requireBookScope(read(),key);
@@ -198,6 +240,8 @@ public final class Library {
             for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(key.equals(f.optString("id")))rootFolder=f;}
             if(rootFolder!=null&&!rootFolder.optString("system").isEmpty())for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(!key.equals(f.optString("id"))&&f.optBoolean("privacy")==target&&rootFolder.optString("system").equals(f.optString("system")))counterpart=f.optString("id");}
             if(!counterpart.isEmpty()){Iterator<String> members=entries.keys();while(members.hasNext()){JSONObject e=entries.getJSONObject(members.next());if(key.equals(e.optString("folder")))e.put("folder",counterpart);}JSONArray next=new JSONArray();for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(key.equals(f.optString("id")))continue;if(key.equals(f.optString("parent")))f.put("parent",counterpart);next.put(f);}state.put("folders",next);}
+            // A moved directory that lives under 我的收藏 keeps every member favorited, nested folders included.
+            Iterator<String> favorites=entries.keys();while(favorites.hasNext()){JSONObject e=entries.getJSONObject(favorites.next());if(inFavorites(state,e.optString("folder")))e.put("favorite",true);}
         }else{
             JSONObject e=entry(state,key);String destination="";String old=e.optString("folder");
             for(int n=0;n<folders.length();n++){JSONObject f=folders.getJSONObject(n);if(old.equals(f.optString("id"))){String system=f.optString("system");if("favorites".equals(system))e.put("favorite",true);if(!system.isEmpty()){
@@ -205,6 +249,7 @@ public final class Library {
                 if(destination.isEmpty()){destination=UUID.randomUUID().toString();folders.put(new JSONObject().put("id",destination).put("system",system).put("title",f.optString("title")).put("privacy",target));}
             }break;}}
             e.put("privacy",target).put("folder",destination);
+            if(inFavorites(state,destination))e.put("favorite",true);
         }write(state);
     }}
     public JSONObject findLocalDownload(String id)throws Exception {for(boolean hidden:new boolean[]{false,true})for(JSONObject b:new Library(context,hidden).books())if(("download:"+id).equals(key(b)))return b;return null;}

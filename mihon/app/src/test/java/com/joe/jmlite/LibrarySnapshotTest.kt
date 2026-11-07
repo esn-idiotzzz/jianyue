@@ -49,4 +49,12 @@ class LibrarySnapshotTest {
         assertEquals("download:7",library.books().single().getString("key"))
         verify(exactly=1){anyConstructed<Store>().list()}
     }
+    @Test fun `a book inside a nested favorites folder is reported as favorite`() {
+        val state=JSONObject()
+            .put("folders",JSONArray().put(JSONObject().put("id","fav").put("title",Library.FAVORITES).put("system","favorites"))
+                .put(JSONObject().put("id","child").put("title","子夹").put("parent","fav")))
+            .put("entries",JSONObject().put("download:1",JSONObject().put("folder","child")))
+        val result=library(state).books(listOf(book("1")))
+        assertTrue(result.single().getBoolean("favorite"))
+    }
 }

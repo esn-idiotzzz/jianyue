@@ -45,6 +45,9 @@ public final class MainActivity extends Activity {
     private final ArrayList<JSONObject> books=new ArrayList<>(),libraryBooks=new ArrayList<>(),bookFolders=new ArrayList<>(),rows=new ArrayList<>(),onlineBooks=new ArrayList<>();
     private final ArrayList<JSONObject> downloadRecords=new ArrayList<>();
     private LinearLayout content,taskCard,nav;
+    private FrameLayout stage;
+    private TextView shelfDropPill;
+    private boolean shelfCapsuleHover;
     private FrameLayout actionSlot;
     private LinearLayout downloadActions;
     private TextView title,taskTitle,taskInfo,taskAction,start;
@@ -88,6 +91,9 @@ public final class MainActivity extends Activity {
     private float dragX,dragY;
     private Runnable pendingShelfMenu;
     private static final int SHELF_MENU_DELAY=90,SHELF_TILE_SETTLE=190;
+    /** One timing and one scale for every drag hover so books and folders feel identical. */
+    private static final int DRAG_TARGET_MS=170,DRAG_PREVIEW_MS=190,DRAG_NAME_MS=120,FOLDER_PREVIEW_DEPTH=3;
+    private static final float DRAG_TARGET_SCALE=.96f,DRAG_PREVIEW_SCALE=.93f;
     private ValueAnimator actionAnimator;
     private FirstRunGuide firstRunGuide;
     private boolean privateShelf;
@@ -119,10 +125,10 @@ public final class MainActivity extends Activity {
         plus=u.icon("add",u.ink);plus.setContentDescription("导入漫画");heading.addView(plus,new LinearLayout.LayoutParams(u.dp(44),u.dp(44)));plus.setOnClickListener(v->importMenu());
         repoHint=u.text("<不行请尝试魔法~>",11,u.muted,false);repoHint.setContentDescription("关于简阅与开源许可");repoHint.setPadding(0,u.dp(12),0,u.dp(12));repoHint.setOnClickListener(v->license());heading.addView(repoHint);
         shelfSearch=new HeaderSearch(this,heading,title,plus,"搜索书架编号或名称",query->{shelfQuery=query;rowsSnapshot="";if(tab==1)render();});root.addView(heading);
-        FrameLayout stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
+        stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
         nav=u.row();nav.setClickable(true);nav.setGravity(Gravity.CENTER);nav.setPadding(u.dp(6),u.dp(5),u.dp(6),u.dp(5));GradientDrawable navBg=u.shape(u.card,28);navBg.setStroke(u.dp(1),u.dark?0x1affffff:0x0d000000);nav.setBackground(navBg);nav.setElevation(u.dp(10));nav.setClipToOutline(true);
         downloadNav=new NavItem(0,"download","下载");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
-        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;v.setPadding(bars.left,bars.top,bars.right,keyboard?insets.getInsets(WindowInsetsCompat.Type.ime()).bottom:0);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}nav.setVisibility(keyboard||privateShelf?View.GONE:View.VISIBLE);return insets;});
+        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);nav.setOnDragListener((v,e)->shelfCapsuleDrag(e));setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;v.setPadding(bars.left,bars.top,bars.right,keyboard?insets.getInsets(WindowInsetsCompat.Type.ime()).bottom:0);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(shelfDropPill!=null){FrameLayout.LayoutParams pillParams=(FrameLayout.LayoutParams)shelfDropPill.getLayoutParams();if(pillParams.bottomMargin!=margin){pillParams.bottomMargin=margin;shelfDropPill.setLayoutParams(pillParams);}}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}nav.setVisibility(keyboard||privateShelf?View.GONE:View.VISIBLE);return insets;});
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);nav.setVisibility(keyboard||privateShelf?View.GONE:View.VISIBLE);});
         buildTab();
         firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();ForegroundUpdates.checkAfterGuide();});
@@ -142,7 +148,7 @@ public final class MainActivity extends Activity {
     }
     private void switchTab(int next){if(tab==next&&!privateShelf)return;privateShelf=false;library=new Library(this);if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();}
     private void buildTab(){
-        cancelShelfMenu();shelfHoldActive=false;
+        cancelShelfMenu();shelfHoldActive=false;hideShelfDropPill();
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
         content.removeAllViews();input=null;searchInput=null;taskCard=null;actionSlot=null;downloadActions=null;taskAction=null;taskShown=false;list=null;grid=null;adapter=null;shelfAdapter=null;onlineAdapter=null;rowsSnapshot="";
         shelfSearch.setVisible(tab==1);title.setText(tab==0?"下载":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1&&!privateShelf&&!shelfSearch.isExpanded()?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&(privateShelf||!folderId.isEmpty())?View.VISIBLE:View.GONE);
@@ -202,6 +208,7 @@ public final class MainActivity extends Activity {
                     dragMoved=true;drop(dragTarget,draggingBook,dragZone);return true;
                 case DragEvent.ACTION_DRAG_ENDED:
                     handler.removeCallbacks(shelfAutoScroll);
+                    hideShelfDropPill();
                     JSONObject item=draggingBook;
                     if(!e.getResult()){clearShelfPreview();restoreShelfTile(item);}
                     else{dragTarget=null;dragZone=ShelfOrder.NONE;rowsSnapshot="";}
@@ -318,7 +325,7 @@ public final class MainActivity extends Activity {
         disk.execute(()->{
             try{
                 List<JSONObject> result=store.list(),local=library.books(result),folders=library.folders(),online=new OnlineHistory(this,jm).list(),downloads=new DownloadHistory(this).list(3);
-                FolderCoverIndex coverIndex=FolderCoverIndex.from(local);
+                FolderCoverIndex coverIndex=FolderCoverIndex.from(local,folders);
                 runOnUiThread(()->{
                     if(isDestroyed()||generation!=refreshGeneration)return;
                     // This generation owns the latch even if the JM/全网 tab changed while it ran.
@@ -442,7 +449,18 @@ public final class MainActivity extends Activity {
         }).show();
     }
     private String plate(JSONObject b){String type=b.optString("type");if("import".equals(type))return "本地导入";if("tree".equals(type))return "本地文件夹";return b.optString("id","—");}
-    private boolean isFavorite(JSONObject b){if(b.optBoolean("favorite"))return true;for(JSONObject f:bookFolders)if("favorites".equals(f.optString("system"))||Library.FAVORITES.equals(f.optString("title")))return f.optString("id").equals(b.optString("folder"));return false;}
+    private boolean isFavorite(JSONObject b){
+        if(b.optBoolean("favorite"))return true;
+        // Books keep their favorite state anywhere under 我的收藏, including nested folders.
+        HashSet<String> seen=new HashSet<>();String id=b.optString("folder");
+        while(!id.isEmpty()&&seen.add(id)){
+            JSONObject folder=null;for(JSONObject f:bookFolders)if(id.equals(f.optString("id"))){folder=f;break;}
+            if(folder==null)return false;
+            if("favorites".equals(folder.optString("system"))||Library.FAVORITES.equals(folder.optString("title")))return true;
+            id=folder.optString("parent");
+        }
+        return false;
+    }
     private void setFavorite(JSONObject b,boolean favorite){
         if(operation){toast("请等待当前操作完成");return;}operation=true;
         disk.execute(()->{String error=null;try{library.favorite(b.optString("key"),favorite);}catch(Exception e){error=e.getMessage();}
@@ -459,7 +477,10 @@ public final class MainActivity extends Activity {
             else if("上移".equals(action))mutate(()->library.moveFolder(f.optString("id"),-1));
             else if("下移".equals(action))mutate(()->library.moveFolder(f.optString("id"),1));
             else if(action.equals("添加到隐私书架")||action.equals("从隐私书架移除"))transferPrivacy(f,true);
-            else PredictiveBack.dialog(this).setTitle("删除书籍夹？").setMessage("夹内书籍会回到书架。").setNegativeButton("取消",null).setPositiveButton("删除",(x,y)->mutate(()->library.deleteFolder(f.optString("id")))).show();
+            else{
+                boolean nested=!f.optString("parent").isEmpty();
+                PredictiveBack.dialog(this).setTitle("删除书籍夹？").setMessage(nested?"夹内书籍会回到上一级书籍夹。":"夹内书籍会回到书架。").setNegativeButton("取消",null).setPositiveButton("删除",(x,y)->mutate(()->library.deleteFolder(f.optString("id")))).show();
+            }
         }).show();
     }
     private interface Named {void run(String name);}
@@ -498,7 +519,7 @@ public final class MainActivity extends Activity {
                 Point slot=shelfSlot(position);child.animate().cancel();child.animate().translationX(slot.x-child.getLeft()).translationY(slot.y-child.getTop()).scaleX(1).scaleY(1).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
             }
         }else if(zone==ShelfOrder.MERGE)hovered.showFolderPreview();
-        else{hovered.setForeground(dragOutline());hovered.animate().scaleX(.96f).scaleY(.96f).setDuration(160).start();}
+        else hovered.showDropTarget();
     }
     private Point shelfSlot(int position){
         int childIndex=position-grid.getFirstVisiblePosition();
@@ -512,10 +533,91 @@ public final class MainActivity extends Activity {
         dragTarget=null;dragZone=ShelfOrder.NONE;dragPreviewPositions.clear();
         if(grid==null)return;
         for(int n=0;n<grid.getChildCount();n++){
-            View child=grid.getChildAt(n);child.animate().cancel();child.setForeground(null);
-            if(child instanceof ShelfTile)((ShelfTile)child).clearFolderPreview();
+            View child=grid.getChildAt(n);child.animate().cancel();
+            if(child instanceof ShelfTile){ShelfTile tile=(ShelfTile)child;tile.clearFolderPreview();tile.clearDropTarget();}
             child.animate().translationX(0).translationY(0).scaleX(1).scaleY(1).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
         }
+    }
+    /** The bottom capsule only becomes a drop target while dragging something that lives in a folder. */
+    private boolean shelfCapsuleActive(){
+        return tab==1&&!privateShelf&&!folderId.isEmpty()&&draggingBook!=null&&(shelfSearch==null||!shelfSearch.isExpanded());
+    }
+    private boolean shelfCapsuleDrag(DragEvent e){
+        if(draggingBook==null)return false;
+        if(e.getAction()==DragEvent.ACTION_DRAG_STARTED)return true;
+        if(!shelfCapsuleActive())return false;
+        switch(e.getAction()){
+            case DragEvent.ACTION_DRAG_ENTERED:
+                handler.removeCallbacks(shelfAutoScroll);
+                clearShelfPreview();
+                setShelfCapsuleHover(true);
+                return true;
+            case DragEvent.ACTION_DRAG_LOCATION:
+                setShelfCapsuleHover(true);
+                return true;
+            case DragEvent.ACTION_DRAG_EXITED:
+                setShelfCapsuleHover(false);
+                return true;
+            case DragEvent.ACTION_DROP:
+                setShelfCapsuleHover(false);
+                dropOnShelfCapsule();
+                return true;
+            case DragEvent.ACTION_DRAG_ENDED:
+                setShelfCapsuleHover(false);
+                return true;
+            default:
+                return false;
+        }
+    }
+    private void dropOnShelfCapsule(){
+        JSONObject item=draggingBook;
+        if(item==null||folderId.isEmpty()||operation)return;
+        if(item.optBoolean("book_folder")){
+            // Dismantle: its books return to the list they are being dragged onto.
+            mutate(()->library.deleteFolder(item.optString("id")));
+            return;
+        }
+        String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");
+        String target=parent;
+        mutate(()->library.move(Library.key(item),target));
+    }
+    private void setShelfCapsuleHover(boolean hover){
+        if(shelfCapsuleHover==hover)return;
+        shelfCapsuleHover=hover;
+        if(shelfDropPill==null)return;
+        shelfDropPill.animate().cancel();
+        shelfDropPill.animate().scaleX(hover?1.06f:1f).scaleY(hover?1.06f:1f).setDuration(120).setInterpolator(new DecelerateInterpolator()).start();
+    }
+    private void showShelfDropPill(String label){
+        if(stage==null)return;
+        shelfCapsuleHover=false;
+        if(shelfDropPill==null){
+            shelfDropPill=u.text(label,13,Ui.BLUE,true);
+            shelfDropPill.setGravity(Gravity.CENTER);
+            shelfDropPill.setPadding(u.dp(24),0,u.dp(24),0);
+            GradientDrawable background=u.shape(u.dark?0xff223554:0xffe9f1ff,28);
+            background.setStroke(u.dp(1),u.dark?0x663478f6:0x4d3478f6);
+            shelfDropPill.setBackground(background);
+            shelfDropPill.setElevation(u.dp(10));
+            shelfDropPill.setOnDragListener((v,e)->shelfCapsuleDrag(e));
+            FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
+            params.bottomMargin=u.dp(4)+navigationInset;
+            stage.addView(shelfDropPill,params);
+        }
+        shelfDropPill.setText(label);
+        shelfDropPill.animate().cancel();
+        shelfDropPill.setVisibility(View.VISIBLE);
+        shelfDropPill.setAlpha(0f);shelfDropPill.setScaleX(.9f);shelfDropPill.setScaleY(.9f);
+        shelfDropPill.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
+        if(nav!=null){nav.animate().cancel();nav.animate().alpha(0f).setDuration(120).start();}
+    }
+    private void hideShelfDropPill(){
+        shelfCapsuleHover=false;
+        if(shelfDropPill!=null){
+            shelfDropPill.animate().cancel();
+            shelfDropPill.animate().alpha(0f).scaleX(.9f).scaleY(.9f).setDuration(120).withEndAction(()->{if(shelfDropPill!=null)shelfDropPill.setVisibility(View.GONE);}).start();
+        }
+        if(nav!=null){nav.animate().cancel();nav.animate().alpha(1f).setDuration(160).start();}
     }
     /** Bring the lifted card back at its slot while the menu is about to open. */
     private void restoreShelfTile(JSONObject item){
@@ -552,7 +654,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 4.4.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 4.5.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -564,7 +666,7 @@ public final class MainActivity extends Activity {
     }
     private void clearLocalComicHint(){if(localComicHintDismiss!=null){handler.removeCallbacks(localComicHintDismiss);localComicHintDismiss=null;}if(localComicHint!=null){TextView hint=localComicHint;localComicHint=null;hint.animate().cancel();if(hint.getParent() instanceof ViewGroup)((ViewGroup)hint.getParent()).removeView(hint);}}
     @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(firstRunGuide!=null)firstRunGuide.showIfNeeded();if(predictiveBack!=null)predictiveBack.refresh();}
-    @Override protected void onPause(){cancelShelfMenu();super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);}
+    @Override protected void onPause(){cancelShelfMenu();hideShelfDropPill();super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
     @Override protected void onDestroy(){resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
     @Override public void onBackPressed(){if(firstRunGuide!=null&&firstRunGuide.isShowing())return;if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&(privateShelf||!folderId.isEmpty()))leaveFolder();else moveTaskToBack(true);}
@@ -677,9 +779,10 @@ public final class MainActivity extends Activity {
             if(!started){draggingBook=null;dragRows.clear();dragTarget=null;dragZone=ShelfOrder.NONE;dragCover=null;dragMoved=false;return false;}
             holdReady=false;shelfHoldActive=false;
             setAlpha(0f);
+            if(shelfCapsuleActive())showShelfDropPill(book.optBoolean("book_folder")?"拖动到此拆除书籍夹":"拖动到此移出书籍夹");
             return true;
         }
-        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private final int width,height;private int touchX,touchY;private View folderPreview;private BookCover bookCover;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
+        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private final int width,height;private int touchX,touchY;private View folderPreview;private BookCover bookCover;private boolean dropTarget;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
         ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);int columns=grid.getNumColumns();width=(getResources().getDisplayMetrics().widthPixels-u.dp(40)-u.dp(12)*(columns-1))/columns;height=(int)(width*1.40f);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,9);name=u.text("",13,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setLineSpacing(u.dp(2),1);name.setPadding(u.dp(1),0,u.dp(1),0);addView(name,new LinearLayout.LayoutParams(-1,Math.max(u.dp(38),name.getLineHeight()*2+u.dp(2))));info=u.text("",10,u.muted,false);info.setMaxLines(2);info.setMinLines(2);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setLineSpacing(u.dp(1),1);info.setPadding(u.dp(1),u.dp(4),u.dp(1),0);info.setVisibility(View.INVISIBLE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);cancelShelfMenu();touchX=(int)e.getX();touchY=(int)e.getY();removeCallbacks(pressFeedback);postDelayed(pressFeedback,Math.max(0,(tab==1?Math.min(SHELF_HOLD_MILLIS,ViewConfiguration.getLongPressTimeout()):ViewConfiguration.getLongPressTimeout())-110));}else if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){removeCallbacks(pressFeedback);animate().cancel();if(getScaleX()!=1f||getScaleY()!=1f)animate().scaleX(1).scaleY(1).setDuration(150).start();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{
             if(holdReady)return true;
             if(book==null)return false;
@@ -717,13 +820,40 @@ public final class MainActivity extends Activity {
             return super.onTouchEvent(event);
         }
         @Override protected void onDetachedFromWindow(){removeCallbacks(shelfLongPress);removeCallbacks(pressFeedback);if(holdReady)endShelfHold();animate().cancel();setScaleX(1);setScaleY(1);super.onDetachedFromWindow();}
-        void bind(JSONObject b){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);removeCallbacks(pressFeedback);boolean rebound=book==null||!shelfKey(book).equals(shelfKey(b));if(draggingBook==null||rebound){animate().cancel();setTranslationX(0);setTranslationY(0);setScaleX(1);setScaleY(1);setForeground(null);clearFolderPreview();}book=b;setAlpha(draggingBook!=null&&Library.key(draggingBook).equals(Library.key(b))?0f:1f);name.setText(b.optString("title","未命名"));setContentDescription(b.optString("title"));String detail=onlineDetail(b);info.setText(detail);info.setVisibility(detail.isEmpty()?View.INVISIBLE:View.VISIBLE);String identity=b.optBoolean("book_folder")?"folder:"+b.optString("id"):b.optString("key");if(b.optBoolean("book_folder")){identity+="/"+folderCovers.signature(b.optString("id"));}else if(b.has("sourceId"))identity+="|"+b.optString("thumbnail");if(b.optBoolean("book_folder")){if(!identity.equals(faceKey)){face.removeAllViews();face.addView(folderCover(b,width,height),new FrameLayout.LayoutParams(-1,-1));}else retryMissingCovers(face);}else{if(bookCover==null)bookCover=new BookCover();if(bookCover.getParent()!=face){face.removeAllViews();face.addView(bookCover,new FrameLayout.LayoutParams(-1,-1));}bookCover.bind(b,true);}faceKey=identity;if(rebound&&draggingBook!=null){String bound=shelfKey(b);post(()->{Integer position=dragPreviewPositions.get(bound);if(draggingBook!=null&&bound.equals(shelfKey(book))&&position!=null){Point slot=shelfSlot(position);animate().cancel();setTranslationX(slot.x-getLeft());setTranslationY(slot.y-getTop());}});}}
-        void clearFolderPreview(){if(folderPreview!=null){face.removeView(folderPreview);folderPreview=null;if(book!=null)name.setText(book.optString("title","未命名"));}}
+        void bind(JSONObject b){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);removeCallbacks(pressFeedback);boolean rebound=book==null||!shelfKey(book).equals(shelfKey(b));if(draggingBook==null||rebound){animate().cancel();setTranslationX(0);setTranslationY(0);setScaleX(1);setScaleY(1);setForeground(null);clearFolderPreview();clearDropTarget();name.setAlpha(1f);if(bookCover!=null)bookCover.setAlpha(1f);}book=b;setAlpha(draggingBook!=null&&Library.key(draggingBook).equals(Library.key(b))?0f:1f);name.setText(b.optString("title","未命名"));setContentDescription(b.optString("title"));String detail=onlineDetail(b);info.setText(detail);info.setVisibility(detail.isEmpty()?View.INVISIBLE:View.VISIBLE);String identity=b.optBoolean("book_folder")?"folder:"+b.optString("id"):b.optString("key");if(b.optBoolean("book_folder")){identity+="/"+folderCovers.signature(b.optString("id"));}else if(b.has("sourceId"))identity+="|"+b.optString("thumbnail");if(b.optBoolean("book_folder")){if(!identity.equals(faceKey)){face.removeAllViews();face.addView(folderCover(b,width,height),new FrameLayout.LayoutParams(-1,-1));}else retryMissingCovers(face);}else{if(bookCover==null)bookCover=new BookCover();if(bookCover.getParent()!=face){face.removeAllViews();face.addView(bookCover,new FrameLayout.LayoutParams(-1,-1));}bookCover.bind(b,true);}faceKey=identity;if(rebound&&draggingBook!=null){String bound=shelfKey(b);post(()->{Integer position=dragPreviewPositions.get(bound);if(draggingBook!=null&&bound.equals(shelfKey(book))&&position!=null){Point slot=shelfSlot(position);animate().cancel();setTranslationX(slot.x-getLeft());setTranslationY(slot.y-getTop());}});}}
+        void showDropTarget(){
+            if(dropTarget)return;
+            dropTarget=true;
+            face.animate().cancel();
+            face.setForeground(dragOutline());
+            face.animate().scaleX(DRAG_TARGET_SCALE).scaleY(DRAG_TARGET_SCALE).setDuration(DRAG_TARGET_MS).setInterpolator(new DecelerateInterpolator()).start();
+        }
+        void clearDropTarget(){
+            if(!dropTarget)return;
+            dropTarget=false;
+            face.animate().cancel();
+            face.setForeground(null);
+            face.animate().scaleX(1f).scaleY(1f).setDuration(DRAG_TARGET_MS).setInterpolator(new DecelerateInterpolator()).start();
+        }
+        void clearFolderPreview(){
+            if(folderPreview==null)return;
+            View preview=folderPreview;folderPreview=null;
+            preview.animate().cancel();
+            preview.animate().alpha(0f).scaleX(DRAG_PREVIEW_SCALE).scaleY(DRAG_PREVIEW_SCALE).setDuration(DRAG_PREVIEW_MS).setInterpolator(new DecelerateInterpolator()).withEndAction(()->face.removeView(preview)).start();
+            if(bookCover!=null){bookCover.animate().cancel();bookCover.animate().alpha(1f).setDuration(DRAG_PREVIEW_MS).setInterpolator(new DecelerateInterpolator()).start();}
+            if(book!=null){name.animate().cancel();name.setText(book.optString("title","未命名"));name.setAlpha(0f);name.animate().alpha(1f).setDuration(DRAG_NAME_MS).start();}
+        }
+        /** A hovered book turns into the same folder face a real folder uses, then opens on release. */
         void showFolderPreview(){
-            Bitmap target=snapshotFace(face);FrameLayout preview=new FrameLayout(MainActivity.this);preview.setBackground(u.shape(u.dark?0xff252b39:0xffe8edf8,16));preview.setClipToOutline(true);
-            LinearLayout collage=u.column();collage.setPadding(u.dp(8),u.dp(8),u.dp(8),u.dp(8));
-            for(int row=0;row<2;row++){LinearLayout line=u.row();for(int col=0;col<2;col++){View cell;if(row==0){ImageView image=new ImageView(MainActivity.this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setImageBitmap(col==0?target:dragCover);cell=image;}else{cell=new View(MainActivity.this);cell.setBackground(u.shape(u.dark?0xff30394b:0xffd9e1f1,6));}LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-1,1);cp.setMargins(u.dp(2),u.dp(2),u.dp(2),u.dp(2));line.addView(cell,cp);}collage.addView(line,new LinearLayout.LayoutParams(-1,0,1));}
-            preview.addView(collage,new FrameLayout.LayoutParams(-1,-1));preview.setForeground(dragOutline());TextView count=u.text("2",10,Color.WHITE,true);count.setGravity(Gravity.CENTER);count.setBackground(u.shape(Ui.BLUE,8));FrameLayout.LayoutParams badge=new FrameLayout.LayoutParams(u.dp(24),u.dp(20),Gravity.RIGHT|Gravity.BOTTOM);badge.setMargins(0,0,u.dp(8),u.dp(8));preview.addView(count,badge);folderPreview=preview;face.addView(preview,new FrameLayout.LayoutParams(-1,-1));name.setText("新建书夹");
+            if(folderPreview!=null||book==null||book.optBoolean("book_folder"))return;
+            Bitmap target=snapshotFace(face);
+            FrameLayout preview=folderFace(0,2,index->index==0?bitmapCell(target):index==1?bitmapCell(dragCover):emptyFolderCell(6));
+            preview.setAlpha(0f);preview.setScaleX(DRAG_PREVIEW_SCALE);preview.setScaleY(DRAG_PREVIEW_SCALE);
+            folderPreview=preview;face.addView(preview,new FrameLayout.LayoutParams(-1,-1));
+            showDropTarget();
+            if(bookCover!=null){bookCover.animate().cancel();bookCover.animate().alpha(0f).setDuration(DRAG_PREVIEW_MS).setInterpolator(new DecelerateInterpolator()).start();}
+            preview.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(DRAG_PREVIEW_MS).setInterpolator(new DecelerateInterpolator()).start();
+            name.animate().cancel();name.animate().alpha(0f).setDuration(DRAG_NAME_MS).setInterpolator(new DecelerateInterpolator()).withEndAction(()->{if(folderPreview!=preview)return;name.setText("新建书夹");name.animate().alpha(1f).setDuration(DRAG_NAME_MS).start();}).start();
         }
     }
     private void retryMissingCovers(View view){if(view instanceof ImageView){ImageView image=(ImageView)view;if(image.getDrawable()==null&&image.getTag() instanceof JSONObject){JSONObject b=(JSONObject)image.getTag();if(!b.has("sourceId")||(OnlineHistory.isJm(b)&&!b.optString("thumbnail").isEmpty()))covers.load(image,b);}}else if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int n=0;n<group.getChildCount();n++)retryMissingCovers(group.getChildAt(n));}}
@@ -740,5 +870,66 @@ public final class MainActivity extends Activity {
         @Override public void onProvideShadowMetrics(Point size,Point touchPoint){size.set(snapshot.getWidth(),snapshot.getHeight());touchPoint.set(touch.x,touch.y);}
         @Override public void onDrawShadow(Canvas canvas){int save=canvas.save();canvas.scale(.97f,.97f,snapshot.getWidth()/2f,snapshot.getHeight()/2f);canvas.drawBitmap(snapshot,0,0,null);canvas.restoreToCount(save);}
     }
-    private FrameLayout folderCover(JSONObject f,int width,int height){FrameLayout face=new RoundedCover(this,16);face.setBackground(u.shape(u.dark?0xff252b39:0xffe8edf8,16));face.setClipToOutline(true);List<JSONObject> members=folderCovers.members(f.optString("id"));LinearLayout collage=u.column();collage.setPadding(u.dp(8),u.dp(8),u.dp(8),u.dp(8));for(int row=0;row<2;row++){LinearLayout r=u.row();for(int col=0;col<2;col++){int n=row*2+col;FrameLayout c=n<members.size()?cover(members.get(n),true):new FrameLayout(this);if(n>=members.size())c.setBackground(u.shape(u.dark?0xff30394b:0xffd9e1f1,6));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-1,1);cp.setMargins(u.dp(2),u.dp(2),u.dp(2),u.dp(2));r.addView(c,cp);}collage.addView(r,new LinearLayout.LayoutParams(-1,0,1));}face.addView(collage,new FrameLayout.LayoutParams(-1,-1));TextView count=u.text(String.valueOf(members.size()),10,Color.WHITE,true);count.setGravity(17);count.setBackground(u.shape(0xb923304c,8));FrameLayout.LayoutParams badge=new FrameLayout.LayoutParams(u.dp(24),u.dp(20),Gravity.RIGHT|Gravity.BOTTOM);badge.setMargins(0,0,u.dp(8),u.dp(8));face.addView(count,badge);return face;}
+    private interface FolderCellFactory {View create(int index);}
+    /**
+     * One collage for real folders and for the drag preview, so a book that becomes a folder keeps
+     * exactly the same face during the transition.
+     */
+    private FrameLayout folderFace(int depth,int count,FolderCellFactory factory){
+        FrameLayout face=new RoundedCover(this,16);
+        face.setBackground(u.shape(u.dark?0xff252b39:0xffe8edf8,16));
+        face.setClipToOutline(true);
+        LinearLayout collage=u.column();
+        int padding=Math.max(1,8>>depth);
+        collage.setPadding(u.dp(padding),u.dp(padding),u.dp(padding),u.dp(padding));
+        int margin=Math.max(1,2>>depth);
+        for(int row=0;row<2;row++){
+            LinearLayout line=u.row();
+            for(int col=0;col<2;col++){
+                View cell=factory.create(row*2+col);
+                LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-1,1);
+                cp.setMargins(u.dp(margin),u.dp(margin),u.dp(margin),u.dp(margin));
+                line.addView(cell,cp);
+            }
+            collage.addView(line,new LinearLayout.LayoutParams(-1,0,1));
+        }
+        face.addView(collage,new FrameLayout.LayoutParams(-1,-1));
+        if(depth==0){
+            TextView countText=u.text(String.valueOf(count),10,Color.WHITE,true);
+            countText.setGravity(17);countText.setBackground(u.shape(0xb923304c,8));
+            FrameLayout.LayoutParams badge=new FrameLayout.LayoutParams(u.dp(24),u.dp(20),Gravity.RIGHT|Gravity.BOTTOM);
+            badge.setMargins(0,0,u.dp(8),u.dp(8));face.addView(countText,badge);
+        }
+        return face;
+    }
+    private View emptyFolderCell(int radius){View cell=new View(this);cell.setBackground(u.shape(u.dark?0xff30394b:0xffd9e1f1,radius));return cell;}
+    private View bitmapCell(Bitmap bitmap){
+        RoundedCover holder=new RoundedCover(this,12);
+        holder.setBackground(u.shape(u.tint,12));holder.setClipToOutline(true);
+        ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if(bitmap!=null)image.setImageBitmap(bitmap);
+        holder.addView(image,new FrameLayout.LayoutParams(-1,-1));
+        return holder;
+    }
+    /** Nested folders are rendered recursively so the outer preview shows 书籍夹中夹 like books. */
+    private View folderMember(JSONObject item,int depth){
+        if(!item.optBoolean("book_folder"))return cover(item,true);
+        if(depth>=FOLDER_PREVIEW_DEPTH)return flatFolderCell(item.optString("id"),2);
+        return folderCover(item,depth+1);
+    }
+    private View flatFolderCell(String folderId,int guard){
+        List<JSONObject> nested=folderCovers.members(folderId);
+        RoundedCover holder=new RoundedCover(this,8);
+        holder.setBackground(u.shape(u.dark?0xff30394b:0xffd9e1f1,8));holder.setClipToOutline(true);
+        JSONObject first=nested.isEmpty()?null:nested.get(0);
+        View inner=null;
+        if(first!=null){if(!first.optBoolean("book_folder"))inner=cover(first,true);else if(guard>0)inner=flatFolderCell(first.optString("id"),guard-1);}
+        if(inner!=null){FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-1,-1);int inset=u.dp(2);lp.setMargins(inset,inset,inset,inset);holder.addView(inner,lp);}
+        return holder;
+    }
+    private FrameLayout folderCover(JSONObject f,int width,int height){return folderCover(f,0);}
+    private FrameLayout folderCover(JSONObject f,int depth){
+        List<JSONObject> members=folderCovers.members(f.optString("id"));
+        return folderFace(depth,members.size(),index->index>=members.size()?emptyFolderCell(depth==0?6:4):folderMember(members.get(index),depth));
+    }
 }
