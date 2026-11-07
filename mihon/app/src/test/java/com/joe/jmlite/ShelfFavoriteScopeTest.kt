@@ -157,4 +157,46 @@ class ShelfFavoriteScopeTest {
         assertEquals("root",entry(state).getString("folder"))
         assertEquals(setOf("root"),folderIds(state))
     }
+
+    @Test fun `moving the only book out of a folder removes the folder`(){
+        val state=state(folder("solo"))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","solo"))
+        library(state).move("download:1","")
+        assertTrue(folderIds(state).isEmpty())
+        assertTrue(entry(state).optString("folder").isEmpty())
+    }
+
+    @Test fun `moving one of two books collapses the folder and appends the remaining book`(){
+        val state=state(folder("pair"))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","pair"))
+        state.getJSONObject("entries").put("download:2",JSONObject().put("folder","pair"))
+        library(state).move("download:1","")
+        assertTrue(folderIds(state).isEmpty())
+        assertFalse(entry(state,"download:2").has("folder"))
+        val order=state.getJSONArray("bookOrder")
+        assertEquals("download:2",order.getString(order.length()-1))
+    }
+
+    @Test fun `moving one of three books keeps the folder and its two books`(){
+        val state=state(folder("trio"))
+        for(i in 1..3) state.getJSONObject("entries").put("download:$i",JSONObject().put("folder","trio"))
+        library(state).move("download:1","")
+        assertEquals(setOf("trio"),folderIds(state))
+    }
+
+    @Test fun `a protected folder is never collapsed`(){
+        val state=state(folder("fav","favorites"))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","fav"))
+        library(state).move("download:1","")
+        assertEquals(setOf("fav"),folderIds(state))
+    }
+
+    @Test fun `a folder subtree with one remaining book collapses as a whole`(){
+        val state=state(folder("root"),folder("child",parent="root"))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","child"))
+        state.getJSONObject("entries").put("download:2",JSONObject().put("folder","root"))
+        library(state).move("download:2","")
+        assertTrue(folderIds(state).isEmpty())
+        assertFalse(entry(state,"download:1").has("folder"))
+    }
 }
