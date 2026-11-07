@@ -47,7 +47,7 @@ class ShelfLongPressTest {
             SystemClock.sleep(180)
             instrumentation.runOnMainSync{assertNull(field("draggingBook"))}
             SystemClock.sleep(180)
-            instrumentation.runOnMainSync{assertNotNull("300 ms hold must enter the original drag state",field("draggingBook"))}
+            instrumentation.runOnMainSync{assertNull("a long hold must wait for movement before dragging",field("draggingBook"))}
             assertTrue(instrumentation.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("删除书籍夹").isEmpty())
             touch(MotionEvent.ACTION_UP);pointerDown=false
             SystemClock.sleep(400)

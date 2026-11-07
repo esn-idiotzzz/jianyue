@@ -91,3 +91,5 @@ DownloadInputFocusTest is a separate Android instrumentation test. It alternates
 4.2.0 adds FailedSourcesTest (5), taking the direct JVM runner to 290 tests. It covers exact IDs, runtime aliases, package isolation, language isolation and ambiguous mappings. FailedSourcesDialogTest checks actual row visibility, constrained dialog layout and filtering; ShelfLongPressTest checks the shorter hold and release-to-menu behavior on Android.
 
 4.3.0 keeps the direct runner at 290 tests. ShelfLongPressTest now also allows the card-settle delay (about 90 ms) before the menu window appears, matching the animated release-to-menu transition.
+
+4.4.0 keeps the direct runner at 290 tests. ShelfLongPressTest now checks that a long hold only arms the card: releasing without movement opens the menu, and the drag state must stay idle until the finger actually moves.
