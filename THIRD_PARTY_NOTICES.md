@@ -84,6 +84,8 @@ Junrar 的 UnRAR 限制许可不等同于 MIT 或 Apache-2.0；这里只用于�
 
 ## 图标与构建/测试工具
 
+- [lingeringsound/adblock_auto](https://github.com/lingeringsound/adblock_auto)：内置登录窗口的去广告规则来源，随包文件为 `app/src/main/assets/browser-adblock.txt`，取自用户指定的 `base/其他.prop`，保留原始规则头和作者来源信息。
+
 - [Material Symbols / Material Design Icons](https://github.com/google/material-design-icons)：界面图标，Apache-2.0。
 - [Simple Icons](https://github.com/simple-icons/simple-icons)：品牌 SVG 图标，CC0-1.0；品牌标识的商标权仍归对应权利人。源码 SVG 中原作者注释保留。
 - [Gradle](https://github.com/gradle/gradle)、[Android Gradle Plugin](https://android.googlesource.com/platform/tools/base/)、[Kotlin](https://github.com/JetBrains/kotlin)：构建工具链。

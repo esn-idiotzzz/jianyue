@@ -16,8 +16,6 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 import eu.kanade.tachiyomi.util.system.WebViewUtil
-import eu.kanade.tachiyomi.util.system.openInBrowser
-import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toWebViewHeaders
 import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.view.setComposeContent
@@ -25,7 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import mihon.app.di.appGraph
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.i18n.MR
@@ -92,9 +89,6 @@ class WebViewActivity : BaseActivity() {
                 headers = headers.orEmpty(),
                 defaultUserAgentProvider = network::defaultUserAgentProvider,
                 onUrlChange = { assistUrl = it },
-                onShare = this::shareWebpage,
-                onOpenInBrowser = this::openInBrowser,
-                onClearCookies = this::clearCookies,
             )
         }
     }
@@ -116,23 +110,6 @@ class WebViewActivity : BaseActivity() {
             @Suppress("DEPRECATION")
             overridePendingTransition(R.anim.shared_axis_x_pop_enter, R.anim.shared_axis_x_pop_exit)
         }
-    }
-
-    private fun shareWebpage(url: String) {
-        try {
-            startActivity(url.toUri().toShareIntent(this, type = "text/plain"))
-        } catch (e: Exception) {
-            toast(e.message)
-        }
-    }
-
-    private fun openInBrowser(url: String) {
-        openInBrowser(url, forceDefaultBrowser = true)
-    }
-
-    private fun clearCookies(url: String) {
-        val cleared = network.cookieJar.remove(url.toHttpUrl())
-        logcat { "Cleared $cleared cookies for: $url" }
     }
 
     companion object {

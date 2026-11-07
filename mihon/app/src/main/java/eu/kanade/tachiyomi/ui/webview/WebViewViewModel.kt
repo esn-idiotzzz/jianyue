@@ -1,7 +1,5 @@
 package eu.kanade.tachiyomi.ui.webview
 
-import android.content.Context
-import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -13,16 +11,12 @@ import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.online.HttpSource
-import eu.kanade.tachiyomi.util.system.openInBrowser
-import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toWebViewHeaders
-import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import logcat.LogPriority
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.source.service.SourceManager
 
@@ -53,25 +47,6 @@ class WebViewViewModel(
                 logcat(LogPriority.ERROR, e) { "Failed to build headers" }
                 emptyMap()
             }
-        }
-    }
-
-    fun shareWebpage(context: Context, url: String) {
-        try {
-            context.startActivity(url.toUri().toShareIntent(context, type = "text/plain"))
-        } catch (e: Exception) {
-            context.toast(e.message)
-        }
-    }
-
-    fun openInBrowser(context: Context, url: String) {
-        context.openInBrowser(url, forceDefaultBrowser = true)
-    }
-
-    fun clearCookies(url: String) {
-        url.toHttpUrlOrNull()?.let {
-            val cleared = network.cookieJar.remove(it)
-            logcat { "Cleared $cleared cookies for: $url" }
         }
     }
 

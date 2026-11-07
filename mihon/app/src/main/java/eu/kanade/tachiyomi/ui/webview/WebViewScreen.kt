@@ -3,7 +3,6 @@ package eu.kanade.tachiyomi.ui.webview
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
@@ -25,7 +24,6 @@ class WebViewScreen(
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
-        val context = LocalContext.current
         val viewModel =
             assistedMetroViewModel<WebViewViewModel, WebViewViewModel.Factory> { create(sourceId = sourceId) }
 
@@ -42,9 +40,6 @@ class WebViewScreen(
             headers = headers.orEmpty(),
             defaultUserAgentProvider = viewModel::defaultUserAgentProvider,
             onUrlChange = { assistUrl = it },
-            onShare = { viewModel.shareWebpage(context, it) },
-            onOpenInBrowser = { viewModel.openInBrowser(context, it) },
-            onClearCookies = viewModel::clearCookies,
         )
     }
 }

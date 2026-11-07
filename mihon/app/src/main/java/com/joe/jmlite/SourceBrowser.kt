@@ -49,12 +49,12 @@ internal object SourceBrowser {
                 if(result.mangas.isNotEmpty()){catalogueMode=0;return result}
             }catch(e:kotlinx.coroutines.TimeoutCancellationException){first=e}
             catch(e:CancellationException){throw e}
-            catch(e:Exception){first=e}
+            catch(e:Exception){if(SourceLogin.required(e))throw e;first=e}
             if(source.supportsLatest){
                 try {val result=withTimeout(12_000){source.getLatestUpdates(page)};catalogueMode=1;return result}
                 catch(e:kotlinx.coroutines.TimeoutCancellationException){if(first==null)first=e}
                 catch(e:CancellationException){throw e}
-                catch(e:Exception){if(first==null)first=e}
+                catch(e:Exception){if(SourceLogin.required(e))throw e;if(first==null)first=e}
             }
             try {val result=withTimeout(12_000){source.getSearchManga(page,"",source.getFilterList())};catalogueMode=2;return result}
             catch(e:CancellationException){throw e}

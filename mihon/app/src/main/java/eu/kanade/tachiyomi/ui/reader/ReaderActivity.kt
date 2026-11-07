@@ -202,7 +202,6 @@ class ReaderActivity : BaseActivity() {
             val backgroundColor = remember(general.theme) { Color(baseContext.readerBackgroundColor(general.theme)) }
             LaunchedEffect(general.theme) {
                 windowInsetsController.isAppearanceLightNavigationBars = androidx.core.graphics.ColorUtils.calculateLuminance(baseContext.readerBackgroundColor(general.theme)) > 0.5
-                windowInsetsController.show(WindowInsetsCompat.Type.navigationBars())
             }
             val colorOverlayBlendMode = remember(colorOverlayMode) {
                 ReaderPreferences.ColorFilterMode.getOrNull(colorOverlayMode)?.second
@@ -627,8 +626,7 @@ class ReaderActivity : BaseActivity() {
         if (visible) {
             windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
         } else if (readerPreferences.fullscreen.get()) {
-            windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
-            windowInsetsController.show(WindowInsetsCompat.Type.navigationBars())
+            windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
         }
     }
 

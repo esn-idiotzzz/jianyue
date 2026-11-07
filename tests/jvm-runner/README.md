@@ -74,3 +74,7 @@ PrivacyRecoveryTest adds 6 cases for exact-code validation without unintended wr
 FolderCoverIndexTest adds 5 cases for cached folder membership, visible-cover invalidation, count changes, immutable membership and cross-shelf snapshot isolation.
 
 3.8.0 adds MainNavigationTest (5 cases) for four root tabs moving the task to the background and search closing first, plus two PredictiveBackTest cases for disabled root previews and child/root state changes. The runner now requires 246 successful tests. Actual Android desktop and IME gestures still require device verification.
+
+The source login window adds BrowserAdBlockTest (12), SourceLoginTest (5), and two SourceBrowserTest regressions. The runner now requires 265 successful cases. These cover bundled-rule matching, exceptions, resource/domain scope, keeping main navigation accessible, explicit authentication errors, and preserving login failures during catalogue fallback. Browser rendering, confirmation dialogs, device back gestures and real account login still require device verification.
+
+3.8.1 adds WebViewLifecycleTest (3) for detachment, stopping requests, destruction and idempotent disposal, plus ReaderFullscreenTest (3) for hiding both system bars during reading, restoring them with menus and honoring the fullscreen preference. The runner now requires 271 successful cases. These JVM checks do not establish device memory usage, OEM gesture behavior or long-running stability.

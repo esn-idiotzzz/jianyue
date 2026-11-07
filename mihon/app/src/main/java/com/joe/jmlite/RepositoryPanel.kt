@@ -12,10 +12,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import org.json.JSONObject
+import kotlinx.coroutines.*
+import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 
 /** A searchable, recycled row list of the packaged Chinese sources. */
 object RepositoryPanel {
-    private class Row(val root:FrameLayout,val icon:ImageView,val title:TextView,val subtitle:TextView,val heart:Ui.Icon,val body:LinearLayout)
+    private class Row(val root:FrameLayout,val icon:ImageView,val title:TextView,val subtitle:TextView,val globe:Ui.Icon,val heart:Ui.Icon,val body:LinearLayout)
     @JvmStatic fun create(activity:Activity):View {
         val ui=OnlineUi(activity)
         val baseUi=Ui(activity)
@@ -29,9 +31,10 @@ object RepositoryPanel {
             }}.distinctBy{it.getString("id")}
         }
         val root=ui.column()
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
         root.addOnAttachStateChangeListener(object:View.OnAttachStateChangeListener{
             override fun onViewAttachedToWindow(view:View){}
-            override fun onViewDetachedFromWindow(view:View){icons.close()}
+            override fun onViewDetachedFromWindow(view:View){icons.close();scope.cancel()}
         })
         val search=ui.row().apply{setPadding(ui.dp(12),0,ui.dp(8),0);background=ui.shape(ui.card,16)}
         search.addView(Ui(activity).icon("search",ui.muted),LinearLayout.LayoutParams(ui.dp(26),ui.dp(26)))
@@ -68,15 +71,30 @@ object RepositoryPanel {
                     val sub=ui.text("",11,ui.muted).apply{setPadding(0,ui.dp(6),0,0);maxLines=1}
                     text.addView(name);text.addView(sub)
                     body.addView(text,LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(ui.dp(13),0,ui.dp(6),0)})
+                    val globe=Ui(activity).icon("online",ui.muted)
+                    body.addView(globe,LinearLayout.LayoutParams(ui.dp(44),ui.dp(48)))
                     val heart=Ui(activity).icon("heart",ui.muted)
                     body.addView(heart,LinearLayout.LayoutParams(ui.dp(44),ui.dp(48)))
                     val wrapper=FrameLayout(activity).apply{setPadding(0,0,0,ui.dp(9));addView(body,FrameLayout.LayoutParams(-1,-2))}
-                    Row(wrapper,icon,name,sub,heart,body).also{wrapper.tag=it}
+                    Row(wrapper,icon,name,sub,globe,heart,body).also{wrapper.tag=it}
                 }
                 val on=favorite(item)
                 row.title.text=item.getString("name")
                 row.subtitle.text=when(item.getString("language")){"zh-Hans"->"简体中文";"zh-Hant"->"繁體中文";else->"中文图源"}+(if(on)" · 已收藏" else "")
                 FavoriteStyle.paint(baseUi,row.heart,row.heart,null,on)
+                row.globe.contentDescription="打开 ${item.getString("name")} 的网站并登录"
+                row.globe.setOnClickListener{view->
+                    view.isEnabled=false
+                    scope.launch {
+                        try {
+                            val source=SourceBrowser.resolve(activity,item.getLong("id"),item.getString("name"),item.getString("language"),item.getString("packageName"))
+                            val url=withContext(Dispatchers.IO){source.getHomeUrl()}
+                            if(!activity.isFinishing&&!activity.isDestroyed)activity.startActivity(WebViewActivity.newIntent(activity,url,source.id,source.name))
+                        }catch(e:CancellationException){throw e}
+                        catch(e:Exception){Toast.makeText(activity,"无法打开图源网站：${e.message}",Toast.LENGTH_LONG).show()}
+                        finally{view.isEnabled=true}
+                    }
+                }
                 row.heart.contentDescription=if(on)"取消收藏 ${item.getString("name")}" else "收藏 ${item.getString("name")}"
                 row.heart.setOnClickListener{
                     prefs.edit().putBoolean(item.getString("id"),!favorite(item)).apply();shown=sorted(shown)

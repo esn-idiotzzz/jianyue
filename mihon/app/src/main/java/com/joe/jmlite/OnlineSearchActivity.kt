@@ -32,6 +32,7 @@ class OnlineSearchActivity : Activity() {
     private lateinit var ui: OnlineUi
     private lateinit var queryInput: EditText
     private lateinit var status: TextView
+    private var sourceLoginNotice:TextView?=null
     private lateinit var grid: GridView
     private lateinit var adapter: ResultAdapter
     private val results = ArrayList<OnlineRepository.Item>()
@@ -44,6 +45,7 @@ class OnlineSearchActivity : Activity() {
     private val checked = HashSet<String>()
     private val sourceMode by lazy { intent.hasExtra("sourceId") || intent.hasExtra("sourcePackage") }
     private var sourceSession:SourceBrowser.Session?=null
+    private var loginHint:TextView?=null
     private var currentPage=0
     private var hasNext=false
     private var activeQuery=""
@@ -125,6 +127,12 @@ class OnlineSearchActivity : Activity() {
             setPadding(ui.dp(22), 0, ui.dp(22), ui.dp(6))
         }
         root.addView(status)
+        if(sourceMode){
+            sourceLoginNotice=ui.text("若不能加载，请点击地球图标，登录状态~",12,ui.muted).apply{
+                setPadding(ui.dp(22),0,ui.dp(22),ui.dp(10))
+            }
+            root.addView(sourceLoginNotice)
+        }
 
         grid = GridView(this).apply {
             numColumns = 3
@@ -278,6 +286,8 @@ class OnlineSearchActivity : Activity() {
             adapter.notifyDataSetChanged()
         }
         val token=generation
+        sourceLoginNotice?.visibility=if(activeQuery.isBlank())View.VISIBLE else View.GONE
+        clearLoginHint()
         searching=true
         status.text=if(currentPage>0) "正在加载更多漫画…" else if(activeQuery.isBlank()) "正在加载热门书籍…" else "正在搜索本图源…"
         searchJob=scope.launch {
@@ -299,16 +309,45 @@ class OnlineSearchActivity : Activity() {
                 status.text=if(results.isEmpty()) "此图源暂未返回漫画，点击重试" else "${if(activeQuery.isBlank())"热门书籍" else "搜索结果"} · ${results.size} 部${if(hasNext)" · 上滑加载更多" else ""}"
             }catch(e:kotlinx.coroutines.TimeoutCancellationException){if(token==generation)status.text="图源请求超时，点击重试"}
             catch(e:kotlinx.coroutines.CancellationException){return@launch}
-            catch(e:Exception){if(token==generation)status.text="加载失败：${e.message?:e.javaClass.simpleName} · 点击重试"}
+            catch(e:Exception){if(token==generation){
+                status.text="加载失败：${e.message?:e.javaClass.simpleName} · 点击重试"
+                if(activeQuery.isBlank()&&currentPage==0&&SourceLogin.required(e))showLoginHint()
+            }}
             finally{if(token==generation)searching=false}
         }
     }
+    private fun showLoginHint(){
+        if(isFinishing||isDestroyed)return
+        val source=sourceSession?.source?:return
+        val host=findViewById<FrameLayout>(android.R.id.content)
+        val hint=ui.text("此图源需要登录 · 点击打开网站",14,Color.WHITE,true).apply{
+            gravity=Gravity.CENTER;setPadding(ui.dp(22),ui.dp(12),ui.dp(22),ui.dp(12))
+            background=ui.shape(0xf02a3445.toInt(),28);elevation=ui.dp(8).toFloat()
+            setOnClickListener{
+                scope.launch {
+                    try {
+                        val url=kotlinx.coroutines.withContext(Dispatchers.IO){source.getHomeUrl()}
+                        startActivity(eu.kanade.tachiyomi.ui.webview.WebViewActivity.newIntent(this@OnlineSearchActivity,url,source.id,source.name))
+                        clearLoginHint();finish()
+                    }catch(e:kotlinx.coroutines.CancellationException){throw e}
+                    catch(e:Exception){Toast.makeText(this@OnlineSearchActivity,"无法打开图源网站：${e.message}",Toast.LENGTH_LONG).show()}
+                }
+            }
+        }
+        val inset=androidx.core.view.ViewCompat.getRootWindowInsets(host)?.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())?.bottom?:0
+        host.addView(hint,FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply{bottomMargin=ui.dp(32)+inset;leftMargin=ui.dp(18);rightMargin=ui.dp(18)})
+        loginHint=hint;hint.alpha=0f;hint.animate().alpha(1f).setDuration(160).start()
+        hint.announceForAccessibility(hint.text)
+        hint.postDelayed({if(loginHint===hint)clearLoginHint()},5000)
+    }
+    private fun clearLoginHint(){loginHint?.let{it.animate().cancel();(it.parent as? ViewGroup)?.removeView(it)};loginHint=null}
     override fun onBackPressed(){if(searchExpanded)toggleSearch?.invoke(false) else super.onBackPressed()}
     override fun onStop(){predictiveBack?.onStop();super.onStop()}
     private val refreshTask=Runnable { refreshScheduled=false;adapter.notifyDataSetChanged();completionSummary?.let{if(it.succeeded>0)status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}"} }
     private fun refreshResults(){ if(!refreshScheduled){refreshScheduled=true;grid.postDelayed(refreshTask,80)} }
     override fun onResume(){super.onResume();if(::adapter.isInitialized){results.removeAll{ChapterAvailability.empty(this,it.sourceId,it.url)};adapter.notifyDataSetChanged()}}
     override fun onDestroy() {
+        clearLoginHint()
         predictiveBack?.close()
         grid.removeCallbacks(refreshTask)
         grid.removeCallbacks(queryTask)

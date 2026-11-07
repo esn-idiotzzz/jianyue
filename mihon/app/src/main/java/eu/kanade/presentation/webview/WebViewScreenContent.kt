@@ -1,22 +1,34 @@
 package eu.kanade.presentation.webview
 
 import android.content.pm.ApplicationInfo
+import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.graphics.Bitmap
 import android.os.Message
+import android.view.ViewGroup
 import android.webkit.JsPromptResult
+import android.webkit.CookieManager
 import android.webkit.JsResult
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -25,12 +37,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import cafe.adriel.voyager.core.stack.mutableStateStackOf
@@ -41,6 +55,7 @@ import com.kevinnzou.web.WebContent
 import com.kevinnzou.web.WebView
 import com.kevinnzou.web.WebViewNavigator
 import com.kevinnzou.web.WebViewState
+import com.joe.jmlite.BrowserAdBlock
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.presentation.components.WarningBanner
@@ -50,22 +65,32 @@ import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import eu.kanade.tachiyomi.util.system.setUserAgent
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
+import java.util.concurrent.atomic.AtomicBoolean
+import org.json.JSONObject
 import logcat.LogPriority
 import mihon.icons.materialsymbols.MaterialSymbols
-import mihon.icons.materialsymbols.automirroredrounded.ArrowBack
-import mihon.icons.materialsymbols.automirroredrounded.ArrowForward
 import mihon.icons.materialsymbols.rounded.Close
-import mihon.icons.materialsymbols.rounded.TabClose
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
-import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.screens.LoadingScreen
 
 class WebViewWindow(webContent: WebContent, val navigator: WebViewNavigator) {
     var state by mutableStateOf(WebViewState(webContent))
     var popupMessage: Message? = null
         private set
     var webView: WebView? = null
+
+    fun destroy() {
+        val view = webView ?: return
+        webView = null
+        (view.parent as? ViewGroup)?.removeView(view)
+        view.stopLoading()
+        view.destroy()
+    }
 
     constructor(popupMessage: Message, navigator: WebViewNavigator) : this(WebContent.NavigatorOnly, navigator) {
         this.popupMessage = popupMessage
@@ -78,12 +103,26 @@ fun WebViewScreenContent(
     initialTitle: String?,
     url: String,
     defaultUserAgentProvider: () -> String,
-    onShare: (String) -> Unit,
-    onOpenInBrowser: (String) -> Unit,
-    onClearCookies: (String) -> Unit,
     headers: Map<String, String> = emptyMap(),
     onUrlChange: (String) -> Unit = {},
 ) {
+    val context = LocalContext.current.applicationContext
+    val adBlock by produceState<BrowserAdBlock?>(null) {
+        value = withContext(Dispatchers.IO) {
+            BrowserAdBlock(context.assets.open("browser-adblock.txt").bufferedReader().use { it.readText() })
+        }
+    }
+    if (adBlock == null) {
+        LoadingScreen()
+        return
+    }
+    val blocker = adBlock!!
+    val preferences = remember { context.getSharedPreferences("source_browser", Context.MODE_PRIVATE) }
+    var adBlockEnabled by remember { mutableStateOf(preferences.getBoolean("adblock_enabled", true)) }
+    val blockingEnabled = remember { AtomicBoolean(adBlockEnabled) }
+    var showUrl by remember { mutableStateOf(false) }
+    var showAdBlockSettings by remember { mutableStateOf(false) }
+    var confirmDisableAdBlock by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     val windowStack = remember {
@@ -106,13 +145,45 @@ fun WebViewScreenContent(
     var isActive by remember { mutableStateOf(true) }
 
     DisposableEffect(Unit) {
-        onDispose { isActive = false }
+        onDispose {
+            isActive = false
+            CookieManager.getInstance().flush()
+            windowStack.items.forEach { it.destroy() }
+        }
     }
 
     val headersHost = remember { url.toUri().host }
 
     val webClient = remember {
         object : AccompanistWebViewClient() {
+            private fun hideAds(view: WebView, url: String?) {
+                if (!isActive || !blockingEnabled.get()) return
+                val css = blocker.css(url ?: return)
+                view.evaluateJavascript(
+                    "(function(){var s=document.getElementById('jianyue-adblock');" +
+                        "if(!s){s=document.createElement('style');s.id='jianyue-adblock';document.documentElement.appendChild(s);}" +
+                        "s.textContent=${JSONObject.quote(css)};})()",
+                    null,
+                )
+            }
+
+            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                if (blockingEnabled.get() && request != null && blocker.blocks(
+                    request.url.toString(),
+                    request.requestHeaders.entries.firstOrNull { it.key.equals("Referer", true) }?.value ?: currentUrl,
+                    BrowserAdBlock.resourceType(request.url.toString(), request.requestHeaders),
+                    request.isForMainFrame,
+                )) {
+                    return WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            override fun onPageCommitVisible(view: WebView, url: String?) {
+                super.onPageCommitVisible(view, url)
+                hideAds(view, url)
+            }
+
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 url?.let {
@@ -122,7 +193,10 @@ fun WebViewScreenContent(
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
+                if (!isActive) return
                 super.onPageFinished(view, url)
+                hideAds(view, url)
+                CookieManager.getInstance().flush()
                 scope.launch {
                     val html = view.getHtml()
                     showCloudflareHelp = "window._cf_chl_opt" in html || "Ray ID is" in html
@@ -232,17 +306,78 @@ fun WebViewScreenContent(
         return webView
     }
 
-    val popState = remember<() -> Unit> {
-        {
-            if (windowStack.size == 1) {
-                onNavigateUp()
-            } else {
-                windowStack.pop()
-            }
+    BackHandler {
+        val initialUri = url.toUri()
+        val currentUri = currentUrl.toUri()
+        val atHome = currentUri.host == initialUri.host &&
+            currentUri.path.orEmpty().trimEnd('/') == initialUri.path.orEmpty().trimEnd('/')
+        when {
+            atHome -> onNavigateUp()
+            navigator.canGoBack -> navigator.navigateBack()
+            windowStack.size > 1 -> windowStack.pop()
+            else -> onNavigateUp()
         }
     }
 
-    BackHandler(windowStack.size > 1, popState)
+    fun setAdBlockEnabled(enabled: Boolean) {
+        blockingEnabled.set(enabled)
+        adBlockEnabled = enabled
+        preferences.edit().putBoolean("adblock_enabled", enabled).apply()
+        windowStack.items.forEach { window ->
+            window.webView?.evaluateJavascript("document.getElementById('jianyue-adblock')?.remove()", null)
+            window.navigator.reload()
+        }
+    }
+
+    if (showUrl) {
+        AlertDialog(
+            onDismissRequest = { showUrl = false },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            title = { Text("网址信息") },
+            text = { androidx.compose.foundation.text.selection.SelectionContainer { Text(currentUrl) } },
+            confirmButton = { TextButton(onClick = { showUrl = false }) { Text("完成") } },
+            dismissButton = {
+                TextButton(onClick = {
+                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                        .setPrimaryClip(ClipData.newPlainText("图源网址", currentUrl))
+                    showUrl = false
+                }) { Text("复制网址") }
+            },
+        )
+    }
+    if (showAdBlockSettings) {
+        AlertDialog(
+            onDismissRequest = { showAdBlockSettings = false },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            title = { Text("去广告拓展") },
+            text = {
+                Column {
+                    Text("自用去广告规则 · 其他.prop")
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (adBlockEnabled) "已开启" else "已关闭")
+                        Switch(checked = adBlockEnabled, onCheckedChange = { enabled ->
+                            if (enabled) setAdBlockEnabled(true) else {
+                                showAdBlockSettings = false
+                                confirmDisableAdBlock = true
+                            }
+                        })
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showAdBlockSettings = false }) { Text("完成") } },
+        )
+    }
+    if (confirmDisableAdBlock) {
+        fun dismissConfirmation() { confirmDisableAdBlock = false; showAdBlockSettings = true }
+        AlertDialog(
+            onDismissRequest = { dismissConfirmation() },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            title = { Text("关闭去广告拓展？") },
+            text = { Text("关闭后将重新加载网页，网站广告可能重新显示。") },
+            confirmButton = { TextButton(onClick = { setAdBlockEnabled(false); dismissConfirmation() }) { Text("确认关闭") } },
+            dismissButton = { TextButton(onClick = { dismissConfirmation() }) { Text("取消") } },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -250,60 +385,20 @@ fun WebViewScreenContent(
                 Column {
                     AppBar(
                         title = currentWindow.state.pageTitle ?: initialTitle,
-                        subtitle = currentUrl,
                         navigateUp = onNavigateUp,
                         navigationIcon = MaterialSymbols.Rounded.Close,
                         actions = {
                             AppBarActions(
                                 listOf(
-                                    AppBar.Action(
-                                        title = stringResource(MR.strings.action_webview_back),
-                                        icon = MaterialSymbols.AutoMirroredRounded.ArrowBack,
-                                        onClick = {
-                                            if (navigator.canGoBack) {
-                                                navigator.navigateBack()
-                                            }
-                                        },
-                                        enabled = navigator.canGoBack,
-                                    ),
-                                    AppBar.Action(
-                                        title = stringResource(MR.strings.action_webview_forward),
-                                        icon = MaterialSymbols.AutoMirroredRounded.ArrowForward,
-                                        onClick = {
-                                            if (navigator.canGoForward) {
-                                                navigator.navigateForward()
-                                            }
-                                        },
-                                        enabled = navigator.canGoForward,
+                                    AppBar.OverflowAction(
+                                        title = "网址信息",
+                                        onClick = { showUrl = true },
                                     ),
                                     AppBar.OverflowAction(
-                                        title = stringResource(MR.strings.action_webview_refresh),
-                                        onClick = { navigator.reload() },
+                                        title = "去广告拓展",
+                                        onClick = { showAdBlockSettings = true },
                                     ),
-                                    AppBar.OverflowAction(
-                                        title = stringResource(MR.strings.action_share),
-                                        onClick = { onShare(currentUrl) },
-                                    ),
-                                    AppBar.OverflowAction(
-                                        title = stringResource(MR.strings.action_open_in_browser),
-                                        onClick = { onOpenInBrowser(currentUrl) },
-                                    ),
-                                    AppBar.OverflowAction(
-                                        title = stringResource(MR.strings.pref_clear_cookies),
-                                        onClick = { onClearCookies(currentUrl) },
-                                    ),
-                                ).toMutableList().apply {
-                                    if (windowStack.size > 1) {
-                                        add(
-                                            0,
-                                            AppBar.Action(
-                                                title = stringResource(MR.strings.action_webview_close_tab),
-                                                icon = MaterialSymbols.Rounded.TabClose,
-                                                onClick = popState,
-                                            ),
-                                        )
-                                    }
-                                },
+                                ),
                             )
                         },
                     )
@@ -348,12 +443,14 @@ fun WebViewScreenContent(
         key(currentWindow) {
             WebView(
                 state = currentWindow.state,
+                captureBackPresses = false,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding),
                 navigator = navigator,
                 onCreated = { webView ->
                     webView.setDefaultSettings()
+                    CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
                     // Debug mode (chrome://inspect/#devices)
                     if (BuildConfig.DEBUG &&
@@ -369,7 +466,7 @@ fun WebViewScreenContent(
                     if (window == null) {
                         // If we couldn't find any window on the stack that owns this WebView, it means that we can
                         // safely dispose of it because the window containing it has been closed.
-                        webView.destroy()
+                        currentWindow.destroy()
                     } else {
                         // The composable is being disposed but the WebView object is not.
                         // When the WebView element is recomposed, we will want the WebView to resume from its state
