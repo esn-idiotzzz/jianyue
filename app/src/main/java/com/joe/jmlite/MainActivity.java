@@ -537,6 +537,7 @@ public final class MainActivity extends Activity {
         }
         // While the finger still covers the lifted slot the row stays filled: no landing hole.
         boolean atOrigin=origin!=null&&x>=origin.getLeft()&&x<origin.getRight()&&y>=origin.getTop()&&y<origin.getBottom();
+        if(atOrigin){dragHoverKey="";dragHoverRect.setEmpty();}
         ShelfTile hovered=null;float hitLeft=0,hitTop=0;
         if(!atOrigin){
             // A chosen merge/into target stays sticky until the finger leaves its original bounds;
@@ -572,8 +573,9 @@ public final class MainActivity extends Activity {
             else zone=ShelfOrder.zone(Math.max(0,Math.min(width,x-hitLeft)),width,false,false);
         }
         List<String> next;JSONObject dropTarget=null;int dropZone=ShelfOrder.NONE;int gap=-1;
-        if(atOrigin||hovered==null||sourceKey.equals(shelfKey(target))){
-            next=compact;
+        if(atOrigin){
+            // The lifted card is still over its own slot: keep that slot as the landing gap.
+            gap=order.indexOf(sourceKey);next=ShelfOrder.landing(order,sourceKey,gap);
         }else if(zone==ShelfOrder.MERGE||zone==ShelfOrder.INTO){
             next=compact;dropTarget=target;dropZone=zone;
             if(!dragHoverKey.equals(shelfKey(target))){
@@ -913,9 +915,6 @@ public final class MainActivity extends Activity {
             if(!started){draggingBook=null;dragRows.clear();dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragPreviewSignature="";dragCover=null;return false;}
             holdReady=false;shelfHoldActive=false;
             setAlpha(0f);
-            // Lift the tile out of the flow at once so its slot closes under the drag shadow.
-            ArrayList<String> order=new ArrayList<>();for(JSONObject row:dragRows)order.add(shelfKey(row));
-            applyShelfPreview(ShelfOrder.without(order,shelfKey(book)));
             if(shelfCapsuleActive())showShelfDropPill(book.optBoolean("book_folder")?"拖动到此拆除书籍夹":"拖动到此移出书籍夹");
             return true;
         }
