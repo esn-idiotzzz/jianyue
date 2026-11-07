@@ -104,4 +104,10 @@ class ShelfOrderTest {
         val compact = ShelfOrder.without(listOf("f1", "b1"), "b1")
         assertEquals(-1, ShelfOrder.dropTargetIndex(compact, 1, false, 1))
     }
+    @Test fun `most of a book is a merge target and only the outer strips insert`() {
+        assertEquals(ShelfOrder.BEFORE, ShelfOrder.zone(10f, 100f, false, false))
+        assertEquals(ShelfOrder.MERGE, ShelfOrder.zone(15f, 100f, false, false))
+        assertEquals(ShelfOrder.MERGE, ShelfOrder.zone(85f, 100f, false, false))
+        assertEquals(ShelfOrder.AFTER, ShelfOrder.zone(90f, 100f, false, false))
+    }
 }

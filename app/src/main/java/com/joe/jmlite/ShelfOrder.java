@@ -13,7 +13,8 @@ public final class ShelfOrder {
         if(width<=0||x<0||x>width)return NONE;
         if(sourceFolder)return targetFolder?(x<width/2?BEFORE:AFTER):NONE;
         if(targetFolder)return INTO;
-        return x<width*.25f?BEFORE:x>width*.75f?AFTER:MERGE;
+        // Keep most of the book as a merge target; only the narrow outer strips push it aside.
+        return x<width*.12f?BEFORE:x>width*.88f?AFTER:MERGE;
     }
     public static List<String> insert(List<String> order,String source,String target,boolean after){
         ArrayList<String> next=new ArrayList<>(order);

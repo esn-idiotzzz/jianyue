@@ -127,4 +127,34 @@ class ShelfFavoriteScopeTest {
         lib.deleteFolder("child")
         verify(exactly=1){lib["write"](any<JSONObject>())}
     }
+
+    @Test fun `system folders cannot be dismantled`(){
+        val state=state(folder("fav","favorites"),folder("jm","online_jm"),folder("web","online_web"))
+        val lib=library(state)
+        for(id in listOf("fav","jm","web")) assertThrows(java.io.IOException::class.java){lib.deleteFolder(id)}
+        assertEquals(setOf("fav","jm","web"),folderIds(state))
+        verify(exactly=0){lib["write"](any<JSONObject>())}
+    }
+
+    @Test fun `dismantling an empty folder only removes the folder`(){
+        val state=state(folder("empty"))
+        library(state).deleteFolder("empty")
+        assertTrue(folderIds(state).isEmpty())
+    }
+
+    @Test fun `dismantling a one book folder returns the book to the shelf`(){
+        val state=state(folder("solo"))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","solo"))
+        library(state).deleteFolder("solo")
+        assertFalse(entry(state).has("folder"))
+        assertTrue(folderIds(state).isEmpty())
+    }
+
+    @Test fun `dismantling a one book nested folder returns the book to its parent`(){
+        val state=state(folder("root"),folder("solo",parent="root"))
+        state.getJSONObject("entries").put("download:1",JSONObject().put("folder","solo"))
+        library(state).deleteFolder("solo")
+        assertEquals("root",entry(state).getString("folder"))
+        assertEquals(setOf("root"),folderIds(state))
+    }
 }

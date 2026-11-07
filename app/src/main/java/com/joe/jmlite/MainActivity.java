@@ -96,9 +96,14 @@ public final class MainActivity extends Activity {
     private Runnable pendingShelfMenu;
     private static final int SHELF_MENU_DELAY=90,SHELF_TILE_SETTLE=190;
     /** One timing and one scale for every drag hover so books and folders feel identical. */
-    private static final int DRAG_TARGET_MS=170,DRAG_PREVIEW_MS=190,DRAG_NAME_MS=120,FOLDER_PREVIEW_DEPTH=3,DRAG_END_SETTLE_MS=460;
-    private static final android.view.animation.DecelerateInterpolator DRAG_PREVIEW_INTERPOLATOR=new android.view.animation.DecelerateInterpolator(1.6f);
+    private static final int DRAG_TARGET_MS=170,DRAG_PREVIEW_MS=250,DRAG_NAME_MS=120,FOLDER_PREVIEW_DEPTH=3,DRAG_END_SETTLE_MS=520;
+    /** A gentle fast-out curve makes the push and fill read as one calm movement. */
+    private static final android.view.animation.PathInterpolator DRAG_PREVIEW_INTERPOLATOR=new android.view.animation.PathInterpolator(0.32f,0f,0.2f,1f);
     private final Runnable dragEndSettle=new Runnable(){public void run(){if(draggingBook==null)clearShelfPreview();}};
+    /** A short edge dwell keeps a quick pass from pushing a book the user means to merge with. */
+    private static final int SHELF_PUSH_DWELL=90;
+    private String pendingPushKey="";private int pendingPushZone=ShelfOrder.NONE;private long pendingPushAt;
+    private final Runnable shelfPushPreview=new Runnable(){public void run(){if(draggingBook!=null)previewShelfDrag(dragPointerX,dragPointerY);}};
     private static final float DRAG_TARGET_SCALE=.96f,DRAG_PREVIEW_SCALE=.93f;
     private ValueAnimator actionAnimator;
     private FirstRunGuide firstRunGuide;
@@ -208,7 +213,7 @@ public final class MainActivity extends Activity {
                     dragPointerX=e.getX();dragPointerY=e.getY();previewShelfDrag(dragPointerX,dragPointerY);handler.removeCallbacks(shelfAutoScroll);handler.post(shelfAutoScroll);return true;
                 case DragEvent.ACTION_DRAG_EXITED:handler.removeCallbacks(shelfAutoScroll);clearShelfPreview();return true;
                 case DragEvent.ACTION_DROP:
-                    previewShelfDrag(e.getX(),e.getY());
+                    previewShelfDrag(e.getX(),e.getY(),true);
                     if(dragTarget==null||dragZone==ShelfOrder.NONE||operation)return false;
                     drop(dragTarget,draggingBook,dragZone);return true;
                 case DragEvent.ACTION_DRAG_ENDED:
@@ -216,7 +221,7 @@ public final class MainActivity extends Activity {
                     hideShelfDropPill();
                     JSONObject item=draggingBook;
                     boolean placed=e.getResult();
-                    draggingBook=null;dragRows.clear();dragCover=null;dragPreviewPositions.clear();dragPreviewSignature="";dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();
+                    draggingBook=null;dragRows.clear();dragCover=null;dragPreviewPositions.clear();dragPreviewSignature="";dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();clearPendingPush();
                     if(placed){
                         // The mutation owns the refreshed layout; keep the landing preview a moment so the
                         // already animated tiles never slide back to their old slots before the write lands.
@@ -497,7 +502,7 @@ public final class MainActivity extends Activity {
         String parent=f.optString("parent");int index=-1,count=0;
         for(JSONObject item:bookFolders)if(parent.equals(item.optString("parent"))){if(f.optString("id").equals(item.optString("id")))index=count;count++;}
         boolean canUp=index>0,canDown=index>=0&&index<count-1;
-        ArrayList<String> items=new ArrayList<>();if(!Library.isProtectedFolder(f))items.add("重命名书籍夹");if(canUp)items.add("上移");if(canDown)items.add("下移");items.add("删除书籍夹");items.add(privateShelf?"从隐私书架移除":"添加到隐私书架");
+        ArrayList<String> items=new ArrayList<>();boolean system=Library.isProtectedFolder(f);if(!system)items.add("重命名书籍夹");if(canUp)items.add("上移");if(canDown)items.add("下移");if(!system)items.add("删除书籍夹");items.add(privateShelf?"从隐私书架移除":"添加到隐私书架");
         PredictiveBack.dialog(this,true).setTitle(f.optString("title")).setItems(items.toArray(new String[0]),(d,n)->{
             String action=items.get(n);
             if("重命名书籍夹".equals(action))nameDialog("重命名书籍夹",f.optString("title"),name->mutate(()->library.renameFolder(f.optString("id"),name)));
@@ -505,8 +510,10 @@ public final class MainActivity extends Activity {
             else if("下移".equals(action))mutate(()->library.moveFolder(f.optString("id"),1));
             else if(action.equals("添加到隐私书架")||action.equals("从隐私书架移除"))transferPrivacy(f,true);
             else{
-                boolean nested=!f.optString("parent").isEmpty();
-                PredictiveBack.dialog(this).setTitle("删除书籍夹？").setMessage(nested?"夹内书籍和子书籍夹中的书籍都会移到上一级，子书籍夹会被一并拆除。":"夹内书籍和子书籍夹中的书籍都会回到书架，子书籍夹会被一并拆除。").setNegativeButton("取消",null).setPositiveButton("删除",(x,y)->mutate(()->library.deleteFolder(f.optString("id")))).show();
+                boolean nested=!f.optString("parent").isEmpty();String where=nested?"上一级书籍夹":"书架";
+                int books=0,children=0;for(JSONObject member:folderCovers.members(f.optString("id"))){if(member.optBoolean("book_folder"))children++;else books++;}
+                String message=children>0?"夹内书籍和子书籍夹中的书籍都会移到"+where+"，子书籍夹会被一并拆除。":books==0?"该书籍夹没有书籍，拆除后仅删除书籍夹。":books==1?"夹内 1 本书籍会回到"+where+"。":"夹内 "+books+" 本书籍会回到"+where+"。";
+                PredictiveBack.dialog(this).setTitle("删除书籍夹？").setMessage(message).setNegativeButton("取消",null).setPositiveButton("删除",(x,y)->mutate(()->library.deleteFolder(f.optString("id")))).show();
             }
         }).show();
     }
@@ -522,7 +529,8 @@ public final class MainActivity extends Activity {
     private JSONArray folders(){try{return new JSONArray(prefs.getString("folders","[]"));}catch(Exception e){return new JSONArray();}}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();if(request==43){toast("正在导入漫画…");mutate(()->library.importComic(uri));return;}if(request!=41)return;try{getContentResolver().takePersistableUriPermission(uri,data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION);JSONArray all=folders();for(int n=0;n<all.length();n++)if(all.getJSONObject(n).optString("uri").equals(uri.toString())){toast("已添加此文件夹");return;}String name=android.provider.DocumentsContract.getTreeDocumentId(uri);int slash=name.lastIndexOf('/');if(slash>=0)name=name.substring(slash+1);all.put(new JSONObject().put("uri",uri.toString()).put("title",name).put("local",true));prefs.edit().putString("folders",all.toString()).apply();refresh();}catch(Exception e){toast("未获得文件夹读取权限，请重新选择");}}
     private static String shelfKey(JSONObject book){return book.optBoolean("book_folder")?"folder:"+book.optString("id"):Library.key(book);}
-    private void previewShelfDrag(float x,float y){
+    private void previewShelfDrag(float x,float y){previewShelfDrag(x,y,false);}
+    private void previewShelfDrag(float x,float y,boolean force){
         if(draggingBook==null||grid==null||rows.isEmpty())return;
         String sourceKey=shelfKey(draggingBook);
         boolean sourceFolder=draggingBook.optBoolean("book_folder");
@@ -572,12 +580,23 @@ public final class MainActivity extends Activity {
             else if(targetFolder)zone=ShelfOrder.INTO;
             else zone=ShelfOrder.zone(Math.max(0,Math.min(width,x-hitLeft)),width,false,false);
         }
+        boolean edgePush=!sourceFolder&&hovered!=null&&!targetFolder&&(zone==ShelfOrder.BEFORE||zone==ShelfOrder.AFTER);
+        if(edgePush&&!force){
+            long now=android.os.SystemClock.uptimeMillis();String key=shelfKey(target);
+            if(!key.equals(pendingPushKey)||zone!=pendingPushZone||pendingPushAt==0){
+                pendingPushKey=key;pendingPushZone=zone;pendingPushAt=now;
+                handler.removeCallbacks(shelfPushPreview);handler.postDelayed(shelfPushPreview,SHELF_PUSH_DWELL);return;
+            }
+            if(now-pendingPushAt<SHELF_PUSH_DWELL)return;
+        }else clearPendingPush();
         List<String> next;JSONObject dropTarget=null;int dropZone=ShelfOrder.NONE;int gap=-1;
         if(atOrigin){
             // The lifted card is still over its own slot: keep that slot as the landing gap.
             gap=order.indexOf(sourceKey);next=ShelfOrder.landing(order,sourceKey,gap);
         }else if(zone==ShelfOrder.MERGE||zone==ShelfOrder.INTO){
-            next=compact;dropTarget=target;dropZone=zone;
+            // Keep the target card exactly where the finger is: compacting would slide it a slot away.
+            next=order.indexOf(shelfKey(target))>order.indexOf(sourceKey)?order:compact;
+            dropTarget=target;dropZone=zone;
             if(!dragHoverKey.equals(shelfKey(target))){
                 dragHoverKey=shelfKey(target);
                 dragHoverRect.set(hitLeft,hitTop,hitLeft+hovered.getWidth(),hitTop+hovered.getHeight());
@@ -659,7 +678,9 @@ public final class MainActivity extends Activity {
         return new Point(grid.getPaddingLeft()+column*(firstChild.getWidth()+grid.getHorizontalSpacing()),firstChild.getTop()+(row-firstRow)*rowHeight);
     }
     private GradientDrawable dragOutline(){GradientDrawable border=u.shape(Color.TRANSPARENT,16);border.setStroke(u.dp(2),Ui.BLUE);return border;}
+    private void clearPendingPush(){handler.removeCallbacks(shelfPushPreview);pendingPushKey="";pendingPushZone=ShelfOrder.NONE;pendingPushAt=0;}
     private void clearShelfPreview(){
+        clearPendingPush();
         dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();dragPreviewSignature="";dragPreviewPositions.clear();
         if(grid==null)return;
         for(int n=0;n<grid.getChildCount();n++){
@@ -671,7 +692,7 @@ public final class MainActivity extends Activity {
     }
     /** The bottom capsule only becomes a drop target while dragging something that lives in a folder. */
     private boolean shelfCapsuleActive(){
-        return tab==1&&!privateShelf&&!folderId.isEmpty()&&draggingBook!=null&&(shelfSearch==null||!shelfSearch.isExpanded());
+        return tab==1&&!privateShelf&&!folderId.isEmpty()&&draggingBook!=null&&(shelfSearch==null||!shelfSearch.isExpanded())&&!(draggingBook.optBoolean("book_folder")&&Library.isProtectedFolder(draggingBook));
     }
     private boolean shelfCapsuleDrag(DragEvent e){
         if(draggingBook==null)return false;
@@ -704,6 +725,7 @@ public final class MainActivity extends Activity {
         JSONObject item=draggingBook;
         if(item==null||folderId.isEmpty()||operation)return;
         if(item.optBoolean("book_folder")){
+            if(Library.isProtectedFolder(item)){toast("系统书籍夹不能拆除");return;}
             // Dismantle: its books and every nested folder's books return to the list it is dragged onto.
             mutate(()->library.deleteFolder(item.optString("id")));
             return;
@@ -785,7 +807,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 5.0.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 5.0.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -909,7 +931,7 @@ public final class MainActivity extends Activity {
             if(book==null||operation||draggingBook!=null||(shelfSearch!=null&&shelfSearch.isExpanded()))return false;
             cancelShelfMenu();
             draggingBook=book;dragRows.clear();dragRows.addAll(rows);
-            dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();dragPreviewSignature="";dragCover=snapshotFace(face);
+            dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragHoverKey="";dragHoverRect.setEmpty();dragPreviewSignature="";clearPendingPush();dragCover=snapshotFace(face);
             holdReady=false;handler.removeCallbacks(dragEndSettle);
             boolean started=startDragAndDrop(ClipData.newPlainText("book",Library.key(book)),new TileShadow(this,touchX,touchY),book,0);
             if(!started){draggingBook=null;dragRows.clear();dragTarget=null;dragZone=ShelfOrder.NONE;dragGap=-1;dragPreviewSignature="";dragCover=null;return false;}
