@@ -48,7 +48,8 @@ public final class AdaptiveLayout {
     public static final float SEARCH_COVER_RATIO = 1.36f;
 
     /** Maximum content widths for single-column pages on very wide windows. */
-    public static final int DOWNLOAD_LIST_MAX_WIDTH_DP = 720;
+    public static final int DOWNLOAD_LIST_PADDING_DP = 18;
+    public static final int DOWNLOAD_LIST_MAX_WIDTH_DP = 760;
     public static final int RECORDS_LIST_MAX_WIDTH_DP = 720;
     public static final int REPOSITORY_LIST_MAX_WIDTH_DP = 760;
     public static final int MANGA_DETAIL_MAX_WIDTH_DP = 720;
@@ -152,15 +153,17 @@ public final class AdaptiveLayout {
         // Phone-class devices keep their original edge-to-edge rows at every window width; only
         // tablet windows (including split-screen) narrow the content on very wide layouts.
         if (!isTabletDevice(view.getContext())) return;
+        float density = view.getResources().getDisplayMetrics().density;
+        if (density <= 0f) return;
+        // Density and the padding limits are constant for this view; resolve them once instead of
+        // on every layout pass.
+        int base = Math.round(basePaddingDp * density);
+        int max = Math.round(maxContentWidthDp * density);
         view.addOnLayoutChangeListener((v, left, top, right, bottom,
                                         oldLeft, oldTop, oldRight, oldBottom) -> {
             int width = right - left;
             if (width <= 0) return;
-            float density = v.getResources().getDisplayMetrics().density;
-            int base = Math.round(basePaddingDp * density);
-            int max = Math.round(maxContentWidthDp * density);
-            int inset = centeredInsetPx(width, base, max);
-            int horizontal = base + inset;
+            int horizontal = base + centeredInsetPx(width, base, max);
             if (v.getPaddingLeft() != horizontal || v.getPaddingRight() != horizontal) {
                 v.setPadding(horizontal, v.getPaddingTop(), horizontal, v.getPaddingBottom());
             }
@@ -184,4 +187,5 @@ public final class AdaptiveLayout {
         if (density <= 0f) return 0;
         return Math.round(windowWidthPx(activity) / density);
     }
+
 }
