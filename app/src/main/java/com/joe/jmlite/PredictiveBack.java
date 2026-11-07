@@ -63,7 +63,7 @@ public final class PredictiveBack implements AutoCloseable {
     }
     private void start(boolean fromLeft){
         if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
-        if(previewStart!=null)previewStart.run();
+        if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
         reset();gesturing=true;left=fromLeft;progress=0;
         width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
