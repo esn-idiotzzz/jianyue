@@ -95,3 +95,5 @@ DownloadInputFocusTest is a separate Android instrumentation test. It alternates
 4.4.0 keeps the direct runner at 290 tests. ShelfLongPressTest now checks that a long hold only arms the card: releasing without movement opens the menu, and the drag state must stay idle until the finger actually moves.
 
 4.5.0 adds ShelfFavoriteScopeTest (11) for nested-folder deletion returning books to the parent, child folders lifting one level, the favorites scope covering every descendant, and moves or new subfolders inside 我的收藏 keeping the favorite flag. FolderCoverIndexTest grows to 9 cases for nested folders appearing in the outer preview, folder-before-book ordering, recursive fingerprint invalidation and root isolation; LibrarySnapshotTest adds a nested-favorites read case. The direct runner now requires 306 successful tests. These JVM checks do not replace device drag, preview animation or capsule touch checks.
+
+4.5.1 keeps the direct runner at 306 tests. The shelf grid spacing, title size and one-line info are layout-only changes; they do not alter the tested library, folder or drag decision logic.
