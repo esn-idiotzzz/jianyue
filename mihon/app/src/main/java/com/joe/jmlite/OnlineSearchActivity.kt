@@ -56,6 +56,7 @@ class OnlineSearchActivity : Activity() {
     private var activeQuery=""
     private val itemKeys=HashSet<String>()
     private var searchExpanded=false
+    private val tabletDevice:Boolean by lazy { AdaptiveLayout.isTabletDevice(this) }
     private var predictiveBack:PredictiveBack?=null
     private var searchAnimation:android.animation.ValueAnimator?=null
     private var toggleSearch:((Boolean)->Unit)?=null
@@ -139,8 +140,9 @@ class OnlineSearchActivity : Activity() {
             root.addView(sourceLoginNotice)
         }
 
-        grid = AdaptiveGridView(this, AdaptiveLayout::searchColumns).apply {
-            numColumns = AdaptiveLayout.searchColumns(AdaptiveLayout.windowWidthDp(this@OnlineSearchActivity))
+        grid = AdaptiveGridView(this, { contentDp, windowDp -> AdaptiveLayout.searchColumns(windowDp, contentDp, tabletDevice) }).apply {
+            val windowDp = AdaptiveLayout.windowWidthDp(this@OnlineSearchActivity)
+            numColumns = AdaptiveLayout.searchColumns(windowDp, windowDp - AdaptiveLayout.SEARCH_PAGE_PADDING_DP * 2, tabletDevice)
             horizontalSpacing = ui.dp(AdaptiveLayout.SEARCH_SPACING_DP)
             verticalSpacing = ui.dp(16)
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
@@ -441,7 +443,7 @@ class OnlineSearchActivity : Activity() {
             val measured = View.MeasureSpec.getSize(widthMeasureSpec)
             val density = resources.displayMetrics.density
             val content = grid.width - grid.paddingLeft - grid.paddingRight
-            val tablet = content > 0 && AdaptiveLayout.isTabletWidth(Math.round(content / density))
+            val tablet = tabletDevice && content > 0 && AdaptiveLayout.isTabletWidth(Math.round(content / density))
             val wanted = if (tablet) AdaptiveLayout.searchCoverHeightPx(measured) else ui.dp(138)
             if (wanted != coverHeight) {
                 coverHeight = wanted

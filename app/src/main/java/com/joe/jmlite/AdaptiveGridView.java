@@ -11,9 +11,9 @@ import android.widget.GridView;
  * and rotation do not repeat layout work unnecessarily.
  */
 public final class AdaptiveGridView extends GridView {
-    /** Maps the content width in dp to a column count. */
+    /** Maps the measured content width and the window width, both in dp, to a column count. */
     public interface ColumnPolicy {
-        int columnsFor(int contentWidthDp);
+        int columnsFor(int contentWidthDp, int windowWidthDp);
     }
 
     /** Notified after the column count changes because the window width changed. */
@@ -40,14 +40,17 @@ public final class AdaptiveGridView extends GridView {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int available = MeasureSpec.getSize(widthMeasureSpec) - getPaddingLeft() - getPaddingRight();
-        if (available > 0 && policy != null) {
+        int widthPx = MeasureSpec.getSize(widthMeasureSpec);
+        if (widthPx > 0 && policy != null) {
             float density = getResources().getDisplayMetrics().density;
-            int widthDp = density > 0f ? Math.round(available / density) : 0;
-            int columns = Math.max(1, policy.columnsFor(widthDp));
-            if (columns != getNumColumns()) {
-                setNumColumns(columns);
-                if (listener != null) listener.onColumnsChanged(columns, available);
+            if (density > 0f) {
+                int contentWidthDp = Math.round((widthPx - getPaddingLeft() - getPaddingRight()) / density);
+                int windowWidthDp = getResources().getConfiguration().screenWidthDp;
+                int columns = Math.max(1, policy.columnsFor(contentWidthDp, windowWidthDp));
+                if (columns != getNumColumns()) {
+                    setNumColumns(columns);
+                    if (listener != null) listener.onColumnsChanged(columns, widthPx);
+                }
             }
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);

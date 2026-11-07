@@ -62,6 +62,15 @@ public final class AdaptiveLayout {
         return widthDp >= TABLET_MIN_WIDTH_DP;
     }
 
+    /**
+     * True for a tablet-class device: the smallest available width is at least 600dp. A phone in
+     * landscape can be wider than 600dp but keeps its original phone layout; a tablet in
+     * split-screen is still a tablet but follows the narrower window width.
+     */
+    public static boolean isTabletDevice(android.content.Context context) {
+        return context.getResources().getConfiguration().smallestScreenWidthDp >= TABLET_MIN_WIDTH_DP;
+    }
+
     /** The exact phone shelf rule, used for every window below the tablet breakpoint. */
     public static int phoneShelfColumns(int widthDp) {
         if (widthDp <= 0) return PHONE_SHELF_MIN_COLUMNS;
@@ -69,17 +78,24 @@ public final class AdaptiveLayout {
                 Math.min(PHONE_SHELF_MAX_COLUMNS, widthDp / PHONE_SHELF_STEP_DP));
     }
 
-    /** Column count for the bookshelf and history grids. */
-    public static int shelfColumns(int widthDp) {
-        if (!isTabletWidth(widthDp)) return phoneShelfColumns(widthDp);
-        return columnsFor(widthDp - SHELF_PAGE_PADDING_DP * 2, SHELF_SPACING_DP,
+    /**
+     * Column count for the bookshelf and history grids. Phone-class devices keep the original
+     * phone rule at every window width (the rule uses the window width, exactly like the old
+     * {@code screenWidthDp / 120} formula); tablet windows below 600dp do the same, and wider
+     * tablet windows derive the column count from their real content width.
+     */
+    public static int shelfColumns(int windowWidthDp, int contentWidthDp, boolean tabletDevice) {
+        if (!tabletDevice || !isTabletWidth(windowWidthDp)) return phoneShelfColumns(windowWidthDp);
+        int content = contentWidthDp > 0 ? contentWidthDp : windowWidthDp - SHELF_PAGE_PADDING_DP * 2;
+        return columnsFor(content, SHELF_SPACING_DP,
                 SHELF_TARGET_COVER_DP, SHELF_MIN_COVER_DP, SHELF_MAX_COVER_DP);
     }
 
-    /** Column count for the online search result grid. */
-    public static int searchColumns(int widthDp) {
-        if (!isTabletWidth(widthDp)) return PHONE_SEARCH_COLUMNS;
-        return columnsFor(widthDp - SEARCH_PAGE_PADDING_DP * 2, SEARCH_SPACING_DP,
+    /** Column count for the online search result grid, with the same device/window rules. */
+    public static int searchColumns(int windowWidthDp, int contentWidthDp, boolean tabletDevice) {
+        if (!tabletDevice || !isTabletWidth(windowWidthDp)) return PHONE_SEARCH_COLUMNS;
+        int content = contentWidthDp > 0 ? contentWidthDp : windowWidthDp - SEARCH_PAGE_PADDING_DP * 2;
+        return columnsFor(content, SEARCH_SPACING_DP,
                 SEARCH_TARGET_COVER_DP, SEARCH_MIN_COVER_DP, SEARCH_MAX_COVER_DP);
     }
 
@@ -133,6 +149,9 @@ public final class AdaptiveLayout {
      */
     public static void capContentWidth(View view, int basePaddingDp, int maxContentWidthDp) {
         if (view == null) return;
+        // Phone-class devices keep their original edge-to-edge rows at every window width; only
+        // tablet windows (including split-screen) narrow the content on very wide layouts.
+        if (!isTabletDevice(view.getContext())) return;
         view.addOnLayoutChangeListener((v, left, top, right, bottom,
                                         oldLeft, oldTop, oldRight, oldBottom) -> {
             int width = right - left;

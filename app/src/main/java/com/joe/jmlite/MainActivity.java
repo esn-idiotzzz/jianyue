@@ -207,7 +207,7 @@ public final class MainActivity extends Activity {
         header.requestFocus();list.addHeaderView(header,null,false);adapter=new BookAdapter();list.setAdapter(adapter);list.setOnItemClickListener((p,v,pos,id)->{int n=pos-list.getHeaderViewsCount();if(n>=0&&n<rows.size())open(rows.get(n));});list.setOnItemLongClickListener((p,v,pos,id)->{int n=pos-list.getHeaderViewsCount();if(n<0||n>=rows.size()||rows.get(n).optBoolean("empty"))return false;manage(rows.get(n));return true;});content.addView(list,new LinearLayout.LayoutParams(-1,-1));
     }
     private void buildShelf(){
-        PrivacyPullHost frame=new PrivacyPullHost(this);grid=new AdaptiveGridView(this,AdaptiveLayout::shelfColumns);grid.setId(1005);grid.setNumColumns(AdaptiveLayout.shelfColumns(AdaptiveLayout.windowWidthDp(this)));grid.setHorizontalSpacing(u.dp(AdaptiveLayout.SHELF_SPACING_DP));grid.setVerticalSpacing(u.dp(AdaptiveLayout.SHELF_VERTICAL_SPACING_DP));grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);grid.setPadding(u.dp(AdaptiveLayout.SHELF_PAGE_PADDING_DP),u.dp(4),u.dp(AdaptiveLayout.SHELF_PAGE_PADDING_DP),u.dp(privateShelf?20:88)+navigationInset);grid.setClipToPadding(false);grid.setSelector(android.R.color.transparent);shelfAdapter=new ShelfAdapter();grid.setAdapter(shelfAdapter);frame.addView(grid,new FrameLayout.LayoutParams(-1,-1));
+        PrivacyPullHost frame=new PrivacyPullHost(this);final boolean tabletDevice=AdaptiveLayout.isTabletDevice(this);final int windowDp=AdaptiveLayout.windowWidthDp(this);grid=new AdaptiveGridView(this,(contentDp,widthDp)->AdaptiveLayout.shelfColumns(widthDp,contentDp,tabletDevice));grid.setId(1005);grid.setNumColumns(AdaptiveLayout.shelfColumns(windowDp,windowDp-AdaptiveLayout.SHELF_PAGE_PADDING_DP*2,tabletDevice));grid.setHorizontalSpacing(u.dp(AdaptiveLayout.SHELF_SPACING_DP));grid.setVerticalSpacing(u.dp(AdaptiveLayout.SHELF_VERTICAL_SPACING_DP));grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);grid.setPadding(u.dp(AdaptiveLayout.SHELF_PAGE_PADDING_DP),u.dp(4),u.dp(AdaptiveLayout.SHELF_PAGE_PADDING_DP),u.dp(privateShelf?20:88)+navigationInset);grid.setClipToPadding(false);grid.setSelector(android.R.color.transparent);shelfAdapter=new ShelfAdapter();grid.setAdapter(shelfAdapter);frame.addView(grid,new FrameLayout.LayoutParams(-1,-1));
         emptyShelf=u.text(tab==2?"暂无浏览记录":"书架还空着",15,u.muted,false);emptyShelf.setVisibility(tab==2?View.GONE:View.VISIBLE);emptyShelf.setGravity(Gravity.CENTER);frame.addView(emptyShelf,new FrameLayout.LayoutParams(-1,-1));emptyShelf.setOnClickListener(v->{if(tab==1&&!privateShelf)importMenu();});if(tab==1&&!privateShelf)attachPrivacyPull(frame);content.addView(frame,new LinearLayout.LayoutParams(-1,0,1));
         grid.setClipChildren(false);
         grid.setOnScrollListener(new AbsListView.OnScrollListener(){
@@ -1055,7 +1055,7 @@ public final class MainActivity extends Activity {
             if(shelfCapsuleActive())showShelfDropPill(book.optBoolean("book_folder")?"拖动到此拆除书籍夹":"拖动到此移出书籍夹");
             return true;
         }
-        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private int width=1,height=1;private int touchX,touchY;private View folderPreview;private BookCover bookCover;private boolean dropTarget;private float slideTargetX,slideTargetY;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
+        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private int width=1,height=1;private final boolean tabletTile=AdaptiveLayout.isTabletDevice(MainActivity.this);private int touchX,touchY;private View folderPreview;private BookCover bookCover;private boolean dropTarget;private float slideTargetX,slideTargetY;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
         ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,6);name=u.text("",12,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setPadding(u.dp(2),0,u.dp(2),0);addView(name,new LinearLayout.LayoutParams(-1,-2));info=u.text("",10,u.muted,false);info.setMaxLines(1);info.setMinLines(1);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setPadding(u.dp(2),u.dp(2),u.dp(2),0);info.setVisibility(View.INVISIBLE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);cancelShelfMenu();touchX=(int)e.getX();touchY=(int)e.getY();removeCallbacks(pressFeedback);postDelayed(pressFeedback,Math.max(0,(tab==1?Math.min(SHELF_HOLD_MILLIS,ViewConfiguration.getLongPressTimeout()):ViewConfiguration.getLongPressTimeout())-110));}else if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){removeCallbacks(pressFeedback);animate().cancel();if(getScaleX()!=1f||getScaleY()!=1f)animate().scaleX(1).scaleY(1).setDuration(150).start();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{
             if(holdReady)return true;
             if(book==null)return false;
@@ -1065,21 +1065,38 @@ public final class MainActivity extends Activity {
         });
         }
         /**
-         * GridView stretches every tile to the real column width, so the cover height follows the
-         * measured width instead of the display width. Phone windows keep the same 1.40 ratio and
-         * therefore the same pixel height they had before; tablet windows only change the width.
+         * Phones keep the original cover-width formula verbatim, so their shelf stays
+         * pixel-identical at every window size. Tablet tiles follow the real column width and keep
+         * the same 1.40 height/width ratio at every column count.
          */
         @Override protected void onMeasure(int widthSpec,int heightSpec){
-            int measured=MeasureSpec.getSize(widthSpec);
-            if(MeasureSpec.getMode(widthSpec)==MeasureSpec.UNSPECIFIED&&measured<=0)measured=getWidth();
-            if(measured<=0)measured=u.dp(120);
-            int coverHeight=AdaptiveLayout.shelfCoverHeightPx(measured);
+            int coverWidth;
+            if(tabletTile){
+                int measured=MeasureSpec.getSize(widthSpec);
+                int columns=Math.max(1,grid.getNumColumns());
+                int content=grid.getWidth()-grid.getPaddingLeft()-grid.getPaddingRight();
+                int expected;
+                if(content>0)expected=(content-u.dp(10)*(columns-1))/columns;
+                else{
+                    int window=AdaptiveLayout.windowWidthPx(MainActivity.this)-u.dp(36);
+                    expected=window>0?(window-u.dp(10)*(columns-1))/columns:u.dp(120);
+                }
+                // GridView may pre-measure a tile at the full content width; use the expected
+                // column width so the row height is right even before the real layout pass.
+                if(expected>0&&measured>expected)measured=expected;
+                if(measured<=0)measured=u.dp(120);
+                coverWidth=measured;
+            }else{
+                int columns=Math.max(1,grid.getNumColumns());
+                coverWidth=(getResources().getDisplayMetrics().widthPixels-u.dp(36)-u.dp(10)*(columns-1))/columns;
+            }
+            int coverHeight=AdaptiveLayout.shelfCoverHeightPx(coverWidth);
             if(coverHeight!=height){
                 height=coverHeight;
                 ViewGroup.LayoutParams params=face.getLayoutParams();
                 if(params!=null)params.height=height;
             }
-            width=measured;
+            width=coverWidth;
             super.onMeasure(widthSpec,heightSpec);
         }
         @Override public boolean onTouchEvent(MotionEvent event){

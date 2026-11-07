@@ -58,7 +58,7 @@ public class RunJianyueTests {
         var output = new PrintWriter(System.out, true);
         summary.printTo(output);
         summary.printFailuresTo(output);
-        if (summary.getTestsFoundCount() != 336 || summary.getTestsSucceededCount() != 336 ||
+        if (summary.getTestsFoundCount() != 337 || summary.getTestsSucceededCount() != 337 ||
                 summary.getTestsFailedCount() != 0 || summary.getTestsAbortedCount() != 0) {
             System.exit(1);
         }
