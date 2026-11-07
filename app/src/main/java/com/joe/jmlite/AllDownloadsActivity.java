@@ -66,12 +66,16 @@ public final class AllDownloadsActivity extends Activity {
             JSONObject book=shown.get(p);Row row=old!=null?(Row)old.getTag():null;
             if(row==null){LinearLayout outer=ui.column();outer.setPadding(0,0,0,ui.dp(10));LinearLayout body=ui.row();body.setPadding(ui.dp(14),ui.dp(12),ui.dp(14),ui.dp(12));ui.round(body,ui.card,20);outer.addView(body);
                 FrameLayout face=new FrameLayout(AllDownloadsActivity.this);face.setBackground(ui.shape(ui.tint,12));face.setClipToOutline(true);TextView mark=ui.text("漫画",14,Ui.BLUE,true);mark.setGravity(Gravity.CENTER);face.addView(mark,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(AllDownloadsActivity.this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);face.addView(image,new FrameLayout.LayoutParams(-1,-1));body.addView(face,new LinearLayout.LayoutParams(ui.dp(52),ui.dp(72)));
-                LinearLayout text=ui.column();TextView name=ui.text("",14,ui.ink,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(name);ui.space(text,7);TextView info=ui.text("",11,ui.muted,false);text.addView(info);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(ui.dp(14),0,0,0);body.addView(text,lp);row=new Row(outer,image,name,info);outer.setTag(row);
+                LinearLayout text=ui.column();TextView name=ui.text("",14,ui.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(name);ui.space(text,7);TextView info=ui.text("",11,ui.muted,false);info.setSingleLine(true);info.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(info);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(ui.dp(14),0,0,0);body.addView(text,lp);row=new Row(outer,image,name,info);outer.setTag(row);
             }
             row.name.setText(book.optString("title","未命名"));row.info.setText((book.has("sourceId")&&!OnlineHistory.isJm(book)?book.optString("sourceName","全网漫画"):"JM"+book.optString("id"))+" · "+DownloadRecordActions.summary(book));
-            if(book.has("sourceId")&&!OnlineHistory.isJm(book)){covers.clear(row.image);RemoteCovers.load(row.image,book.optString("thumbnail"),book.optLong("sourceId"));}else{RemoteCovers.load(row.image,"",0L);covers.load(row.image,book);}
+            boolean remote=book.has("sourceId")&&!OnlineHistory.isJm(book);
+            if(row.remote&&!remote)RemoteCovers.load(row.image,"",0L);
+            if(!row.remote&&remote)covers.clear(row.image);
+            row.remote=remote;
+            if(remote)RemoteCovers.load(row.image,book.optString("thumbnail"),book.optLong("sourceId"));else covers.load(row.image,book);
             return row.root;
         }
     }
-    private static final class Row {final View root;final ImageView image;final TextView name,info;Row(View root,ImageView image,TextView name,TextView info){this.root=root;this.image=image;this.name=name;this.info=info;}}
+    private static final class Row {final View root;final ImageView image;final TextView name,info;boolean remote;Row(View root,ImageView image,TextView name,TextView info){this.root=root;this.image=image;this.name=name;this.info=info;}}
 }

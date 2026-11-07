@@ -36,7 +36,9 @@ final class CoverLoader implements AutoCloseable {
     void clear(ImageView view){view.setTag(COVER_TAG,null);view.setImageDrawable(null);}
 
     void load(ImageView view,JSONObject book){
-        String key=Library.key(book);view.setTag(COVER_TAG,key);view.setImageDrawable(null);
+        String key=Library.key(book);
+        if(key.equals(view.getTag(COVER_TAG))&&view.getDrawable()!=null)return;
+        view.setTag(COVER_TAG,key);view.setImageDrawable(null);
         if(closed||key.isEmpty())return;
         Bitmap ready=cache.get(key);
         if(ready!=null){view.setImageBitmap(ready);return;}

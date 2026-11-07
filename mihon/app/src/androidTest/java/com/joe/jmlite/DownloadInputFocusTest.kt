@@ -4,6 +4,8 @@ import android.content.Intent
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.MotionEvent
+import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -35,6 +37,12 @@ class DownloadInputFocusTest {
                 var unchanged=""
                 val bounds=Rect()
                 instrumentation.runOnMainSync {
+                    (page.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                        .hideSoftInputFromWindow(target.windowToken,0)
+                }
+                SystemClock.sleep(350)
+                instrumentation.waitForIdleSync()
+                instrumentation.runOnMainSync {
                     unchanged=other.text.toString()
                     target.setText("")
                     assertTrue(target.getGlobalVisibleRect(bounds))
@@ -46,7 +54,13 @@ class DownloadInputFocusTest {
                 }
                 SystemClock.sleep(350)
                 instrumentation.waitForIdleSync()
-                instrumentation.runOnMainSync{assertSame("touch must select this editor after keyboard resize",target,page.currentFocus)}
+                instrumentation.runOnMainSync {
+                    assertSame("touch must select this editor after keyboard resize",target,page.currentFocus)
+                    var header=target.parent as ViewGroup
+                    while(header !is DownloadHeader)header=header.parent as ViewGroup
+                    header.requestFocus() // The same deferred request ListView makes after a resize.
+                    assertSame("header focus restoration must preserve the chosen editor",target,page.currentFocus)
+                }
                 instrumentation.sendStringSync(text)
                 instrumentation.waitForIdleSync()
                 instrumentation.runOnMainSync {

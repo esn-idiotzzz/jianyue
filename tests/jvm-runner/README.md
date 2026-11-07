@@ -82,3 +82,8 @@ The source login window adds BrowserAdBlockTest (12), SourceLoginTest (5), and t
 4.0.0 adds CoverDiskCacheTest (7) for persistence beyond decoded bitmap eviction, source isolation, hashed filenames, bounded eviction, invalidation, unavailable storage and rejected writes. OnlineSearchTest now checks failure identities for exceptions/timeouts, repository order despite completion order, and exclusion of successful empty sources. The direct runner requires 279 successful tests. These checks do not replace device scrolling, keyboard focus, login or shared-list rendering checks.
 
 DownloadInputFocusTest is a separate Android instrumentation test. It alternates real touches between the download page editors three times and checks the selected focus after keyboard layout plus typed text isolation. It must be run on a connected Android device; it is not part of the 279 JVM tests.
+
+4.1.0 extends the direct runner to 285 successful JVM tests. Its device tests also check cover-view reuse across 100 bindings and input focus after repeated keyboard hiding, tapping and deferred header focus requests.
+
+- `CoverBindingTest`: 3 cases for preserving a visible local cover, clearing recycled images, and retrying missing covers.
+- `DownloadHeaderTest`: 3 cases for dispatching remembered input focus; Android focus propagation and real keyboard resize remain device tests.
