@@ -51,7 +51,7 @@ class OnlineSearchTest {
 
         val summary = OnlineRepository.searchSources(listOf(hanging, working), "漫画", {}, items::add)
 
-        assertEquals(OnlineRepository.SearchSummary(2, 1, 1), summary)
+        assertEquals(OnlineRepository.SearchSummary(2, 1, 1, listOf(1)), summary)
         assertEquals(listOf("有效结果"), items.map { it.title })
     }
 
@@ -69,7 +69,7 @@ class OnlineSearchTest {
 
         val summary = OnlineRepository.searchSources(listOf(broken, first, second), "漫画", {}, items::add)
 
-        assertEquals(OnlineRepository.SearchSummary(3, 2, 1), summary)
+        assertEquals(OnlineRepository.SearchSummary(3, 2, 1, listOf(1)), summary)
         assertEquals(setOf("结果一", "结果二"), items.map { it.title }.toSet())
     }
 
@@ -83,7 +83,7 @@ class OnlineSearchTest {
 
         val summary = OnlineRepository.searchSources(listOf(broken, hanging), "漫画", {}, items::add)
 
-        assertEquals(OnlineRepository.SearchSummary(2, 0, 2), summary)
+        assertEquals(OnlineRepository.SearchSummary(2, 0, 2, listOf(1, 2)), summary)
         assertTrue(items.isEmpty())
     }
 
@@ -192,7 +192,26 @@ class OnlineSearchTest {
         assertFalse(pending.isCompleted)
         assertEquals(listOf("快源结果"), items.map { it.title })
         advanceUntilIdle()
-        assertEquals(OnlineRepository.SearchSummary(9, 1, 8), pending.await())
+        assertEquals(OnlineRepository.SearchSummary(9, 1, 8, (1L..8L).toList()), pending.await())
+    }
+
+    @Test
+    fun `failed source identities follow repository order regardless of completion order`() = runTest {
+        val slow = source(11)
+        val fast = source(22)
+        val empty = source(33)
+        coEvery { slow.getSearchManga(any(), any(), any()) } coAnswers {
+            delay(1_000)
+            throw IOException("late failure")
+        }
+        coEvery { fast.getSearchManga(any(), any(), any()) } throws IOException("early failure")
+        coEvery { empty.getSearchManga(any(), any(), any()) } returns MangasPage(emptyList(), false)
+
+        val summary = OnlineRepository.searchSources(listOf(slow, fast, empty), "漫画", {}, {})
+
+        assertEquals(listOf(11L, 22L), summary.failedSourceIds)
+        assertEquals(summary.failed, summary.failedSourceIds.size)
+        assertEquals(1, summary.succeeded)
     }
 
     @Test

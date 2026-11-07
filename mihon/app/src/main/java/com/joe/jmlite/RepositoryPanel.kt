@@ -3,6 +3,7 @@ package com.joe.jmlite
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.text.Editable
@@ -19,6 +20,9 @@ import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 object RepositoryPanel {
     private class Row(val root:FrameLayout,val icon:ImageView,val title:TextView,val subtitle:TextView,val globe:Ui.Icon,val heart:Ui.Icon,val body:LinearLayout)
     @JvmStatic fun create(activity:Activity):View {
+        return create(activity,null)
+    }
+    fun create(activity:Activity,sourceIds:Set<Long>?):View {
         val ui=OnlineUi(activity)
         val baseUi=Ui(activity)
         val prefs=activity.getSharedPreferences("source_favorites",Context.MODE_PRIVATE)
@@ -28,14 +32,10 @@ object RepositoryPanel {
             buildList<JSONObject>{for(i in 0 until entries.length()){
                 val entry=entries.getJSONObject(i);val sources=entry.getJSONArray("sources")
                 for(j in 0 until sources.length())add(JSONObject(sources.getJSONObject(j).toString()).put("packageName",entry.getString("packageName")))
-            }}.distinctBy{it.getString("id")}
+            }}.distinctBy{it.getString("id")}.filter{sourceIds==null||it.getLong("id") in sourceIds}
         }
         val root=ui.column()
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
-        root.addOnAttachStateChangeListener(object:View.OnAttachStateChangeListener{
-            override fun onViewAttachedToWindow(view:View){}
-            override fun onViewDetachedFromWindow(view:View){icons.close();scope.cancel()}
-        })
         val search=ui.row().apply{setPadding(ui.dp(12),0,ui.dp(8),0);background=ui.shape(ui.card,16)}
         search.addView(Ui(activity).icon("search",ui.muted),LinearLayout.LayoutParams(ui.dp(26),ui.dp(26)))
         val input=EditText(activity).apply{hint="搜索图源";setSingleLine();textSize=15f;setTextColor(ui.ink);setHintTextColor(ui.muted);setBackgroundColor(Color.TRANSPARENT);setPadding(ui.dp(8),0,0,0)}
@@ -97,8 +97,7 @@ object RepositoryPanel {
                 }
                 row.heart.contentDescription=if(on)"取消收藏 ${item.getString("name")}" else "收藏 ${item.getString("name")}"
                 row.heart.setOnClickListener{
-                    prefs.edit().putBoolean(item.getString("id"),!favorite(item)).apply();shown=sorted(shown)
-                    count.text="${shown.size} 个图源 · ${all.count{favorite(it)}} 个收藏";notifyDataSetChanged()
+                    prefs.edit().putBoolean(item.getString("id"),!favorite(item)).apply()
                 }
                 row.body.setOnClickListener{activity.startActivity(Intent(activity,OnlineSearchActivity::class.java).putExtra("sourceId",item.getLong("id")).putExtra("sourceName",item.getString("name")).putExtra("sourceLang",item.getString("language")).putExtra("sourcePackage",item.getString("packageName")))}
                 icons.load(row.icon,item.getString("packageName"))
@@ -107,6 +106,11 @@ object RepositoryPanel {
         }
         list.adapter=adapter
         fun filter(){val q=input.text.toString().trim();shown=sorted(all.filter{it.getString("name").contains(q,true)});count.text="${shown.size} 个图源 · ${all.count{favorite(it)}} 个收藏";adapter.notifyDataSetChanged()}
+        val listener=SharedPreferences.OnSharedPreferenceChangeListener{_,_->filter()}
+        root.addOnAttachStateChangeListener(object:View.OnAttachStateChangeListener{
+            override fun onViewAttachedToWindow(view:View){prefs.registerOnSharedPreferenceChangeListener(listener);filter()}
+            override fun onViewDetachedFromWindow(view:View){prefs.unregisterOnSharedPreferenceChangeListener(listener);icons.close();scope.cancel()}
+        })
         input.addTextChangedListener(object:TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun afterTextChanged(s:Editable?){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){filter()}})
         filter();return root
     }

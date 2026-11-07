@@ -7,6 +7,11 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.text.InputType
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
+import android.text.TextPaint
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -263,6 +268,7 @@ class OnlineSearchActivity : Activity() {
                     val found = if (results.isEmpty()) "没有找到相关漫画" else "共找到 ${results.size} 部漫画"
                     "$found · 图源成功 ${summary.succeeded}/${summary.total}，失败 ${summary.failed}"
                 }
+                appendFailedSourcesLink()
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 return@launch
             } catch (error: Throwable) {
@@ -343,7 +349,25 @@ class OnlineSearchActivity : Activity() {
     private fun clearLoginHint(){loginHint?.let{it.animate().cancel();(it.parent as? ViewGroup)?.removeView(it)};loginHint=null}
     override fun onBackPressed(){if(searchExpanded)toggleSearch?.invoke(false) else super.onBackPressed()}
     override fun onStop(){predictiveBack?.onStop();super.onStop()}
-    private val refreshTask=Runnable { refreshScheduled=false;adapter.notifyDataSetChanged();completionSummary?.let{if(it.succeeded>0)status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}"} }
+    private fun appendFailedSourcesLink(){
+        val summary=completionSummary?:return
+        if(sourceMode)return
+        val text=SpannableString("${status.text} 点此查看")
+        text.setSpan(object:ClickableSpan(){
+            override fun updateDrawState(paint:TextPaint){paint.color=OnlineUi.BLUE;paint.isUnderlineText=false}
+            override fun onClick(view:View){
+                val panel=RepositoryPanel.create(this@OnlineSearchActivity,summary.failedSourceIds.toSet())
+                val host=FrameLayout(this@OnlineSearchActivity).apply{
+                    addView(panel,FrameLayout.LayoutParams(-1,(resources.displayMetrics.heightPixels*.65f).toInt()))
+                }
+                PredictiveBack.dialog(this@OnlineSearchActivity).setTitle("失败的图源 · ${summary.failed}").setView(host).setPositiveButton("关闭",null).show()
+            }
+        },text.length-4,text.length,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        status.text=text
+        status.movementMethod=LinkMovementMethod.getInstance()
+        status.highlightColor=Color.TRANSPARENT
+    }
+    private val refreshTask=Runnable { refreshScheduled=false;adapter.notifyDataSetChanged();completionSummary?.let{if(it.succeeded>0){status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}";appendFailedSourcesLink()}} }
     private fun refreshResults(){ if(!refreshScheduled){refreshScheduled=true;grid.postDelayed(refreshTask,80)} }
     override fun onResume(){super.onResume();if(::adapter.isInitialized){results.removeAll{ChapterAvailability.empty(this,it.sourceId,it.url)};adapter.notifyDataSetChanged()}}
     override fun onDestroy() {
@@ -357,6 +381,7 @@ class OnlineSearchActivity : Activity() {
     }
 
     private inner class ResultAdapter : BaseAdapter() {
+        private inner class Tile(val root:LinearLayout,val image:ImageView,val title:TextView,val source:TextView)
         override fun getCount(): Int = results.size
         override fun getItem(position: Int): Any = results[position]
         override fun getItemId(position: Int): Long = position.toLong()
@@ -368,8 +393,15 @@ class OnlineSearchActivity : Activity() {
                 val empty=ChapterAvailability.probe(this@OnlineSearchActivity,item)
                 if(empty==true){results.removeAll{it.sourceId==item.sourceId&&it.url==item.url};refreshResults()}
             }
-            if(convertView?.tag==key)return convertView
-            val tile = ui.column().apply { tag=key }
+            val holder=convertView?.tag as? Tile ?: createTile()
+            holder.title.text=item.title
+            holder.source.text=item.sourceName
+            RemoteCovers.load(holder.image,item.thumbnail,item.sourceId)
+            return holder.root
+        }
+
+        private fun createTile():Tile {
+            val tile = ui.column()
             val coverFrame = FrameLayout(this@OnlineSearchActivity)
             coverFrame.background = ui.shape(ui.tint, 12)
             coverFrame.clipToOutline = true
@@ -381,25 +413,22 @@ class OnlineSearchActivity : Activity() {
                 scaleType = ImageView.ScaleType.CENTER_CROP
             }
             coverFrame.addView(image, FrameLayout.LayoutParams(-1, -1))
-            RemoteCovers.load(image, item.thumbnail, item.sourceId)
             tile.addView(coverFrame, LinearLayout.LayoutParams(-1, ui.dp(138)))
-            tile.addView(
-                ui.text(item.title, 12, ui.ink, true).apply {
+            val title=ui.text("", 12, ui.ink, true).apply {
                     maxLines = 2
+                    minLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     setPadding(ui.dp(2), ui.dp(6), ui.dp(2), 0)
-                },
-                LinearLayout.LayoutParams(-1, -2),
-            )
-            tile.addView(
-                ui.text(item.sourceName, 10, ui.muted).apply {
+                }
+            tile.addView(title,LinearLayout.LayoutParams(-1, -2))
+            val source=ui.text("", 10, ui.muted).apply {
                     maxLines = 1
+                    minLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     setPadding(ui.dp(2), ui.dp(2), ui.dp(2), 0)
-                },
-                LinearLayout.LayoutParams(-1, -2),
-            )
-            return tile
+                }
+            tile.addView(source,LinearLayout.LayoutParams(-1, -2))
+            return Tile(tile,image,title,source).also{tile.tag=it}
         }
     }
 }

@@ -30,7 +30,7 @@ import kotlin.time.Instant
  */
 object OnlineRepository {
     internal const val SEARCH_PARALLELISM = 16
-    data class SearchSummary(val total: Int, val succeeded: Int, val failed: Int)
+    data class SearchSummary(val total: Int, val succeeded: Int, val failed: Int, val failedSourceIds: List<Long> = emptyList())
 
     data class Item(
         val sourceId: Long,
@@ -81,6 +81,7 @@ object OnlineRepository {
         val semaphore = Semaphore(SEARCH_PARALLELISM)
         val done = AtomicInteger(0)
         val succeeded = AtomicInteger(0)
+        val failedSources = Collections.synchronizedSet(HashSet<Long>())
         val seen = Collections.synchronizedSet(HashSet<String>())
         coroutineScope {
             sources.map { source ->
@@ -109,10 +110,12 @@ object OnlineRepository {
                             }
                             succeeded.incrementAndGet()
                         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                            failedSources.add(source.id)
                             // A single source timing out must not cancel the entire search.
                         } catch (cancelled: kotlinx.coroutines.CancellationException) {
                             throw cancelled
                         } catch (_: Throwable) {
+                            failedSources.add(source.id)
                             // A broken or blocking source must not stop the other sources.
                         } finally {
                             onProgress("正在搜索 ${done.incrementAndGet()}/${sources.size} 个中文图源…")
@@ -121,7 +124,7 @@ object OnlineRepository {
                 }
             }.awaitAll()
         }
-        return SearchSummary(sources.size, succeeded.get(), done.get() - succeeded.get())
+        return SearchSummary(sources.size, succeeded.get(), done.get() - succeeded.get(), sources.map { it.id }.filter { it in failedSources }.distinct())
     }
 
     suspend fun loadDetails(
