@@ -29,7 +29,7 @@ public final class PredictiveBack implements AutoCloseable {
     private boolean closed,gesturing,left,committed;
     private float progress;
     private float originalScaleX,originalScaleY,originalX,originalY;
-    private int originalLayer,width;
+    private int originalLayer,width;private float gestureScale=.94f;
     private boolean originalClip;
     private ViewOutlineProvider originalOutline;
     private final ViewTreeObserver.OnGlobalLayoutListener keyboardLayout=this::refresh;
@@ -66,6 +66,23 @@ public final class PredictiveBack implements AutoCloseable {
         if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
         reset();gesturing=true;left=fromLeft;progress=0;
         width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();
+        // Shrink just enough that the top and bottom insets both clear the status bar / camera.
+        int topInset=0;
+        try{
+            android.view.WindowInsets insets=surface.getRootWindowInsets();
+            if(insets!=null){
+                if(Build.VERSION.SDK_INT>=30){
+                    topInset=Math.max(insets.getInsets(android.view.WindowInsets.Type.statusBars()).top,insets.getInsets(android.view.WindowInsets.Type.displayCutout()).top);
+                }else{
+                    topInset=insets.getSystemWindowInsetTop();
+                    if(Build.VERSION.SDK_INT>=28&&insets.getDisplayCutout()!=null)topInset=Math.max(topInset,insets.getDisplayCutout().getSafeInsetTop());
+                }
+            }
+        }catch(RuntimeException ignored){}
+        int surfaceHeight=surface.getHeight();
+        float target=.94f;
+        if(topInset>0&&surfaceHeight>0)target=1f-2f*topInset/(float)surfaceHeight;
+        gestureScale=Math.max(.86f,Math.min(.97f,target));
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
         surface.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),view.getResources().getDisplayMetrics().density*(window==activity.getWindow()?20:16));}});
         surface.setClipToOutline(true);
@@ -74,7 +91,8 @@ public final class PredictiveBack implements AutoCloseable {
     private void advance(float value){
         if(!gesturing)return;
         progress=Math.max(0f,Math.min(1f,value));
-        surface.setScaleX(originalScaleX*previewScale(progress));surface.setScaleY(originalScaleY*previewScale(progress));
+        float scale=1f-(1f-gestureScale)*progress;
+        surface.setScaleX(originalScaleX*scale);surface.setScaleY(originalScaleY*scale);
         surface.setTranslationX(originalX+previewShift(width,progress,left));
     }
     private void invoke(){
