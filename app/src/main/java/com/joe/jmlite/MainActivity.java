@@ -2,6 +2,8 @@ package com.joe.jmlite;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.ClipData;
 import android.content.Intent;
@@ -13,6 +15,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
@@ -44,7 +47,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService disk=Executors.newSingleThreadExecutor();
     private final ArrayList<JSONObject> books=new ArrayList<>(),libraryBooks=new ArrayList<>(),bookFolders=new ArrayList<>(),rows=new ArrayList<>(),onlineBooks=new ArrayList<>();
     private final ArrayList<JSONObject> downloadRecords=new ArrayList<>();
-    private LinearLayout content,taskCard,nav;
+    private LinearLayout content,taskCard;private CapsuleNav nav;
     private FrameLayout stage;
     private TextView shelfDropPill;
     private boolean shelfCapsuleHover;
@@ -70,7 +73,7 @@ public final class MainActivity extends Activity {
     private ShelfAdapter shelfAdapter;
     private OnlineAdapter onlineAdapter;
     private int tab=1,refreshGeneration=0,pendingShelfScroll=-1;
-    private boolean resumed=false,reading=false,starting=false,operation=false,revealed=true;
+    private boolean resumed=false,reading=false,starting=false,operation=false,revealed=true,keyboardVisible;
     private String rowsSnapshot="",draft="",searchDraft="",taskId="",folderId="",highlightKey="";
     private boolean highlightScrollPending;
     private JSONObject pendingShare;
@@ -107,7 +110,7 @@ public final class MainActivity extends Activity {
     private String pendingPushKey="";private int pendingPushZone=ShelfOrder.NONE;private long pendingPushAt;
     private final Runnable shelfPushPreview=new Runnable(){public void run(){if(draggingBook!=null)previewShelfDrag(dragPointerX,dragPointerY);}};
     private static final float DRAG_TARGET_SCALE=.96f,DRAG_PREVIEW_SCALE=.93f;
-    private ValueAnimator actionAnimator;
+    private ValueAnimator actionAnimator;private View tabOutgoing;private int tab1Scroll,tab2Scroll;
     private FirstRunGuide firstRunGuide;
     private boolean privateShelf;
     private int navigationInset;private boolean tabletDevice;private int folderPreviewDepth;
@@ -140,10 +143,10 @@ public final class MainActivity extends Activity {
         repoHint=u.text("<不行请尝试魔法~>",11,u.muted,false);repoHint.setContentDescription("关于简阅与开源许可");repoHint.setPadding(0,u.dp(12),0,u.dp(12));repoHint.setOnClickListener(v->license());heading.addView(repoHint);
         shelfSearch=new HeaderSearch(this,heading,title,plus,"搜索书架编号或名称",query->{shelfQuery=query;rowsSnapshot="";if(tab==1)render();});root.addView(heading);
         stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
-        nav=u.row();nav.setClickable(true);nav.setGravity(Gravity.CENTER);nav.setPadding(u.dp(6),u.dp(5),u.dp(6),u.dp(5));GradientDrawable navBg=u.shape(u.card,28);navBg.setStroke(u.dp(1),u.dark?0x1affffff:0x0d000000);nav.setBackground(navBg);nav.setElevation(u.dp(10));nav.setClipToOutline(true);
+        nav=new CapsuleNav();
         downloadNav=new NavItem(0,"download","下载");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
-        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(56),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);nav.setOnDragListener((v,e)->shelfCapsuleDrag(e));setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;int imeBottom=keyboard?insets.getInsets(WindowInsetsCompat.Type.ime()).bottom:0;v.setPadding(bars.left,bars.top,bars.right,imeBottom);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(shelfDropPill!=null){FrameLayout.LayoutParams pillParams=(FrameLayout.LayoutParams)shelfDropPill.getLayoutParams();if(pillParams.bottomMargin!=margin){pillParams.bottomMargin=margin;shelfDropPill.setLayoutParams(pillParams);}}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}nav.setVisibility(keyboard||privateShelf?View.GONE:View.VISIBLE);return insets;});
-        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);nav.setVisibility(keyboard||privateShelf?View.GONE:View.VISIBLE);});
+        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(58),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);nav.setOnDragListener((v,e)->shelfCapsuleDrag(e));setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;int imeBottom=keyboard?insets.getInsets(WindowInsetsCompat.Type.ime()).bottom:0;v.setPadding(bars.left,bars.top,bars.right,imeBottom);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(shelfDropPill!=null){FrameLayout.LayoutParams pillParams=(FrameLayout.LayoutParams)shelfDropPill.getLayoutParams();if(pillParams.bottomMargin!=margin){pillParams.bottomMargin=margin;shelfDropPill.setLayoutParams(pillParams);}}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}keyboardVisible=keyboard;updateNavVisibility();return insets;});
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);keyboardVisible=keyboard;updateNavVisibility();});
         buildTab();
         firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();ForegroundUpdates.checkAfterGuide();});
         predictiveBack=new PredictiveBack(this,root,()->firstRunGuide==null||!firstRunGuide.isShowing(),()->!shelfSearch.isExpanded()&&(tab!=1||(!privateShelf&&folderId.isEmpty())),()->tab==1&&(privateShelf||!folderId.isEmpty()),this::onBackPressed);predictiveBack.setPreview(()->BackPreview.install(this));
@@ -156,12 +159,91 @@ public final class MainActivity extends Activity {
             super(MainActivity.this);this.index=index;setOrientation(VERTICAL);setGravity(Gravity.CENTER);setPadding(0,u.dp(3),0,u.dp(3));
             icon=u.icon(kind,u.muted);icon.glyphScale=.8f;icon.setMinimumWidth(0);icon.setMinimumHeight(0);addView(icon,new LinearLayout.LayoutParams(u.dp(22),u.dp(22)));
             label=u.text(text,10,u.muted,false);label.setGravity(Gravity.CENTER);label.setIncludeFontPadding(false);label.setPadding(0,u.dp(2),0,0);addView(label,new LinearLayout.LayoutParams(-1,u.dp(14)));
-            setContentDescription(text);setOnClickListener(v->switchTab(index));
+            u.round(this,Color.TRANSPARENT,23);
+            setOnTouchListener((v,e)->{int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN)animate().scaleX(.96f).scaleY(.96f).setDuration(90).start();else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)animate().scaleX(1f).scaleY(1f).setDuration(130).start();return false;});
+            setContentDescription(text);setOnClickListener(v->{performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);switchTab(index);});
         }
-        void active(boolean on){icon.color(on?Ui.BLUE:u.muted);label.setTextColor(on?Ui.BLUE:u.muted);u.round(this,on?u.tint:Color.TRANSPARENT,23);setSelected(on);}
+        void active(boolean on){icon.color(on?Ui.BLUE:u.muted);label.setTextColor(on?Ui.BLUE:u.muted);setSelected(on);if(on&&nav!=null)nav.select(index);}
     }
-    private void switchTab(int next){if(tab==next&&!privateShelf)return;final String leaving=folderId;final Library leavingLibrary=library;while(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}privateShelf=false;library=new Library(this);library.preserveFolder("");if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}buildTab();releaseFolderInBackground(leavingLibrary,leaving,false);}
-    private void buildTab(){
+    /** Lightweight HyperOS-style capsule with a selected pill that glides between tabs. */
+    private final class CapsuleNav extends LinearLayout {
+        private final Paint pillPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private int activeIndex=-1;
+        private float pillLeft,pillWidth;
+        private ValueAnimator pillAnimator;
+        CapsuleNav(){
+            super(MainActivity.this);setOrientation(HORIZONTAL);setGravity(Gravity.CENTER);setClickable(true);
+            setPadding(u.dp(7),u.dp(6),u.dp(7),u.dp(6));
+            GradientDrawable bg=u.shape(u.dark?0xEE202126:0xF4FFFFFF,30);
+            bg.setStroke(u.dp(1),u.dark?0x2EFFFFFF:0x1418202C);
+            setBackground(bg);setElevation(u.dp(12));setClipToOutline(true);
+            pillPaint.setColor(u.tint);
+        }
+        void select(int index){
+            if(index<0||index==activeIndex)return;
+            activeIndex=index;View child=getChildAt(index);
+            if(child==null||getWidth()==0){post(this::snapPill);return;}
+            float targetLeft=child.getLeft(),targetWidth=child.getWidth();
+            if(pillWidth<=0){pillLeft=targetLeft;pillWidth=targetWidth;invalidate();return;}
+            if(pillAnimator!=null)pillAnimator.cancel();
+            final float startLeft=pillLeft,startWidth=pillWidth;
+            ValueAnimator animation=ValueAnimator.ofFloat(0f,1f);pillAnimator=animation;
+            animation.setDuration(260);animation.setInterpolator(new DecelerateInterpolator());
+            animation.addUpdateListener(a->{float f=(float)a.getAnimatedValue();pillLeft=startLeft+(targetLeft-startLeft)*f;pillWidth=startWidth+(targetWidth-startWidth)*f;invalidate();});
+            animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(pillAnimator==animation)pillAnimator=null;}});
+            animation.start();
+        }
+        private void snapPill(){
+            if(activeIndex<0)return;View child=getChildAt(activeIndex);if(child==null)return;
+            pillLeft=child.getLeft();pillWidth=child.getWidth();invalidate();
+        }
+        @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
+            super.onLayout(changed,left,top,right,bottom);
+            if(pillAnimator==null||!pillAnimator.isRunning())snapPill();
+        }
+        @Override protected void dispatchDraw(Canvas canvas){
+            if(pillWidth>0){
+                View child=getChildAt(activeIndex);
+                float top=child!=null?child.getTop()+u.dp(3):u.dp(3);
+                float bottom=child!=null?child.getBottom()-u.dp(3):getHeight()-u.dp(3);
+                canvas.drawRoundRect(pillLeft,top,pillLeft+pillWidth,bottom,u.dp(23),u.dp(23),pillPaint);
+            }
+            super.dispatchDraw(canvas);
+        }
+    }    private void switchTab(int next){
+        if(tab==next&&!privateShelf)return;
+        final int from=tab;
+        finishTabTransition();
+        final String leaving=folderId;final Library leavingLibrary=library;
+        while(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
+        privateShelf=false;library=new Library(this);library.preserveFolder("");
+        if(input!=null)draft=input.getText().toString();if(searchInput!=null)searchDraft=searchInput.getText().toString();
+        if(tab==1&&grid!=null)tab1Scroll=grid.getFirstVisiblePosition();
+        if(tab==2&&grid!=null)tab2Scroll=grid.getFirstVisiblePosition();
+        shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}
+        final LinearLayout previous=content;
+        final LinearLayout incoming=u.column();
+        stage.addView(incoming,Math.max(0,stage.indexOfChild(nav)),new FrameLayout.LayoutParams(-1,-1));
+        content=incoming;
+        buildTab();
+        final int direction=next>from?1:-1;final int distance=u.dp(24);
+        incoming.setAlpha(0f);incoming.setTranslationX(direction*distance);
+        tabOutgoing=previous;
+        previous.animate().alpha(0f).translationX(-direction*distance).setDuration(240).setInterpolator(new DecelerateInterpolator()).start();
+        incoming.animate().alpha(1f).translationX(0f).setDuration(240).setInterpolator(new DecelerateInterpolator()).withEndAction(()->{
+            if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}
+        }).start();
+        final int restoreScroll=next==1?tab1Scroll:next==2?tab2Scroll:0;
+        if(restoreScroll>0&&grid!=null){
+            grid.post(()->{if(grid!=null&&restoreScroll<grid.getCount())grid.setSelectionFromTop(restoreScroll,0);});
+        }
+        releaseFolderInBackground(leavingLibrary,leaving,false);
+    }
+    private void finishTabTransition(){
+        if(tabOutgoing!=null){stage.removeView(tabOutgoing);tabOutgoing=null;}
+        if(content!=null){content.animate().cancel();content.setAlpha(1f);content.setTranslationX(0f);}
+    }    private void buildTab(){
+        finishTabTransition();
         cancelShelfMenu();shelfHoldActive=false;hideShelfDropPill();
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
         content.removeAllViews();input=null;searchInput=null;taskCard=null;actionSlot=null;downloadActions=null;taskAction=null;taskShown=false;list=null;grid=null;adapter=null;shelfAdapter=null;onlineAdapter=null;rowsSnapshot="";
@@ -170,6 +252,18 @@ public final class MainActivity extends Activity {
         if(tab==0)buildDownload();else if(tab==1)buildShelf();else if(tab==3)content.addView(RepositoryPanel.create(this),new LinearLayout.LayoutParams(-1,-1));else buildOnline();render();
         if(tab==2&&resumed)refresh(true);
         if(predictiveBack!=null)predictiveBack.refresh();
+        updateNavVisibility();
+    }
+    private boolean navAllowed(){return !keyboardVisible&&!privateShelf&&!(tab==1&&!folderId.isEmpty());}
+    private void updateNavVisibility(){
+        if(nav==null)return;
+        boolean show=navAllowed();
+        if(show){
+            if(nav.getVisibility()!=View.VISIBLE){nav.setVisibility(View.VISIBLE);nav.setAlpha(0f);nav.setTranslationY(u.dp(10));}
+            nav.animate().alpha(1f).translationY(0f).setDuration(190).setInterpolator(new DecelerateInterpolator()).start();
+        }else if(nav.getVisibility()==View.VISIBLE){
+            nav.animate().alpha(0f).translationY(u.dp(10)).setDuration(170).setInterpolator(new DecelerateInterpolator()).withEndAction(()->{if(!navAllowed())nav.setVisibility(View.GONE);}).start();
+        }
     }
     private void buildDownload(){
         list=new ListView(this);list.setDivider(null);list.setSelector(android.R.color.transparent);list.setClipToPadding(false);list.setPadding(u.dp(20),0,u.dp(20),u.dp(88)+navigationInset);
@@ -918,7 +1012,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.0.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.1.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){

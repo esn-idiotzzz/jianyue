@@ -29,7 +29,7 @@ public final class PredictiveBack implements AutoCloseable {
     private boolean closed,gesturing,left,committed;
     private float progress;
     private float originalScaleX,originalScaleY,originalX,originalY;
-    private int originalLayer,width;private float gestureScale=.94f;
+    private int originalLayer,width;private float gestureScale=.92f,targetOffsetY,radius,maxRadius;private float originalPivotX,originalPivotY;
     private boolean originalClip;
     private ViewOutlineProvider originalOutline;
     private final ViewTreeObserver.OnGlobalLayoutListener keyboardLayout=this::refresh;
@@ -61,30 +61,20 @@ public final class PredictiveBack implements AutoCloseable {
         if(enabled&&unregister==null)unregister=Api33.register(this);
         else if(!enabled&&unregister!=null){unregister.run();unregister=null;reset();}
     }
-    private void start(boolean fromLeft){
+    private void start(boolean fromLeft,float touchY){
         if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
         if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
         reset();gesturing=true;left=fromLeft;progress=0;
-        width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();
-        // Shrink just enough that the top and bottom insets both clear the status bar / camera.
-        int topInset=0;
-        try{
-            android.view.WindowInsets insets=surface.getRootWindowInsets();
-            if(insets!=null){
-                if(Build.VERSION.SDK_INT>=30){
-                    topInset=Math.max(insets.getInsets(android.view.WindowInsets.Type.statusBars()).top,insets.getInsets(android.view.WindowInsets.Type.displayCutout()).top);
-                }else{
-                    topInset=insets.getSystemWindowInsetTop();
-                    if(Build.VERSION.SDK_INT>=28&&insets.getDisplayCutout()!=null)topInset=Math.max(topInset,insets.getDisplayCutout().getSafeInsetTop());
-                }
-            }
-        }catch(RuntimeException ignored){}
+        width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();originalPivotX=surface.getPivotX();originalPivotY=surface.getPivotY();
+        gestureScale=.92f;
         int surfaceHeight=surface.getHeight();
-        float target=.94f;
-        if(topInset>0&&surfaceHeight>0)target=1f-2f*topInset/(float)surfaceHeight;
-        gestureScale=Math.max(.86f,Math.min(.97f,target));
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
-        surface.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),view.getResources().getDisplayMetrics().density*(window==activity.getWindow()?20:16));}});
+        float density=surface.getResources().getDisplayMetrics().density;
+        float normalizedY=surfaceHeight>0?Math.max(-1f,Math.min(1f,(touchY-surfaceHeight/2f)/(surfaceHeight/2f))):0f;
+        targetOffsetY=normalizedY*density*28f;
+        maxRadius=density*32f;radius=0f;
+        surface.setPivotX(width/2f);surface.setPivotY(surfaceHeight/2f);
+        surface.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),radius);}});
         surface.setClipToOutline(true);
         if(surface.isHardwareAccelerated()&&originalLayer==View.LAYER_TYPE_NONE)surface.setLayerType(View.LAYER_TYPE_HARDWARE,null);
     }
@@ -94,6 +84,9 @@ public final class PredictiveBack implements AutoCloseable {
         float scale=1f-(1f-gestureScale)*progress;
         surface.setScaleX(originalScaleX*scale);surface.setScaleY(originalScaleY*scale);
         surface.setTranslationX(originalX+previewShift(width,progress,left));
+        surface.setTranslationY(originalY+targetOffsetY*progress);
+        radius=maxRadius*progress;surface.invalidateOutline();
+        BackPreview.setScrimAlpha(progress);
     }
     private void invoke(){
         if(closed||committed)return;
@@ -113,7 +106,7 @@ public final class PredictiveBack implements AutoCloseable {
         if(!gesturing)return;
         if(settling!=null){settling.removeAllListeners();settling.cancel();}
         ValueAnimator animation=ValueAnimator.ofFloat(progress,0f);settling=animation;
-        animation.setDuration(160);animation.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        animation.setDuration(220);animation.setInterpolator(new android.view.animation.DecelerateInterpolator());
         animation.addUpdateListener(a->{if(settling==animation&&!closed)advance((float)a.getAnimatedValue());});
         animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){
             if(settling!=animation||closed)return;settling=null;reset();
@@ -124,13 +117,13 @@ public final class PredictiveBack implements AutoCloseable {
         if(settling!=null){ValueAnimator old=settling;settling=null;old.removeAllListeners();old.cancel();}
         committed=false;
         if(!gesturing)return;
-        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);
+        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setPivotX(originalPivotX);surface.setPivotY(originalPivotY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);radius=0;BackPreview.setScrimAlpha(0f);
     }
     /** Release the temporary layer once a departing Activity is no longer visible. */
     public void onStop(){reset();}
     @Override public void close(){closed=true;if(Build.VERSION.SDK_INT>=33&&surface.getViewTreeObserver().isAlive())surface.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardLayout);if(unregister!=null){unregister.run();unregister=null;}reset();}
-    static float previewScale(float progress){return 1f-.06f*Math.max(0f,Math.min(1f,progress));}
-    static float previewShift(int width,float progress,boolean left){return Math.max(0,width)*.075f*Math.max(0f,Math.min(1f,progress))*(left?1f:-1f);}
+    static float previewScale(float progress){return 1f-.08f*Math.max(0f,Math.min(1f,progress));}
+    static float previewShift(int width,float progress,boolean left){return Math.max(0,width)*.02f*Math.max(0f,Math.min(1f,progress))*(left?1f:-1f);}
 
     public static AlertDialog.Builder dialog(Activity activity){return dialog(activity,false);}
     /** Shelf menus fade their scrim in with the card so opening never flashes a dark frame. */
@@ -185,7 +178,7 @@ public final class PredictiveBack implements AutoCloseable {
     private static final class Api34 {
         static void suppressExitAnimation(Activity activity){activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE,0,0);}
         static android.window.OnBackAnimationCallback callback(PredictiveBack owner){return new android.window.OnBackAnimationCallback(){
-            @Override public void onBackStarted(android.window.BackEvent event){if(!owner.closed)owner.start(event.getSwipeEdge()==android.window.BackEvent.EDGE_LEFT);}
+            @Override public void onBackStarted(android.window.BackEvent event){if(owner.closed)return;float touchY=0f;try{touchY=event.getTouchY();}catch(RuntimeException ignored){}owner.start(event.getSwipeEdge()==android.window.BackEvent.EDGE_LEFT,touchY);}
             @Override public void onBackProgressed(android.window.BackEvent event){if(!owner.closed&&!owner.committed)owner.advance(event.getProgress());}
             @Override public void onBackCancelled(){if(!owner.closed&&!owner.committed)owner.settle();}
             @Override public void onBackInvoked(){owner.invoke();}

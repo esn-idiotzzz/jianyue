@@ -86,7 +86,7 @@ class OnlineSearchActivity : Activity() {
             val title=header.getChildAt(1)
             val box=FrameLayout(this)
             header.addView(box,LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)))
-            val icon=Ui(this).icon("search",OnlineUi.BLUE).apply{contentDescription="搜索本图源"}
+            val icon=Ui(this).icon("search",ui.ink).apply{contentDescription="搜索本图源"}
             box.addView(icon,FrameLayout.LayoutParams(ui.dp(44),-1,Gravity.END))
             val editor=ui.row().apply{visibility=View.GONE}
             editor.addView(queryInput,LinearLayout.LayoutParams(0,-1,1f))

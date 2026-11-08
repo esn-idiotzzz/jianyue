@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -20,6 +23,7 @@ import java.util.ArrayDeque;
 public final class BackPreview {
     private static final ArrayDeque<Bitmap> stack = new ArrayDeque<>();
     private static final int MAX_DEPTH = 4;
+    private static ColorDrawable scrim;
 
     private BackPreview() {
     }
@@ -53,11 +57,19 @@ public final class BackPreview {
         BitmapDrawable image = new BitmapDrawable(activity.getResources(), preview);
         image.setGravity(Gravity.FILL);
         image.setFilterBitmap(true);
-        // No blur and no scrim: the destination page is shown directly in the gap.
-        window.setBackgroundDrawable(image);
+        // The destination is shown directly; only a gray scrim is layered over it.
+        scrim = new ColorDrawable(0x00000000);
+        LayerDrawable layers = new LayerDrawable(new Drawable[] { image, scrim });
+        window.setBackgroundDrawable(layers);
         return true;
     }
 
+    /** Dim the previous page while the current page is being dragged away. */
+    public static void setScrimAlpha(float progress){
+        if(scrim==null)return;
+        int alpha=(int)(0x55f*Math.max(0f,Math.min(1f,progress)));
+        scrim.setColor(alpha<<24);
+    }
     /** Drop the snapshot for the page that just finished. */
     public static void pop() {
         stack.poll();
