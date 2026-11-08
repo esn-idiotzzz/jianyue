@@ -105,11 +105,11 @@ class AppUpdate(private var activity: Activity) {
             .setTitle("发现新版本")
             .setView(scroll)
             .setNegativeButton("取消更新", null)
-            .setPositiveButton("Github") { _, _ ->
+            .setPositiveButton("下载 APK") { _, _ ->
                 try {
-                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.url)))
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.downloadUrl ?: release.url)))
                 } catch (_: ActivityNotFoundException) {
-                    Toast.makeText(activity, "没有可打开 GitHub 的浏览器", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, "没有可打开下载链接的浏览器", Toast.LENGTH_SHORT).show()
                 }
             }
             .create().also { update ->

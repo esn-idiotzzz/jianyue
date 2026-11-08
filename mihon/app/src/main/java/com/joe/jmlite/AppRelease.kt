@@ -9,7 +9,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-internal data class AppRelease(val version: String, val notes: String, val url: String, val versionCode: Long? = null) {
+internal data class AppRelease(val version: String, val notes: String, val url: String, val versionCode: Long? = null, val downloadUrl: String? = null) {
     data class Check(val valid: Boolean, val release: AppRelease?)
     companion object {
         const val PROJECT = "esn-idiotzzz/jianyue"
@@ -64,16 +64,17 @@ internal data class AppRelease(val version: String, val notes: String, val url: 
                     uri.path != "/$PROJECT/releases/tag/$tag"
                 ) return null
                 val assets = release["assets"] as? JsonArray ?: return null
-                if (assets.none { asset ->
-                    val item = asset as? JsonObject
-                    val name = item?.get("name")?.jsonPrimitive?.contentOrNull.orEmpty()
-                    val download = item?.get("browser_download_url")?.jsonPrimitive?.contentOrNull.orEmpty()
-                    name.endsWith(".apk", ignoreCase = true) &&
+                val apkUrl = assets.asSequence().mapNotNull { asset ->
+                    val item = asset as? JsonObject ?: return@mapNotNull null
+                    val name = item["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    val download = item["browser_download_url"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    if (name.endsWith(".apk", ignoreCase = true) &&
                         download.startsWith("$PROJECT_URL/releases/download/$tag/") &&
-                        item?.get("state")?.jsonPrimitive?.contentOrNull == "uploaded"
-                }) return null
+                        item["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
+                    ) download else null
+                }.firstOrNull() ?: return null
                 val notes = release["body"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-                AppRelease(tag.removePrefix("v").removePrefix("V"), notes.ifEmpty { "此版本未提供更新说明。" }, link, explicitCode)
+                AppRelease(tag.removePrefix("v").removePrefix("V"), notes.ifEmpty { "此版本未提供更新说明。" }, link, explicitCode, apkUrl)
             } catch (_: Exception) {
                 null
             }

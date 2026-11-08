@@ -110,7 +110,7 @@ public final class MainActivity extends Activity {
     private String pendingPushKey="";private int pendingPushZone=ShelfOrder.NONE;private long pendingPushAt;
     private final Runnable shelfPushPreview=new Runnable(){public void run(){if(draggingBook!=null)previewShelfDrag(dragPointerX,dragPointerY);}};
     private static final float DRAG_TARGET_SCALE=.96f,DRAG_PREVIEW_SCALE=.93f;
-    private ValueAnimator actionAnimator;private View tabOutgoing;private int tab1Scroll,tab2Scroll;
+    private ValueAnimator actionAnimator;private View tabOutgoing;private int tab1Scroll,tab2Scroll;private List<JSONObject> normalBooksCache,normalFoldersCache;private FolderCoverIndex normalCoversCache;
     private FirstRunGuide firstRunGuide;
     private boolean privateShelf;
     private Boolean navVisibleTarget;
@@ -402,7 +402,35 @@ public final class MainActivity extends Activity {
 
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleShelfJump(intent);}
     private void handleShelfJump(Intent intent){String key=intent.getStringExtra("shelf_jump");if(key==null)return;intent.removeExtra("shelf_jump");String highlight=intent.getStringExtra("shelf_highlight");intent.removeExtra("shelf_highlight");if(highlight==null||highlight.isEmpty())clearShelfHighlight();Runnable jump=()->disk.execute(()->{try{JSONObject book=new Library(this).find(key);runOnUiThread(()->{if(book==null||isDestroyed())return;Runnable navigate=()->{tab=1;shelfSearch.collapse();shelfQuery="";setPrivateShelf(book.optBoolean("privacy"));folderId=book.optString("folder");library.preserveFolder(folderId);highlightKey=highlight==null?"":highlight;highlightScrollPending=!highlightKey.isEmpty();buildTab();refresh(true);};if(book.optBoolean("privacy"))PrivacyVault.enter(this,navigate);else navigate.run();});}catch(Exception e){runOnUiThread(()->toast("书籍已不存在"));}});if(intent.getBooleanExtra("shelf_private",false))PrivacyVault.enter(this,jump);else jump.run();}
-    private void setPrivateShelf(boolean hidden){while(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}privateShelf=hidden;library=new Library(this,hidden);library.preserveFolder("");folderId="";shelfSearch.collapse();libraryBooks.clear();folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());bookFolders.clear();rowsSnapshot="";buildTab();refresh(true);}
+    private void setPrivateShelf(boolean hidden){
+        while(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
+        if(hidden&&!privateShelf){
+            // Keep the real normal shelf as the return target; no empty rebuild while the disk read runs.
+            normalBooksCache=new ArrayList<>(libraryBooks);
+            normalFoldersCache=new ArrayList<>(bookFolders);
+            normalCoversCache=folderCovers;
+            BackPreview.capture(getWindow().getDecorView(),nav);
+            folderPreviewDepth++;
+        }
+        privateShelf=hidden;library=new Library(this,hidden);library.preserveFolder("");folderId="";shelfSearch.collapse();
+        if(hidden){
+            libraryBooks.clear();folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());bookFolders.clear();
+        }else if(normalBooksCache!=null){
+            libraryBooks.clear();libraryBooks.addAll(normalBooksCache);
+            bookFolders.clear();bookFolders.addAll(normalFoldersCache);
+            if(normalCoversCache!=null)folderCovers=normalCoversCache;
+        }else{
+            // Cold-start jump into privacy: load the normal shelf before the first frame.
+            try{
+                Library normal=new Library(this,false);
+                List<JSONObject> books=normal.books(),folders=normal.folders();
+                libraryBooks.clear();libraryBooks.addAll(books);
+                bookFolders.clear();bookFolders.addAll(folders);
+                folderCovers=FolderCoverIndex.from(books,folders);
+            }catch(Exception ignored){libraryBooks.clear();bookFolders.clear();folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());}
+        }
+        rowsSnapshot="";buildTab();refresh(true);
+    }
     private void transferPrivacy(JSONObject book,boolean folder){Runnable move=()->mutate(()->library.transfer(folder?book.optString("id"):Library.key(book),folder,!privateShelf));if(privateShelf)move.run();else PrivacyVault.beforeFirstUse(this,move);}
     private void attachPrivacyPull(PrivacyPullHost frame){
         final GridView pullGrid=grid;final TextView pullEmpty=emptyShelf;
@@ -1044,7 +1072,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.2.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.2.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){

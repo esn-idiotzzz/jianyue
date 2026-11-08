@@ -184,6 +184,25 @@ class Android15BackTest {
             }
         }
     }
+    @Test fun privacyShelfReturnRestoresCachedShelfWithoutEmptyFlash() = withMain { page ->
+        repeat(2) { cycle ->
+            val folder=JSONObject().put("book_folder",true).put("id","privacy-cache-$cycle").put("title","隐私返回验证$cycle")
+            main {
+                @Suppress("UNCHECKED_CAST") val folders=field(page,"bookFolders") as ArrayList<JSONObject>
+                folders.add(folder)
+                MainActivity::class.java.getDeclaredMethod("setPrivateShelf",Boolean::class.javaPrimitiveType).apply { isAccessible=true }.invoke(page,true)
+            }
+            waitUntil("privacy shelf active") { field(page,"privateShelf") as Boolean }
+            main {
+                MainActivity::class.java.getDeclaredMethod("setPrivateShelf",Boolean::class.javaPrimitiveType).apply { isAccessible=true }.invoke(page,false)
+                val empty=field(page,"emptyShelf") as View
+                // The cached normal shelf is built synchronously; refresh runs afterwards on disk.
+                assertEquals("normal shelf must not flash empty",View.GONE,empty.visibility)
+                assertEquals("",field(page,"folderId") as String)
+                assertFalse(page.isFinishing)
+            }
+        }
+    }
     @Test fun allSixToolbarVariantsFinishAfterInWindowPopWithoutBlackFrames() = withMain { page ->
         val local=JSONObject().put("id","animation-test").put("title","书籍信息动画验证").put("type","tree").put("uri","content://invalid-test/book")
         val jm=JSONObject().put("id","animation-test").put("title","JM详情动画验证").put("jm",true).put("sourceId",-1L)
