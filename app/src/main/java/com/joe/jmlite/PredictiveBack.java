@@ -29,7 +29,7 @@ public final class PredictiveBack implements AutoCloseable {
     private boolean closed,gesturing,left,committed;
     private float progress;
     private float originalScaleX,originalScaleY,originalX,originalY;
-    private int originalLayer,width;private float gestureScale=.92f,targetOffsetY,radius,maxRadius;private float originalPivotX,originalPivotY;
+    private int originalLayer,width;private float gestureScale=.92f,targetOffsetY,radius,maxRadius,density;private float originalPivotX,originalPivotY,originalAlpha;private boolean gestureLeaving;
     private boolean originalClip;
     private ViewOutlineProvider originalOutline;
     private final ViewTreeObserver.OnGlobalLayoutListener keyboardLayout=this::refresh;
@@ -53,6 +53,8 @@ public final class PredictiveBack implements AutoCloseable {
     }
     /** Installs the blurred destination preview when a gesture begins. */
     public PredictiveBack setPreview(Runnable preview){previewStart=preview;return this;}
+    /** True while the gesture is fading out before the target page is built. */
+    public boolean isLeavingByGesture(){return gestureLeaving;}
     /** Re-register after the Activity returns to the foreground; some launchers drop the callback. */
     public void reinstall(){
         if(Build.VERSION.SDK_INT<33||closed||!canHandle.getAsBoolean())return;
@@ -85,11 +87,11 @@ public final class PredictiveBack implements AutoCloseable {
         if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
         if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
         reset();gesturing=true;left=fromLeft;progress=0;
-        width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();originalPivotX=surface.getPivotX();originalPivotY=surface.getPivotY();
+        width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();originalPivotX=surface.getPivotX();originalPivotY=surface.getPivotY();originalAlpha=surface.getAlpha();gestureLeaving=false;
         gestureScale=.92f;
         int surfaceHeight=surface.getHeight();
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
-        float density=surface.getResources().getDisplayMetrics().density;
+        density=surface.getResources().getDisplayMetrics().density;
         float normalizedY=surfaceHeight>0?Math.max(-1f,Math.min(1f,(touchY-surfaceHeight/2f)/(surfaceHeight/2f))):0f;
         targetOffsetY=normalizedY*density*28f;
         maxRadius=density*32f;radius=0f;
@@ -107,23 +109,29 @@ public final class PredictiveBack implements AutoCloseable {
         surface.setTranslationY(originalY+targetOffsetY*progress);
         radius=maxRadius*progress;surface.invalidateOutline();
         BackPreview.setScrimAlpha(progress);
+        BackPreview.setPreviewShift((left?-1f:1f)*density*12f*progress);
     }
     private void invoke(){
         if(closed||committed)return;
         if(activity.isFinishing()||activity.isDestroyed()){reset();return;}
         if(!canHandle.getAsBoolean()){reset();refresh();return;}
-        if(!gesturing){committed=exits.getAsBoolean();action.run();refresh();return;}
-        committed=true;
+        if(!gesturing){committed=exits.getAsBoolean();action.run();surface.post(this::reinstall);return;}
+        committed=true;gestureLeaving=true;
+        if(!surface.isAttachedToWindow()){reset();committed=true;gestureLeaving=false;action.run();surface.post(this::reinstall);return;}
         boolean leaving=exits.getAsBoolean();
         boolean taskRoot=activity.isTaskRoot();
-        // End the preview at normal size, then let the same page transition used by the toolbar
-        // back button (or the Activity close animation) take over. This avoids a second, overlapping
-        // settle animation and makes button and gesture navigation look identical.
-        reset();committed=true;
         if(leaving&&taskRoot&&Build.VERSION.SDK_INT>=34&&window==activity.getWindow())Api34.suppressExitAnimation(activity);
-        action.run();
-        if(closed)return;
-        refresh();
+        // Keep the scaled page at its gesture size and let it slide out to the edge while fading.
+        // The destination preview simultaneously returns from its small parallax offset.
+        float exit=(left?1f:-1f)*width*.16f;
+        BackPreview.settlePreview(220);
+        surface.animate().translationXBy(exit).alpha(0f).setDuration(220).setInterpolator(new android.view.animation.DecelerateInterpolator()).withEndAction(()->{
+            if(closed)return;
+            action.run();
+            if(activity.isFinishing()||activity.isDestroyed()){gestureLeaving=false;return;}
+            reset();committed=true;gestureLeaving=false;
+            surface.post(this::reinstall);
+        }).start();
     }
     private void settle(){
         if(!gesturing)return;
@@ -133,14 +141,15 @@ public final class PredictiveBack implements AutoCloseable {
         animation.addUpdateListener(a->{if(settling==animation&&!closed)advance((float)a.getAnimatedValue());});
         animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){
             if(settling!=animation||closed)return;settling=null;reset();
-            refresh();
+            surface.post(PredictiveBack.this::reinstall);
         }});animation.start();
     }
     private void reset(){
         if(settling!=null){ValueAnimator old=settling;settling=null;old.removeAllListeners();old.cancel();}
         committed=false;
+        surface.animate().cancel();
         if(!gesturing)return;
-        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setPivotX(originalPivotX);surface.setPivotY(originalPivotY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);radius=0;BackPreview.setScrimAlpha(0f);
+        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setPivotX(originalPivotX);surface.setPivotY(originalPivotY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);surface.setAlpha(originalAlpha);radius=0;gestureLeaving=false;BackPreview.setScrimAlpha(0f);BackPreview.setPreviewShift(0f);
     }
     /** Release the temporary layer once a departing Activity is no longer visible. */
     public void onStop(){reset();}

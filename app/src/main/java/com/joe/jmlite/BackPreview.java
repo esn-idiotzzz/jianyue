@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.view.animation.DecelerateInterpolator;
 import java.util.ArrayDeque;
 
 /**
@@ -69,13 +70,20 @@ public final class BackPreview {
             decor.addView(scrimView, 1, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
-        previewView.setImageBitmap(preview);
+        previewView.setImageBitmap(preview);previewView.setTranslationX(0f);
         previewView.setVisibility(View.VISIBLE);
         scrimView.setVisibility(View.VISIBLE);
         scrimView.setAlpha(0f);
         return true;
     }
 
+    /** Parallax the destination slightly away from the edge during the gesture. */
+    public static void setPreviewShift(float dx){if(previewView!=null)previewView.setTranslationX(dx);}
+    /** Elegantly return the lightly shifted destination to its resting position. */
+    public static void settlePreview(long duration){
+        if(previewView==null)return;
+        previewView.animate().translationX(0f).setDuration(duration).setInterpolator(new DecelerateInterpolator()).start();
+    }
     /** Dim the previous page while the current page is being dragged away. */
     public static void setScrimAlpha(float progress) {
         if (scrimView == null) return;

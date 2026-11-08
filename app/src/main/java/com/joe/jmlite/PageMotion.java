@@ -12,7 +12,7 @@ public final class PageMotion {
         int background=new Ui(activity).bg;
         activity.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(background));
         if(Build.VERSION.SDK_INT>=34)Api34.configure(activity,background);
-        else activity.overridePendingTransition(R.anim.shared_axis_x_push_enter,R.anim.page_hold);
+        else activity.overridePendingTransition(R.anim.shared_axis_x_push_enter,R.anim.shared_axis_x_pop_exit);
     }
     static void folder(View content){content.clearAnimation();content.startAnimation(AnimationUtils.loadAnimation(content.getContext(),R.anim.shared_axis_x_push_enter));}
     /** The same pop motion for every internal back action, including the toolbar button. */
@@ -22,6 +22,6 @@ public final class PageMotion {
         incoming.startAnimation(AnimationUtils.loadAnimation(incoming.getContext(),R.anim.shared_axis_x_pop_enter));
     }
     @androidx.annotation.RequiresApi(34) private static final class Api34 {
-        static void configure(Activity activity,int background){activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN,R.anim.shared_axis_x_push_enter,R.anim.page_hold,background);}
+        static void configure(Activity activity,int background){activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN,R.anim.shared_axis_x_push_enter,R.anim.page_hold,background);activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE,R.anim.shared_axis_x_pop_exit,R.anim.page_hold,background);}
     }
 }
