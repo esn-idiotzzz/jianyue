@@ -145,7 +145,7 @@ public final class MainActivity extends Activity {
         shelfSearch=new HeaderSearch(this,heading,title,plus,"搜索书架编号或名称",query->{shelfQuery=query;rowsSnapshot="";if(tab==1)render();});root.addView(heading);
         stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
         nav=new CapsuleNav();
-        downloadNav=new NavItem(0,"download","下载");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
+        downloadNav=new NavItem(0,"browse","浏览");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
         nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(58),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);nav.setOnDragListener((v,e)->shelfCapsuleDrag(e));setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;int imeBottom=keyboard?insets.getInsets(WindowInsetsCompat.Type.ime()).bottom:0;v.setPadding(bars.left,bars.top,bars.right,imeBottom);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(shelfDropPill!=null){FrameLayout.LayoutParams pillParams=(FrameLayout.LayoutParams)shelfDropPill.getLayoutParams();if(pillParams.bottomMargin!=margin){pillParams.bottomMargin=margin;shelfDropPill.setLayoutParams(pillParams);}}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}keyboardVisible=keyboard;updateNavVisibility();return insets;});
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);boolean wasKeyboard=keyboardVisible;keyboardVisible=keyboard;if(wasKeyboard&&!keyboard)clearEditorCursor();updateNavVisibility();});
         buildTab();
@@ -273,7 +273,7 @@ public final class MainActivity extends Activity {
         cancelShelfMenu();shelfHoldActive=false;hideShelfDropPill();
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
         content.removeAllViews();input=null;searchInput=null;taskCard=null;actionSlot=null;downloadActions=null;taskAction=null;taskShown=false;list=null;grid=null;adapter=null;shelfAdapter=null;onlineAdapter=null;rowsSnapshot="";
-        shelfSearch.setVisible(tab==1);title.setText(tab==0?"下载":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1&&!privateShelf&&!shelfSearch.isExpanded()?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&(privateShelf||!folderId.isEmpty())?View.VISIBLE:View.GONE);
+        shelfSearch.setVisible(tab==1);title.setText(tab==0?"浏览":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1&&!privateShelf&&!shelfSearch.isExpanded()?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&(privateShelf||!folderId.isEmpty())?View.VISIBLE:View.GONE);
         repoHint.setVisibility(tab==3?View.VISIBLE:View.GONE);if(repoMenu!=null)repoMenu.setVisibility(tab==3?View.VISIBLE:View.GONE);repositoryNav.active(tab==3);downloadNav.active(tab==0);localNav.active(tab==1);onlineNav.active(tab==2);
         if(tab==0)buildDownload();else if(tab==1)buildShelf();else if(tab==3)content.addView(RepositoryPanel.create(this),new LinearLayout.LayoutParams(-1,-1));else buildOnline();render();
         if(tab==2&&resumed)refresh(true);
@@ -943,6 +943,16 @@ public final class MainActivity extends Activity {
                 return false;
         }
     }
+    private boolean inFavoriteTree(String folder){
+        HashSet<String> seen=new HashSet<>();
+        while(folder!=null&&!folder.isEmpty()&&seen.add(folder)){
+            JSONObject node=null;for(JSONObject f:bookFolders)if(folder.equals(f.optString("id"))){node=f;break;}
+            if(node==null)return false;
+            if("favorites".equals(node.optString("system"))||Library.FAVORITES.equals(node.optString("title")))return true;
+            folder=node.optString("parent");
+        }
+        return false;
+    }
     private void dropOnShelfCapsule(){
         JSONObject item=draggingBook;
         if(item==null||folderId.isEmpty()||operation)return;
@@ -959,16 +969,15 @@ public final class MainActivity extends Activity {
             moveLastBookOut(item,parent,folderId);
             return;
         }
-        final String target=parent;
-        mutate(()->library.move(Library.key(item),target));
-
+        final String target=parent;final String key=Library.key(item);final boolean unfavorite=isFavorite(item)&&!inFavoriteTree(target);
+        libraryBooks.removeIf(b->key.equals(Library.key(b)));folderCovers=FolderCoverIndex.from(libraryBooks,bookFolders);rowsSnapshot="";render();
+        mutate(()->{library.move(key,target);if(unfavorite)library.favorite(key,false);});
     }
-    /** The dragged book is the last one in this folder: move it out, then leave and remove the folder. */
     private void moveLastBookOut(JSONObject item,String parent,String leaving){
         if(operation){toast("请等待当前操作完成");return;}
         operation=true;final String key=Library.key(item);
         disk.execute(()->{String error=null;boolean local=false;
-            try{library.move(key,parent);}catch(Library.LocalComicException e){local=true;}catch(Exception e){error=e.getMessage();}
+            try{library.move(key,parent);if(inFavoriteTree(leaving)&&!inFavoriteTree(parent))library.favorite(key,false);}catch(Library.LocalComicException e){local=true;}catch(Exception e){error=e.getMessage();}
             String msg=error;boolean rejected=local;
             runOnUiThread(()->{operation=false;if(isDestroyed())return;
                 if(rejected)showLocalComicHint();else if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);
@@ -1079,7 +1088,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.3").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){

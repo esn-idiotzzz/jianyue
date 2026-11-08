@@ -97,6 +97,7 @@ final class Ui {
             else if("add".equals(kind)){canvas.drawLine(-7,0,7,0,pen);canvas.drawLine(0,-7,0,7,pen);}
             else if("back".equals(kind)){Path p=new Path();p.moveTo(3,-7);p.lineTo(-4,0);p.lineTo(3,7);canvas.drawPath(p,pen);}
             else if(kind.startsWith("eye")){Path p=new Path();p.moveTo(-10,0);p.cubicTo(-4,-9,4,-9,10,0);p.cubicTo(4,9,-4,9,-10,0);canvas.drawPath(p,pen);canvas.drawCircle(0,0,2.6f,pen);if("eye-off".equals(kind)){pen.setStrokeWidth(4);pen.setColor(bg);canvas.drawLine(-10,-10,10,10,pen);pen.setStrokeWidth(1.7f);pen.setColor(color);canvas.drawLine(-10,-10,10,10,pen);}}
+            else if("browse".equals(kind)){canvas.drawRoundRect(new RectF(-9,-8,9,8),2,2,pen);canvas.drawLine(-9,-3,9,-3,pen);canvas.drawLine(-3,2,3,2,pen);canvas.drawLine(-3,-3,-3,8,pen);}
             else if("download".equals(kind)){canvas.drawLine(0,-8,0,4,pen);Path p=new Path();p.moveTo(-4,0);p.lineTo(0,4);p.lineTo(4,0);canvas.drawPath(p,pen);p.reset();p.moveTo(-8,5);p.lineTo(-8,9);p.lineTo(8,9);p.lineTo(8,5);canvas.drawPath(p,pen);}
             else if("shelf".equals(kind)){canvas.drawRoundRect(new RectF(-8,-8,-2,7),1,1,pen);canvas.drawRoundRect(new RectF(1,-8,7,7),1,1,pen);canvas.drawLine(-10,10,10,10,pen);}
             else if("folder".equals(kind)){Path p=new Path();p.moveTo(-10,-5);p.lineTo(-10,8);p.lineTo(10,8);p.lineTo(10,-5);p.lineTo(0,-5);p.lineTo(-3,-8);p.lineTo(-10,-8);p.close();canvas.drawPath(p,pen);}
