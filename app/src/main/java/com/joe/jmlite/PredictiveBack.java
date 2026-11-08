@@ -55,17 +55,30 @@ public final class PredictiveBack implements AutoCloseable {
     public PredictiveBack setPreview(Runnable preview){previewStart=preview;return this;}
     /** Re-register after the Activity returns to the foreground; some launchers drop the callback. */
     public void reinstall(){
-        if(Build.VERSION.SDK_INT<33||closed)return;
-        if(unregister!=null){unregister.run();unregister=null;}
-        refresh();
+        if(Build.VERSION.SDK_INT<33||closed||!canHandle.getAsBoolean())return;
+        // Always replace the callback on resume: a launcher may have dropped it while keeping
+        // our unregister token alive, and a stale token cannot tell us whether it still works.
+        unregisterSafely();
+        try{unregister=Api33.register(this);}catch(RuntimeException ignored){}
+    }
+    private void registerIfPossible(){
+        if(unregister!=null||closed||!canHandle.getAsBoolean()||imeOwnsBack())return;
+        try{unregister=Api33.register(this);}catch(RuntimeException ignored){}
+    }
+    private void unregisterSafely(){
+        Runnable old=unregister;unregister=null;
+        if(old!=null){try{old.run();}catch(RuntimeException ignored){}}
+    }
+    /** Only let the IME win while an editable field is actually focused; stale insets after resume are ignored. */
+    private boolean imeOwnsBack(){
+        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(surface);
+        if(insets==null||!insets.isVisible(WindowInsetsCompat.Type.ime()))return false;
+        return surface.findFocus() instanceof android.widget.EditText;
     }
     public void refresh(){
         if(Build.VERSION.SDK_INT<33||closed)return;
-        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(surface);
-        // Let the IME own its predictive dismissal before search/page navigation.
-        boolean enabled=canHandle.getAsBoolean()&&(insets==null||!insets.isVisible(WindowInsetsCompat.Type.ime()));
-        if(enabled&&unregister==null)unregister=Api33.register(this);
-        else if(!enabled&&unregister!=null){unregister.run();unregister=null;reset();}
+        if(!canHandle.getAsBoolean()||imeOwnsBack()){unregisterSafely();reset();}
+        else registerIfPossible();
     }
     private void start(boolean fromLeft,float touchY){
         if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
@@ -127,7 +140,7 @@ public final class PredictiveBack implements AutoCloseable {
     }
     /** Release the temporary layer once a departing Activity is no longer visible. */
     public void onStop(){reset();}
-    @Override public void close(){closed=true;if(Build.VERSION.SDK_INT>=33&&surface.getViewTreeObserver().isAlive())surface.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardLayout);if(unregister!=null){unregister.run();unregister=null;}reset();}
+    @Override public void close(){closed=true;if(Build.VERSION.SDK_INT>=33&&surface.getViewTreeObserver().isAlive())surface.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardLayout);unregisterSafely();reset();}
     static float previewScale(float progress){return 1f-.08f*Math.max(0f,Math.min(1f,progress));}
     static float previewShift(int width,float progress,boolean left){return Math.max(0,width)*.02f*Math.max(0f,Math.min(1f,progress))*(left?1f:-1f);}
 
