@@ -224,7 +224,7 @@ public final class MainActivity extends Activity {
         if(tab==2&&grid!=null)tab2Scroll=grid.getFirstVisiblePosition();
         shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}
         final int direction=tabVisualOrder(next)>tabVisualOrder(from)?1:-1;
-        transitionContent(direction,this::buildTab);
+        transitionContent(direction,this::buildTab,true);
         final int restoreScroll=next==1?tab1Scroll:next==2?tab2Scroll:0;
         if(restoreScroll>0&&grid!=null){
             grid.post(()->{if(grid!=null&&restoreScroll<grid.getCount())grid.setSelectionFromTop(restoreScroll,0);});
@@ -233,7 +233,9 @@ public final class MainActivity extends Activity {
     }
     private int tabVisualOrder(int value){return value==1?0:value==0?1:value==2?2:3;}
     /** Shared page change: old page leaves, new page arrives; direction < 0 uses the back pop. */
-    private void transitionContent(int direction,Runnable build){
+    private void transitionContent(int direction,Runnable build){transitionContent(direction,build,false);}
+    /** targetOnTop is used by tab switches; in-window back keeps the real target as stable bottom. */
+    private void transitionContent(int direction,Runnable build,boolean targetOnTop){
         PageMotion.clearEntering(this);
         finishTabTransition();
         // The incoming view is the real destination; never leave its frozen snapshot behind it.
@@ -241,8 +243,8 @@ public final class MainActivity extends Activity {
         final LinearLayout previous=content;
         final LinearLayout incoming=u.column();
         final FrameLayout.LayoutParams match=new FrameLayout.LayoutParams(-1,-1);
-        if(direction<0){
-            // Real target stays as the stable bottom layer; only the source moves out.
+        if(!targetOnTop&&direction<0){
+            // Back within the same window: real target stays as the stable bottom layer.
             stage.addView(incoming,Math.max(0,stage.indexOfChild(previous)),match);
         }else{
             stage.addView(incoming,Math.max(0,stage.indexOfChild(nav)),match);
@@ -250,13 +252,13 @@ public final class MainActivity extends Activity {
         content=incoming;
         build.run();
         tabOutgoing=previous;
-        if(direction<0){
+        if(!targetOnTop&&direction<0){
             incoming.setAlpha(1f);incoming.setTranslationX(0f);
             PageMotion.backOutgoing(previous,()->previous.post(()->{if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}}));
         }else{
             final int distance=u.dp(24);
-            incoming.setAlpha(0f);incoming.setTranslationX(distance);
-            previous.animate().alpha(0f).translationX(-distance).setDuration(240).setInterpolator(new DecelerateInterpolator()).start();
+            incoming.setAlpha(0f);incoming.setTranslationX(direction*distance);
+            previous.animate().alpha(0f).translationX(-direction*distance).setDuration(240).setInterpolator(new DecelerateInterpolator()).start();
             incoming.animate().alpha(1f).translationX(0f).setDuration(240).setInterpolator(new DecelerateInterpolator()).withEndAction(()->{
                 if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}
             }).start();
@@ -1042,7 +1044,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.2.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.2.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
