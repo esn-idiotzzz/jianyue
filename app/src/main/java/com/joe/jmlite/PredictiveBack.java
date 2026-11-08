@@ -85,8 +85,9 @@ public final class PredictiveBack implements AutoCloseable {
     }
     private void start(boolean fromLeft,float touchY){
         if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
-        if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
         reset();gesturing=true;left=fromLeft;progress=0;
+        if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
+        BackPreview.show();
         width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();originalPivotX=surface.getPivotX();originalPivotY=surface.getPivotY();originalAlpha=surface.getAlpha();gestureLeaving=false;
         gestureScale=.92f;
         int surfaceHeight=surface.getHeight();
@@ -149,7 +150,7 @@ public final class PredictiveBack implements AutoCloseable {
         committed=false;
         surface.animate().cancel();
         if(!gesturing)return;
-        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setPivotX(originalPivotX);surface.setPivotY(originalPivotY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);surface.setAlpha(originalAlpha);radius=0;gestureLeaving=false;BackPreview.setScrimAlpha(0f);BackPreview.setPreviewShift(0f);
+        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setPivotX(originalPivotX);surface.setPivotY(originalPivotY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);surface.setAlpha(originalAlpha);radius=0;gestureLeaving=false;BackPreview.setScrimAlpha(0f);BackPreview.setPreviewShift(0f);BackPreview.hide();
     }
     /** Release the temporary layer once a departing Activity is no longer visible. */
     public void onStop(){reset();}

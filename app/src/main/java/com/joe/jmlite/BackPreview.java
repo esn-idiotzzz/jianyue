@@ -71,12 +71,15 @@ public final class BackPreview {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
         previewView.setImageBitmap(preview);previewView.setTranslationX(0f);
-        previewView.setVisibility(View.VISIBLE);
-        scrimView.setVisibility(View.VISIBLE);
+        previewView.setVisibility(View.GONE);
+        scrimView.setVisibility(View.GONE);
         scrimView.setAlpha(0f);
         return true;
     }
 
+    /** Show the preview only for the duration of an active back gesture. */
+    public static void show(){if(previewView==null)return;previewView.setVisibility(View.VISIBLE);if(scrimView!=null){scrimView.setVisibility(View.VISIBLE);scrimView.setAlpha(0f);}}
+    public static void hide(){if(previewView!=null)previewView.setVisibility(View.GONE);if(scrimView!=null)scrimView.setVisibility(View.GONE);}
     /** Parallax the destination slightly away from the edge during the gesture. */
     public static void setPreviewShift(float dx){if(previewView!=null)previewView.setTranslationX(dx);}
     /** Elegantly return the lightly shifted destination to its resting position. */
