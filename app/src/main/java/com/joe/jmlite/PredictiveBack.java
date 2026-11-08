@@ -71,9 +71,10 @@ public final class PredictiveBack implements AutoCloseable {
     }
     /** Only let the IME win while an editable field is actually focused; stale insets after resume are ignored. */
     private boolean imeOwnsBack(){
-        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(surface);
-        if(insets==null||!insets.isVisible(WindowInsetsCompat.Type.ime()))return false;
-        return surface.findFocus() instanceof android.widget.EditText;
+        View focus=surface.findFocus();
+        if(!(focus instanceof android.widget.EditText)||!focus.isShown())return false;
+        android.view.inputmethod.InputMethodManager imm=(android.view.inputmethod.InputMethodManager)surface.getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        return imm!=null&&imm.isAcceptingText();
     }
     public void refresh(){
         if(Build.VERSION.SDK_INT<33||closed)return;
@@ -114,11 +115,14 @@ public final class PredictiveBack implements AutoCloseable {
         if(!gesturing){committed=exits.getAsBoolean();action.run();refresh();return;}
         committed=true;
         boolean leaving=exits.getAsBoolean();
-        if(leaving&&Build.VERSION.SDK_INT>=34&&window==activity.getWindow())Api34.suppressExitAnimation(activity);
-        // Navigate at the current gesture position; never flash back to full size first.
+        boolean taskRoot=activity.isTaskRoot();
+        // End the preview at normal size, then let the same page transition used by the toolbar
+        // back button (or the Activity close animation) take over. This avoids a second, overlapping
+        // settle animation and makes button and gesture navigation look identical.
+        reset();committed=true;
+        if(leaving&&taskRoot&&Build.VERSION.SDK_INT>=34&&window==activity.getWindow())Api34.suppressExitAnimation(activity);
         action.run();
         if(closed)return;
-        if(!leaving)settle();
         refresh();
     }
     private void settle(){

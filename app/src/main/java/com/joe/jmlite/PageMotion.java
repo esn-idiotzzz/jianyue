@@ -15,6 +15,12 @@ public final class PageMotion {
         else activity.overridePendingTransition(R.anim.shared_axis_x_push_enter,R.anim.page_hold);
     }
     static void folder(View content){content.clearAnimation();content.startAnimation(AnimationUtils.loadAnimation(content.getContext(),R.anim.shared_axis_x_push_enter));}
+    /** The same pop motion for every internal back action, including the toolbar button. */
+    static void back(View outgoing,View incoming){
+        outgoing.clearAnimation();incoming.clearAnimation();
+        outgoing.startAnimation(AnimationUtils.loadAnimation(outgoing.getContext(),R.anim.shared_axis_x_pop_exit));
+        incoming.startAnimation(AnimationUtils.loadAnimation(incoming.getContext(),R.anim.shared_axis_x_pop_enter));
+    }
     @androidx.annotation.RequiresApi(34) private static final class Api34 {
         static void configure(Activity activity,int background){activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN,R.anim.shared_axis_x_push_enter,R.anim.page_hold,background);}
     }

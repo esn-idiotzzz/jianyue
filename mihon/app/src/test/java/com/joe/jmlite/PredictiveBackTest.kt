@@ -226,12 +226,12 @@ class PredictiveBackTest {
         fixture.start()
         fixture.callback.onBackInvoked()
         assertEquals(1, fixture.actions.get())
-        assertEquals(.91f * PredictiveBack.previewScale(.6f), scaleAtNavigation)
-        assertEquals(11f + PredictiveBack.previewShift(1000, .6f, true), shiftAtNavigation)
-        assertEquals(scaleAtNavigation, fixture.surface.scaleX)
-        verify(exactly = 1) { animation.animator.start() }
-        animation.finish()
+        // The gesture preview is intentionally ended before navigation so the same page
+        // transition as the toolbar back button takes over.
+        assertEquals(.91f, scaleAtNavigation)
+        assertEquals(11f, shiftAtNavigation)
         fixture.surface.assertRestored()
+        verify(exactly = 0) { animation.animator.start() }
         assertEquals(1, fixture.actions.get())
     }
 
@@ -247,8 +247,7 @@ class PredictiveBackTest {
         fixture.callback.onBackCancelled()
         assertEquals(scale, fixture.surface.scaleX)
         assertEquals(1, fixture.actions.get())
-        verify(exactly = 1) { animation.animator.start() }
-        animation.finish()
+        verify(exactly = 0) { animation.animator.start() }
         fixture.surface.assertRestored()
     }
 
@@ -260,8 +259,8 @@ class PredictiveBackTest {
         fixture.callback.onBackInvoked()
         fixture.callback.onBackInvoked()
         assertEquals(1, fixture.actions.get())
-        assertTrue(fixture.surface.scaleX < .91f)
-        assertEquals(View.LAYER_TYPE_HARDWARE, fixture.surface.layer)
+        assertEquals(.91f, fixture.surface.scaleX)
+        assertEquals(View.LAYER_TYPE_NONE, fixture.surface.layer)
         verify(exactly = 0) { animation.animator.start() }
         fixture.owner.onStop()
         fixture.surface.assertRestored()
@@ -291,14 +290,14 @@ class PredictiveBackTest {
         val fixture = Fixture()
         val animation = Animation()
         fixture.start()
-        fixture.callback.onBackInvoked()
+        fixture.callback.onBackCancelled()
         fixture.owner.close()
         animation.updates.last().onAnimationUpdate(animation.animator)
         animation.finish()
         fixture.surface.assertRestored()
         verify(exactly = 1) { animation.animator.removeAllListeners() }
         verify(exactly = 1) { animation.animator.cancel() }
-        assertEquals(1, fixture.actions.get())
+        assertEquals(0, fixture.actions.get())
     }
 
     @Test fun `a dialog callback registers with its own window and cancels that dialog`() {

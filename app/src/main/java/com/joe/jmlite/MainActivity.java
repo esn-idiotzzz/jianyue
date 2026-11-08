@@ -222,18 +222,8 @@ public final class MainActivity extends Activity {
         if(tab==1&&grid!=null)tab1Scroll=grid.getFirstVisiblePosition();
         if(tab==2&&grid!=null)tab2Scroll=grid.getFirstVisiblePosition();
         shelfSearch.collapse();tab=next;folderId="";if(tab==2){onlineBooks.clear();rows.clear();}
-        final LinearLayout previous=content;
-        final LinearLayout incoming=u.column();
-        stage.addView(incoming,Math.max(0,stage.indexOfChild(nav)),new FrameLayout.LayoutParams(-1,-1));
-        content=incoming;
-        buildTab();
-        final int direction=tabVisualOrder(next)>tabVisualOrder(from)?1:-1;final int distance=u.dp(24);
-        incoming.setAlpha(0f);incoming.setTranslationX(direction*distance);
-        tabOutgoing=previous;
-        previous.animate().alpha(0f).translationX(-direction*distance).setDuration(240).setInterpolator(new DecelerateInterpolator()).start();
-        incoming.animate().alpha(1f).translationX(0f).setDuration(240).setInterpolator(new DecelerateInterpolator()).withEndAction(()->{
-            if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}
-        }).start();
+        final int direction=tabVisualOrder(next)>tabVisualOrder(from)?1:-1;
+        transitionContent(direction,this::buildTab);
         final int restoreScroll=next==1?tab1Scroll:next==2?tab2Scroll:0;
         if(restoreScroll>0&&grid!=null){
             grid.post(()->{if(grid!=null&&restoreScroll<grid.getCount())grid.setSelectionFromTop(restoreScroll,0);});
@@ -241,6 +231,28 @@ public final class MainActivity extends Activity {
         releaseFolderInBackground(leavingLibrary,leaving,false);
     }
     private int tabVisualOrder(int value){return value==1?0:value==0?1:value==2?2:3;}
+    /** Shared page change: old page leaves, new page arrives; direction < 0 uses the back pop. */
+    private void transitionContent(int direction,Runnable build){
+        finishTabTransition();
+        final LinearLayout previous=content;
+        final LinearLayout incoming=u.column();
+        stage.addView(incoming,Math.max(0,stage.indexOfChild(nav)),new FrameLayout.LayoutParams(-1,-1));
+        content=incoming;
+        build.run();
+        tabOutgoing=previous;
+        if(direction<0){
+            incoming.setAlpha(1f);incoming.setTranslationX(0f);
+            PageMotion.back(previous,incoming);
+            previous.postDelayed(()->{if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}},330);
+        }else{
+            final int distance=u.dp(24);
+            incoming.setAlpha(0f);incoming.setTranslationX(distance);
+            previous.animate().alpha(0f).translationX(-distance).setDuration(240).setInterpolator(new DecelerateInterpolator()).start();
+            incoming.animate().alpha(1f).translationX(0f).setDuration(240).setInterpolator(new DecelerateInterpolator()).withEndAction(()->{
+                if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}
+            }).start();
+        }
+    }
     private void finishTabTransition(){
         if(tabOutgoing!=null){stage.removeView(tabOutgoing);tabOutgoing=null;}
         if(content!=null){content.animate().cancel();content.setAlpha(1f);content.setTranslationX(0f);}
@@ -347,11 +359,11 @@ public final class MainActivity extends Activity {
     }
     private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return privateShelf?"隐私书架":"书架";}
     private void leaveFolder(){
-        if(folderId.isEmpty()&&privateShelf){setPrivateShelf(false);return;}
+        if(folderId.isEmpty()&&privateShelf){transitionContent(-1,()->setPrivateShelf(false));return;}
         String leaving=folderId;String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");
         folderId=parent;library.preserveFolder(parent);
         boolean optimistic=collapseFolderInMemory(leaving);
-        buildTab();releaseFolderInBackground(library,leaving,optimistic);if(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
+        transitionContent(-1,this::buildTab);releaseFolderInBackground(library,leaving,optimistic);if(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
     }
     /** Apply the pending collapse before the parent shelf is drawn, so the folder never flashes. */
     private boolean collapseFolderInMemory(String folderId){
