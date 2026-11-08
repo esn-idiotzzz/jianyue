@@ -83,9 +83,9 @@ public final class PredictiveBack implements AutoCloseable {
         if(!canHandle.getAsBoolean()||imeOwnsBack()){unregisterSafely();reset();}
         else registerIfPossible();
     }
-    private void start(boolean fromLeft,float touchY){
+    private void start(boolean fromLeft,float touchX,float touchY){
         if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
-        reset();gesturing=true;left=fromLeft;progress=0;
+        reset();gesturing=true;progress=0;int gestureWidth=surface.getWidth();left=touchX>0f&&gestureWidth>0?touchX<gestureWidth/2f:fromLeft;
         if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
         BackPreview.show();
         width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();originalPivotX=surface.getPivotX();originalPivotY=surface.getPivotY();originalAlpha=surface.getAlpha();gestureLeaving=false;
@@ -116,7 +116,7 @@ public final class PredictiveBack implements AutoCloseable {
         if(closed||committed)return;
         if(activity.isFinishing()||activity.isDestroyed()){reset();return;}
         if(!canHandle.getAsBoolean()){reset();refresh();return;}
-        if(!gesturing){committed=exits.getAsBoolean();action.run();surface.post(this::reinstall);return;}
+        if(!gesturing){committed=exits.getAsBoolean();action.run();surface.postDelayed(this::reinstall,120);return;}
         committed=true;gestureLeaving=true;
         if(!surface.isAttachedToWindow()){reset();committed=true;gestureLeaving=false;action.run();surface.post(this::reinstall);return;}
         boolean leaving=exits.getAsBoolean();
@@ -124,14 +124,15 @@ public final class PredictiveBack implements AutoCloseable {
         if(leaving&&taskRoot&&Build.VERSION.SDK_INT>=34&&window==activity.getWindow())Api34.suppressExitAnimation(activity);
         // Keep the scaled page at its gesture size and let it slide out to the edge while fading.
         // The destination preview simultaneously returns from its small parallax offset.
-        float exit=(left?1f:-1f)*width*.16f;
+        float exit=(left?1f:-1f)*width*1.05f;
+        BackPreview.setScrimAlpha(0f);
         BackPreview.settlePreview(220);
-        surface.animate().translationXBy(exit).alpha(0f).setDuration(220).setInterpolator(new android.view.animation.DecelerateInterpolator()).withEndAction(()->{
+        surface.animate().translationXBy(exit).setDuration(260).setInterpolator(new android.view.animation.DecelerateInterpolator()).withEndAction(()->{
             if(closed)return;
             action.run();
             if(activity.isFinishing()||activity.isDestroyed()){gestureLeaving=false;return;}
             reset();committed=true;gestureLeaving=false;
-            surface.post(this::reinstall);
+            surface.postDelayed(this::reinstall,120);
         }).start();
     }
     private void settle(){
@@ -142,7 +143,7 @@ public final class PredictiveBack implements AutoCloseable {
         animation.addUpdateListener(a->{if(settling==animation&&!closed)advance((float)a.getAnimatedValue());});
         animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){
             if(settling!=animation||closed)return;settling=null;reset();
-            surface.post(PredictiveBack.this::reinstall);
+            surface.postDelayed(PredictiveBack.this::reinstall,120);
         }});animation.start();
     }
     private void reset(){
@@ -211,7 +212,7 @@ public final class PredictiveBack implements AutoCloseable {
     private static final class Api34 {
         static void suppressExitAnimation(Activity activity){activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE,0,0);}
         static android.window.OnBackAnimationCallback callback(PredictiveBack owner){return new android.window.OnBackAnimationCallback(){
-            @Override public void onBackStarted(android.window.BackEvent event){if(owner.closed)return;float touchY=0f;try{touchY=event.getTouchY();}catch(RuntimeException ignored){}owner.start(event.getSwipeEdge()==android.window.BackEvent.EDGE_LEFT,touchY);}
+            @Override public void onBackStarted(android.window.BackEvent event){if(owner.closed)return;float touchY=0f,touchX=0f;try{touchY=event.getTouchY();}catch(RuntimeException ignored){}try{touchX=event.getTouchX();}catch(RuntimeException ignored){}owner.start(event.getSwipeEdge()==android.window.BackEvent.EDGE_LEFT,touchX,touchY);}
             @Override public void onBackProgressed(android.window.BackEvent event){if(!owner.closed&&!owner.committed)owner.advance(event.getProgress());}
             @Override public void onBackCancelled(){if(!owner.closed&&!owner.committed)owner.settle();}
             @Override public void onBackInvoked(){owner.invoke();}

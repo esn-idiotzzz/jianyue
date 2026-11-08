@@ -18,8 +18,12 @@ public final class PageMotion {
     /** The same pop motion for every internal back action, including the toolbar button. */
     static void back(View outgoing,View incoming){
         outgoing.clearAnimation();incoming.clearAnimation();
-        outgoing.startAnimation(AnimationUtils.loadAnimation(outgoing.getContext(),R.anim.shared_axis_x_pop_exit));
-        incoming.startAnimation(AnimationUtils.loadAnimation(incoming.getContext(),R.anim.shared_axis_x_pop_enter));
+        android.view.animation.Animation exit=AnimationUtils.loadAnimation(outgoing.getContext(),R.anim.shared_axis_x_pop_exit);
+        android.view.animation.Animation enter=AnimationUtils.loadAnimation(incoming.getContext(),R.anim.shared_axis_x_pop_enter);
+        // Keep the outgoing page at its final offset/alpha until it is removed; otherwise View
+        // animations snap back to alpha 1 for a frame and briefly flash the old page.
+        exit.setFillAfter(true);enter.setFillAfter(true);
+        outgoing.startAnimation(exit);incoming.startAnimation(enter);
     }
     @androidx.annotation.RequiresApi(34) private static final class Api34 {
         static void configure(Activity activity,int background){activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN,R.anim.shared_axis_x_push_enter,R.anim.page_hold,background);activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE,R.anim.shared_axis_x_pop_exit,R.anim.page_hold,background);}
