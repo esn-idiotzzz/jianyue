@@ -147,7 +147,7 @@ public final class MainActivity extends Activity {
         nav=new CapsuleNav();
         downloadNav=new NavItem(0,"download","下载");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
         nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(58),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);nav.setOnDragListener((v,e)->shelfCapsuleDrag(e));setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;int imeBottom=keyboard?insets.getInsets(WindowInsetsCompat.Type.ime()).bottom:0;v.setPadding(bars.left,bars.top,bars.right,imeBottom);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(shelfDropPill!=null){FrameLayout.LayoutParams pillParams=(FrameLayout.LayoutParams)shelfDropPill.getLayoutParams();if(pillParams.bottomMargin!=margin){pillParams.bottomMargin=margin;shelfDropPill.setLayoutParams(pillParams);}}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}keyboardVisible=keyboard;updateNavVisibility();return insets;});
-        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);keyboardVisible=keyboard;updateNavVisibility();});
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);boolean wasKeyboard=keyboardVisible;keyboardVisible=keyboard;if(wasKeyboard&&!keyboard)clearEditorCursor();updateNavVisibility();});
         buildTab();
         firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();ForegroundUpdates.checkAfterGuide();});
         predictiveBack=new PredictiveBack(this,root,()->firstRunGuide==null||!firstRunGuide.isShowing(),()->!shelfSearch.isExpanded()&&(tab!=1||(!privateShelf&&folderId.isEmpty())),()->!shelfSearch.isExpanded()&&tab==1&&(privateShelf||!folderId.isEmpty()),this::onBackPressed);predictiveBack.setPreview(()->BackPreview.install(this));
@@ -281,8 +281,15 @@ public final class MainActivity extends Activity {
         updateNavVisibility();
     }
     private boolean navAllowed(){return !keyboardVisible&&!privateShelf&&!(tab==1&&!folderId.isEmpty());}
+    private void clearEditorCursor(){
+        View focus=getCurrentFocus();
+        if(focus instanceof EditText)((EditText)focus).clearFocus();
+    }
     private void updateNavVisibility(){
         if(nav==null)return;
+        // The stage is already inset above the keyboard; hide before the first keyboard frame
+        // instead of animating the capsule up over the IME and then fading it out.
+        if(keyboardVisible){navVisibleTarget=false;nav.animate().cancel();nav.animate().withEndAction(null);nav.setVisibility(View.GONE);return;}
         boolean show=navAllowed();
         if(navVisibleTarget!=null&&navVisibleTarget==show)return;
         boolean initial=navVisibleTarget==null;navVisibleTarget=show;
@@ -481,7 +488,7 @@ public final class MainActivity extends Activity {
         final String id;try{id=JmApi.parseId(input.getText().toString());}catch(IllegalArgumentException e){input.setError("请输入有效编号或 JM 链接");return;}
         draft=input.getText().toString();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
         starting=true;
-        withLocalDownload(id,()->{BackPreview.capture(getWindow().getDecorView());startActivity(new Intent().setClassName(this,"com.joe.jmlite.MihonEntryActivity").putExtra("online_id",id).putExtra("title","JM"+id+" · 在线阅读"));});
+        withLocalDownload(id,()->{BackPreview.capture(getWindow().getDecorView());startActivity(new Intent().setClassName(this,"com.joe.jmlite.MihonEntryActivity").putExtra("source_jm_id",id).putExtra("title","JM"+id+" · 在线阅读"));});
     }
     /** Both the download and online buttons share the same existing-shelf prompt. */
     private void withLocalDownload(String id,Runnable proceed){
@@ -505,7 +512,7 @@ public final class MainActivity extends Activity {
     /** All online cover taps land on a details screen before reading. */
     private void openOnline(JSONObject o){BackPreview.capture(getWindow().getDecorView());
         if(OnlineHistory.isJm(o)){
-            startActivity(new Intent(this,BookInfoActivity.class).putExtra("book",o.toString()));
+            startActivity(new Intent(this,BookInfoActivity.class).putExtra("book",o.toString()).putExtra("prefer_local",true));
             return;
         }
         startActivity(new Intent(this,OnlineMangaActivity.class)
@@ -1072,7 +1079,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.2.3").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
