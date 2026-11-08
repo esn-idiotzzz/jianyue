@@ -100,7 +100,7 @@ public final class BookInfoActivity extends Activity {
         refreshFavorite();
     }
 
-    @Override protected void onResume(){super.onResume();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
+    @Override protected void onResume(){super.onResume();if(predictiveBack!=null)predictiveBack.reinstall();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
     @Override protected void onDestroy(){if(backPreview&&isFinishing()&&!isChangingConfigurations())BackPreview.pop();if(predictiveBack!=null)predictiveBack.close();disk.shutdownNow();covers.close();super.onDestroy();}
 

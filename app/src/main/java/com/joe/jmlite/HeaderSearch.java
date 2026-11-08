@@ -66,12 +66,13 @@ public final class HeaderSearch {
             transition++;if(animation!=null){animation.cancel();animation=null;}expanded=false;
             input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
             title.setAlpha(1f);title.setVisibility(View.VISIBLE);editor.setVisibility(View.GONE);icon.setAlpha(1f);icon.setVisibility(View.VISIBLE);ui.round(box,Color.TRANSPARENT,20);box.setClipBounds(null);
-        }else if(animation==null&&!expanded){
+        }else if(!expanded){
             // Restore the resting toolbar whenever the search is not open. A collapse that was
             // interrupted (page rebuild, tab switch) must not leave the magnifier at alpha 0.
+            if(animation!=null){transition++;animation.cancel();animation=null;}
             title.setAlpha(1f);title.setVisibility(View.VISIBLE);editor.setAlpha(0f);editor.setVisibility(View.GONE);
             icon.setAlpha(1f);icon.setVisibility(View.VISIBLE);if(companion!=null)companion.setVisibility(View.VISIBLE);
-            if(box.getWidth()>0)box.setClipBounds(new Rect(Math.max(0,box.getWidth()-ui.dp(44)),0,box.getWidth(),box.getHeight()));else box.setClipBounds(null);
+            box.setClipBounds(null);
         }
         box.setVisibility(show?View.VISIBLE:View.GONE);
         searchSpace.setVisibility(show?View.VISIBLE:View.GONE);
@@ -86,7 +87,7 @@ public final class HeaderSearch {
         int target=expand?width:ui.dp(44);
         animation=ValueAnimator.ofInt(current,target);animation.setDuration(220);animation.setInterpolator(new DecelerateInterpolator());
         animation.addUpdateListener(a->{int reveal=(int)a.getAnimatedValue();box.setClipBounds(new Rect(Math.max(0,box.getWidth()-reveal),0,box.getWidth(),box.getHeight()));float f=a.getAnimatedFraction(),progress=expand?f:1f-f;title.setAlpha(1f-progress);editor.setAlpha(progress);icon.setAlpha(1f-progress);});
-        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setAlpha(expand?0f:1f);editor.setAlpha(expand?1f:0f);icon.setAlpha(expand?0f:1f);title.setVisibility(expand?View.INVISIBLE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);box.setClipBounds(expand?null:new Rect(Math.max(0,box.getWidth()-ui.dp(44)),0,box.getWidth(),box.getHeight()));if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}notifyExpansionChanged();}});
+        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setAlpha(expand?0f:1f);editor.setAlpha(expand?1f:0f);icon.setAlpha(expand?0f:1f);title.setVisibility(expand?View.INVISIBLE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);box.setClipBounds(null);if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}notifyExpansionChanged();}});
         ui.round(box,expand?ui.tint:Color.TRANSPARENT,20);
         if(!expand){input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);}
         animation.start();

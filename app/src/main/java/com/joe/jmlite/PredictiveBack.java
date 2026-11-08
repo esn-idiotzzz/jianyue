@@ -53,6 +53,12 @@ public final class PredictiveBack implements AutoCloseable {
     }
     /** Installs the blurred destination preview when a gesture begins. */
     public PredictiveBack setPreview(Runnable preview){previewStart=preview;return this;}
+    /** Re-register after the Activity returns to the foreground; some launchers drop the callback. */
+    public void reinstall(){
+        if(Build.VERSION.SDK_INT<33||closed)return;
+        if(unregister!=null){unregister.run();unregister=null;}
+        refresh();
+    }
     public void refresh(){
         if(Build.VERSION.SDK_INT<33||closed)return;
         WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(surface);

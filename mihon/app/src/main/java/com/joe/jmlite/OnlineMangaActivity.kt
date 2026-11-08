@@ -549,7 +549,7 @@ class OnlineMangaActivity : Activity() {
         )
     }
 
-    override fun onResume() {
+    override fun onResume() { predictiveBack?.reinstall();
         super.onResume()
         refreshFavorite()
         if (details == null) return

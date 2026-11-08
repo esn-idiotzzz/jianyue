@@ -161,7 +161,7 @@ public final class MainActivity extends Activity {
             label=u.text(text,10,u.muted,false);label.setGravity(Gravity.CENTER);label.setIncludeFontPadding(false);label.setPadding(0,u.dp(2),0,0);addView(label,new LinearLayout.LayoutParams(-1,u.dp(14)));
             u.round(this,Color.TRANSPARENT,23);
             setOnTouchListener((v,e)->{int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN)animate().scaleX(.96f).scaleY(.96f).setDuration(90).start();else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)animate().scaleX(1f).scaleY(1f).setDuration(130).start();return false;});
-            setContentDescription(text);setOnClickListener(v->{performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);switchTab(index);});
+            setContentDescription(text);setOnClickListener(v->switchTab(index));
         }
         void active(boolean on){icon.color(on?Ui.BLUE:u.muted);label.setTextColor(on?Ui.BLUE:u.muted);setSelected(on);if(on&&nav!=null)nav.select(index);}
     }
@@ -173,11 +173,11 @@ public final class MainActivity extends Activity {
         private ValueAnimator pillAnimator;
         CapsuleNav(){
             super(MainActivity.this);setOrientation(HORIZONTAL);setGravity(Gravity.CENTER);setClickable(true);
-            setPadding(u.dp(7),u.dp(6),u.dp(7),u.dp(6));
-            GradientDrawable bg=u.shape(u.dark?0xEE202126:0xF4FFFFFF,30);
-            bg.setStroke(u.dp(1),u.dark?0x2EFFFFFF:0x1418202C);
-            setBackground(bg);setElevation(u.dp(12));setClipToOutline(true);
-            pillPaint.setColor(u.tint);
+            setPadding(u.dp(8),u.dp(6),u.dp(8),u.dp(6));
+            GradientDrawable bg=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{u.dark?0xF224252B:0xFAFFFFFF,u.dark?0xE61B1C22:0xF2FFFFFF});
+            bg.setCornerRadius(u.dp(30));bg.setStroke(u.dp(1),u.dark?0x33FFFFFF:0x1A18202C);
+            setBackground(bg);setElevation(u.dp(13));setClipToOutline(true);
+            pillPaint.setColor(u.dark?0x402F6FEA:0x263478F6);
         }
         void select(int index){
             if(index<0||index==activeIndex)return;
@@ -227,7 +227,7 @@ public final class MainActivity extends Activity {
         stage.addView(incoming,Math.max(0,stage.indexOfChild(nav)),new FrameLayout.LayoutParams(-1,-1));
         content=incoming;
         buildTab();
-        final int direction=next>from?1:-1;final int distance=u.dp(24);
+        final int direction=tabVisualOrder(next)>tabVisualOrder(from)?1:-1;final int distance=u.dp(24);
         incoming.setAlpha(0f);incoming.setTranslationX(direction*distance);
         tabOutgoing=previous;
         previous.animate().alpha(0f).translationX(-direction*distance).setDuration(240).setInterpolator(new DecelerateInterpolator()).start();
@@ -240,11 +240,13 @@ public final class MainActivity extends Activity {
         }
         releaseFolderInBackground(leavingLibrary,leaving,false);
     }
+    private int tabVisualOrder(int value){return value==1?0:value==0?1:value==2?2:3;}
     private void finishTabTransition(){
         if(tabOutgoing!=null){stage.removeView(tabOutgoing);tabOutgoing=null;}
         if(content!=null){content.animate().cancel();content.setAlpha(1f);content.setTranslationX(0f);}
     }    private void buildTab(){
         finishTabTransition();
+        if(tab==1&&!folderId.isEmpty())shelfSearch.collapse();
         cancelShelfMenu();shelfHoldActive=false;hideShelfDropPill();
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
         content.removeAllViews();input=null;searchInput=null;taskCard=null;actionSlot=null;downloadActions=null;taskAction=null;taskShown=false;list=null;grid=null;adapter=null;shelfAdapter=null;onlineAdapter=null;rowsSnapshot="";
@@ -1013,7 +1015,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.1.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.1.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -1029,7 +1031,8 @@ public final class MainActivity extends Activity {
         if((action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)&&!highlightKey.isEmpty())clearShelfHighlight();
         return super.dispatchTouchEvent(ev);
     }
-    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(firstRunGuide!=null)firstRunGuide.showIfNeeded();if(predictiveBack!=null)predictiveBack.refresh();}
+    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(firstRunGuide!=null)firstRunGuide.showIfNeeded();if(predictiveBack!=null){predictiveBack.reinstall();getWindow().getDecorView().postDelayed(()->{if(predictiveBack!=null)predictiveBack.reinstall();},350);}}
+    @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&predictiveBack!=null)predictiveBack.reinstall();}
     @Override protected void onPause(){cancelShelfMenu();hideShelfDropPill();super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
     @Override protected void onDestroy(){if(isFinishing()&&!isChangingConfigurations())SourceVisits.reset(this);resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
