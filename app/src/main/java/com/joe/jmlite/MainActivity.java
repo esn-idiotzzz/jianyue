@@ -63,7 +63,7 @@ public final class MainActivity extends Activity {
     private String shelfQuery="";
     private NavItem downloadNav,localNav,onlineNav,repositoryNav;
     private boolean jmHistory=false,historyLoaded=false;
-    private TextView repoHint;
+    private TextView repoHint;private Ui.Icon repoMenu;
     private ProgressBar progress;
     private EditText input,searchInput;
     private ListView list;
@@ -133,15 +133,14 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle b){
         if(b==null&&isTaskRoot())PrivacyVault.resetSession();
-        super.onCreate(b);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
+        super.onCreate(b);getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
         if(b!=null){tab=b.getInt("tab",1);draft=b.getString("draft","");searchDraft=b.getString("search","");folderId=b.getString("folder","");taskId=b.getString("task_id","");pendingShelfScroll=b.getInt("shelf_scroll",-1);}
         library.preserveFolder(folderId);
         LinearLayout root=u.column();root.setBackgroundColor(u.bg);Ui.insets(this,root,u.dark);
         LinearLayout heading=u.row();heading.setPadding(u.dp(16),u.dp(8),u.dp(12),u.dp(12));
         back=u.icon("back",u.ink);back.setContentDescription("返回书架");heading.addView(back,new LinearLayout.LayoutParams(u.dp(40),u.dp(44)));back.setOnClickListener(v->leaveFolder());
         title=u.text("简阅",23,u.ink,true);title.setMaxLines(1);title.setEllipsize(android.text.TextUtils.TruncateAt.END);title.setPadding(u.dp(4),0,0,0);heading.addView(title,new LinearLayout.LayoutParams(0,u.dp(48),1));title.setGravity(Gravity.CENTER_VERTICAL);
-        plus=u.icon("add",u.ink);plus.setContentDescription("导入漫画");heading.addView(plus,new LinearLayout.LayoutParams(u.dp(44),u.dp(44)));plus.setOnClickListener(v->importMenu());
-        repoHint=u.text("<不行请尝试魔法~>",11,u.muted,false);repoHint.setContentDescription("关于简阅与开源许可");repoHint.setPadding(0,u.dp(12),0,u.dp(12));repoHint.setOnClickListener(v->license());heading.addView(repoHint);
+        repoHint=u.text("<不行请尝试魔法callio~>",11,u.muted,false);repoHint.setPadding(0,u.dp(12),0,u.dp(12));heading.addView(repoHint);plus=u.icon("add",u.ink);plus.setContentDescription("导入漫画");heading.addView(plus,new LinearLayout.LayoutParams(u.dp(44),u.dp(44)));plus.setOnClickListener(v->importMenu());repoMenu=u.icon("menu",u.ink);repoMenu.setContentDescription("关于简阅与开源许可");heading.addView(repoMenu,new LinearLayout.LayoutParams(u.dp(44),u.dp(44)));repoMenu.setOnClickListener(v->license());
         shelfSearch=new HeaderSearch(this,heading,title,plus,"搜索书架编号或名称",query->{shelfQuery=query;rowsSnapshot="";if(tab==1)render();});root.addView(heading);
         stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
         nav=new CapsuleNav();
@@ -274,7 +273,7 @@ public final class MainActivity extends Activity {
         if(actionAnimator!=null){actionAnimator.cancel();actionAnimator=null;}
         content.removeAllViews();input=null;searchInput=null;taskCard=null;actionSlot=null;downloadActions=null;taskAction=null;taskShown=false;list=null;grid=null;adapter=null;shelfAdapter=null;onlineAdapter=null;rowsSnapshot="";
         shelfSearch.setVisible(tab==1);title.setText(tab==0?"下载":tab==1?folderTitle():tab==3?"仓库":"历史");plus.setVisibility(tab==1&&!privateShelf&&!shelfSearch.isExpanded()?View.VISIBLE:View.GONE);back.setVisibility(tab==1&&(privateShelf||!folderId.isEmpty())?View.VISIBLE:View.GONE);
-        repoHint.setVisibility(tab==3?View.VISIBLE:View.GONE);repositoryNav.active(tab==3);downloadNav.active(tab==0);localNav.active(tab==1);onlineNav.active(tab==2);
+        repoHint.setVisibility(tab==3?View.VISIBLE:View.GONE);if(repoMenu!=null)repoMenu.setVisibility(tab==3?View.VISIBLE:View.GONE);repositoryNav.active(tab==3);downloadNav.active(tab==0);localNav.active(tab==1);onlineNav.active(tab==2);
         if(tab==0)buildDownload();else if(tab==1)buildShelf();else if(tab==3)content.addView(RepositoryPanel.create(this),new LinearLayout.LayoutParams(-1,-1));else buildOnline();render();
         if(tab==2&&resumed)refresh(true);
         if(predictiveBack!=null)predictiveBack.refresh();
@@ -283,7 +282,7 @@ public final class MainActivity extends Activity {
     private boolean navAllowed(){return !keyboardVisible&&!privateShelf&&!(tab==1&&!folderId.isEmpty());}
     private void clearEditorCursor(){
         View focus=getCurrentFocus();
-        if(focus instanceof EditText)((EditText)focus).clearFocus();
+        if(focus instanceof EditText){((EditText)focus).setCursorVisible(false);((EditText)focus).clearFocus();}
     }
     private void updateNavVisibility(){
         if(nav==null)return;
@@ -307,17 +306,16 @@ public final class MainActivity extends Activity {
         list.setItemsCanFocus(true);
         AdaptiveLayout.capContentWidth(list,AdaptiveLayout.DOWNLOAD_LIST_PADDING_DP,AdaptiveLayout.DOWNLOAD_LIST_MAX_WIDTH_DP);
         LinearLayout header=new DownloadHeader(this),card=u.column();card.setPadding(u.dp(18),u.dp(20),u.dp(18),u.dp(18));u.round(card,u.card,22);card.addView(u.text("JM Comic",18,u.ink,true));u.space(card,16);
-        input=new EditText(this);input.setId(1001);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(u.ink);input.setHintTextColor(u.muted);input.setHint("输入 JM 编号或链接");input.setText(draft);input.setPadding(u.dp(15),0,u.dp(15),0);input.setSelectAllOnFocus(true);u.round(input,u.bg,14);card.addView(input,new LinearLayout.LayoutParams(-1,u.dp(52)));u.space(card,14);
+        input=new EditText(this);input.setId(1001);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(u.ink);input.setHintTextColor(u.muted);input.setHint("输入 JM 编号或链接");input.setText(draft);input.setPadding(u.dp(15),0,u.dp(15),0);input.setCursorVisible(false);input.setSelectAllOnFocus(false);u.round(input,u.bg,14);card.addView(input,new LinearLayout.LayoutParams(-1,u.dp(52)));u.space(card,14);
         actionSlot=new FrameLayout(this);downloadActions=u.row();start=u.button("开始下载",true);start.setTextSize(14);start.setMinHeight(u.dp(48));start.setId(1002);start.setOnClickListener(v->download());LinearLayout.LayoutParams d=new LinearLayout.LayoutParams(0,u.dp(48),1);d.setMargins(0,0,u.dp(10),0);downloadActions.addView(start,d);TextView online=u.button("在线阅读",false);online.setTextSize(14);online.setMinHeight(u.dp(48));online.setId(1003);online.setOnClickListener(v->online());downloadActions.addView(online,new LinearLayout.LayoutParams(0,u.dp(48),1));actionSlot.addView(downloadActions,new FrameLayout.LayoutParams(-1,u.dp(48)));card.addView(actionSlot,new LinearLayout.LayoutParams(-1,-2));header.addView(card);u.space(header,12);
         Ui.clearable(input);
-        input.setOnClickListener(v->v.requestFocus());
+        input.setOnClickListener(v->{input.setCursorVisible(true);v.requestFocus();});
         LinearLayout searchCard=u.row();searchCard.setPadding(u.dp(10),0,u.dp(8),0);u.round(searchCard,u.card,18);
         Ui.Icon find=u.icon("search",u.muted);find.glyphScale=.8f;find.setMinimumWidth(0);find.setMinimumHeight(0);searchCard.addView(find,new LinearLayout.LayoutParams(u.dp(30),u.dp(54)));
-        searchInput=new EditText(this);searchInput.setId(1006);searchInput.setSingleLine(true);searchInput.setTextSize(15);searchInput.setTextColor(u.ink);searchInput.setHintTextColor(u.muted);searchInput.setHint("搜索全网漫画");searchInput.setText(searchDraft);searchInput.setBackgroundColor(Color.TRANSPARENT);searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);searchInput.setPadding(u.dp(6),0,u.dp(6),0);
+        searchInput=new EditText(this);searchInput.setId(1006);searchInput.setSingleLine(true);searchInput.setTextSize(15);searchInput.setTextColor(u.ink);searchInput.setHintTextColor(u.muted);searchInput.setHint("搜索全网漫画");searchInput.setText(searchDraft);searchInput.setCursorVisible(false);searchInput.setBackgroundColor(Color.TRANSPARENT);searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);searchInput.setPadding(u.dp(6),0,u.dp(6),0);
         Ui.magicWandHint(searchInput);Ui.clearable(searchInput);
-        searchInput.setOnClickListener(v->v.requestFocus());
+        searchInput.setOnClickListener(v->{searchInput.setCursorVisible(true);v.requestFocus();});
         searchInput.setOnEditorActionListener((v,actionId,event)->{if(actionId==EditorInfo.IME_ACTION_SEARCH){searchOnline();return true;}return false;});
-        if(tabletDevice){View.OnFocusChangeListener keepJmInputVisible=(v,hasFocus)->{if(!hasFocus||list==null)return;list.post(()->{if(list!=null)list.setSelectionFromTop(0,0);});list.postDelayed(()->{if(list!=null&&v.hasFocus())list.setSelectionFromTop(0,0);},180);};input.setOnFocusChangeListener(keepJmInputVisible);}
         searchCard.addView(searchInput,new LinearLayout.LayoutParams(0,u.dp(54),1));
         TextView searchGo=u.text("搜索",13,Color.WHITE,true);searchGo.setGravity(Gravity.CENTER);u.round(searchGo,Ui.BLUE,14);searchGo.setPadding(u.dp(14),0,u.dp(14),0);searchGo.setOnClickListener(v->searchOnline());
         LinearLayout.LayoutParams searchGoParams=new LinearLayout.LayoutParams(u.dp(56),u.dp(36));searchGoParams.setMargins(0,0,u.dp(2),0);searchCard.addView(searchGo,searchGoParams);
@@ -488,11 +486,12 @@ public final class MainActivity extends Activity {
         final String id;try{id=JmApi.parseId(input.getText().toString());}catch(IllegalArgumentException e){input.setError("请输入有效编号或 JM 链接");return;}
         draft=input.getText().toString();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
         starting=true;
-        withLocalDownload(id,()->{BackPreview.capture(getWindow().getDecorView());startActivity(new Intent().setClassName(this,"com.joe.jmlite.MihonEntryActivity").putExtra("source_jm_id",id).putExtra("title","JM"+id+" · 在线阅读"));});
+        withLocalDownload(id,true,()->{BackPreview.capture(getWindow().getDecorView());startActivity(new Intent().setClassName(this,"com.joe.jmlite.MihonEntryActivity").putExtra("source_jm_id",id).putExtra("title","JM"+id+" · 在线阅读"));});
     }
     /** Both the download and online buttons share the same existing-shelf prompt. */
-    private void withLocalDownload(String id,Runnable proceed){
-        disk.execute(()->{try{JSONObject b=new Library(this).findLocalDownload(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null){DownloadCollision.show(this,b);return;}proceed.run();});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
+    private void withLocalDownload(String id,Runnable proceed){withLocalDownload(id,false,proceed);}
+    private void withLocalDownload(String id,boolean openLocal,Runnable proceed){
+        disk.execute(()->{try{JSONObject b=new Library(this).findLocalDownload(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null){if(openLocal)DownloadCollision.openLocal(this,b);else DownloadCollision.show(this,b);return;}proceed.run();});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
     }
     private void searchOnline(){
         if(searchInput==null)return;
@@ -1079,7 +1078,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
