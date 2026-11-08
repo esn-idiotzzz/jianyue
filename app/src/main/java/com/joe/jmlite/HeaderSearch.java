@@ -47,7 +47,7 @@ public final class HeaderSearch {
         box=new FrameLayout(activity);slot.addView(box,new FrameLayout.LayoutParams(-1,ui.dp(44),Gravity.CENTER_VERTICAL));
         icon=ui.icon("search",ui.ink);icon.setContentDescription(hint);box.addView(icon,new FrameLayout.LayoutParams(ui.dp(44),-1,Gravity.END));
         editor=ui.row();editor.setVisibility(View.GONE);
-        input=new EditText(activity);input.setHint(hint);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(ui.ink);input.setHintTextColor(ui.muted);input.setBackgroundColor(Color.TRANSPARENT);input.setPadding(ui.dp(12),0,ui.dp(6),0);input.setCursorVisible(false);input.setOnClickListener(v->input.setCursorVisible(true));Ui.clearable(input);
+        input=new EditText(activity);input.setHint(hint);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(ui.ink);input.setHintTextColor(ui.muted);input.setBackgroundColor(Color.TRANSPARENT);input.setPadding(ui.dp(12),0,ui.dp(6),0);input.setCursorVisible(false);input.setOnClickListener(v->input.setCursorVisible(true));Ui.clearable(input);Ui.bindCursorToIme(input);
         editor.addView(input,new LinearLayout.LayoutParams(0,-1,1));
         TextView close=ui.text("×",25,ui.muted,false);close.setGravity(Gravity.CENTER);close.setContentDescription("关闭搜索");editor.addView(close,new LinearLayout.LayoutParams(ui.dp(40),-1));
         box.addView(editor,new FrameLayout.LayoutParams(-1,-1));

@@ -47,7 +47,7 @@ class MihonEntryActivity : Activity() {
             try {
                 val directJmId = intent.getStringExtra("source_jm_id")
                 if (directJmId != null) {
-                    withContext(Dispatchers.IO) { OnlineRepository.directJmRead(this@MihonEntryActivity, directJmId) }
+                    withContext(Dispatchers.IO) { OnlineRepository.directJmRead(this@MihonEntryActivity, directJmId, intent.getBooleanExtra("start_over", true)) }
                     if (!isFinishing) finish()
                     return@launch
                 }

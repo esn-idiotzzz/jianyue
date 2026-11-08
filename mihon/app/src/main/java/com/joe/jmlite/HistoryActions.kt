@@ -34,7 +34,7 @@ object HistoryActions {
                 val chapter=chapters.find{it.url==record.optString("lastChapterUrl")} ?: chapters.find{it.lastPageRead>0&&!it.read} ?: chapters.maxByOrNull{it.sourceOrder}
                 withContext(Dispatchers.Main){if(!activity.isDestroyed&&!activity.isFinishing){
                     if(manga!=null&&chapter!=null) OnlineRepository.openChapter(activity,manga.id,chapter.id,false)
-                    else if(jm) activity.startActivity(Intent(activity,MihonEntryActivity::class.java).putExtra("online_id",record.getString("url")).putExtra("title",record.optString("title")))
+                    else if(jm) activity.startActivity(Intent(activity,MihonEntryActivity::class.java).putExtra("source_jm_id",record.getString("url")).putExtra("start_over",false).putExtra("title",record.optString("title")))
                     else activity.startActivity(Intent(activity,OnlineMangaActivity::class.java).putExtra("sourceId",source).putExtra("url",url).putExtra("title",record.optString("title")))
                 }}
             } catch(e:Exception){withContext(Dispatchers.Main){if(!activity.isDestroyed)android.widget.Toast.makeText(activity,"无法继续阅读：${e.message}",1).show()}}

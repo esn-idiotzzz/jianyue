@@ -130,6 +130,7 @@ object RepositoryPanel {
         val search=ui.row().apply{setPadding(ui.dp(12),0,ui.dp(8),0);background=ui.shape(ui.card,16)}
         search.addView(Ui(activity).icon("search",ui.muted),LinearLayout.LayoutParams(ui.dp(26),ui.dp(26)))
         val input=EditText(activity).apply{hint="搜索图源";setSingleLine();textSize=15f;setTextColor(ui.ink);setHintTextColor(ui.muted);setBackgroundColor(Color.TRANSPARENT);setPadding(ui.dp(8),0,0,0)}
+        Ui.bindCursorToIme(input)
         Ui.clearable(input)
         search.addView(input,LinearLayout.LayoutParams(0,ui.dp(48),1f))
         root.addView(search,LinearLayout.LayoutParams(-1,ui.dp(48)).apply{setMargins(ui.dp(18),ui.dp(4),ui.dp(18),0)})

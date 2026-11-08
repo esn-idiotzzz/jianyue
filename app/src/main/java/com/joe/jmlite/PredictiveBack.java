@@ -236,7 +236,7 @@ public final class PredictiveBack implements AutoCloseable {
             if(Build.VERSION.SDK_INT>=28)window.setNavigationBarDividerColor(android.graphics.Color.TRANSPARENT);
             if(Build.VERSION.SDK_INT>=29)window.setNavigationBarContrastEnforced(false);
             View decor=window.getDecorView();androidx.core.view.WindowCompat.getInsetsController(window,decor).setAppearanceLightNavigationBars(androidx.core.view.WindowCompat.getInsetsController(activity.getWindow(),activity.getWindow().getDecorView()).isAppearanceLightNavigationBars());
-            decor.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),ui.dp(16));}});decor.setClipToOutline(true);
+            decor.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),ui.dp(16));}});decor.setClipToOutline(true);decor.setPadding(ui.dp(16),ui.dp(10),ui.dp(16),ui.dp(8));
             dialog.setOnShowListener(shown->{
                 android.widget.ListView list=dialog.getListView();
                 if(list==null)return;

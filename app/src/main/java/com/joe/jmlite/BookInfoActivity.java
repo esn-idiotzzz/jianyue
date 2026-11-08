@@ -57,7 +57,7 @@ public final class BookInfoActivity extends Activity {
         FrameLayout cover=new FrameLayout(this);cover.setBackground(u.shape(u.tint,18));cover.setClipToOutline(true);cover.setElevation(u.dp(6));
         TextView mark=u.text("JM",22,Ui.BLUE,true);mark.setGravity(Gravity.CENTER);cover.addView(mark,new FrameLayout.LayoutParams(-1,-1));
         coverImage=new ImageView(this);coverImage.setScaleType(ImageView.ScaleType.CENTER_CROP);coverImage.setTag(book);cover.addView(coverImage,new FrameLayout.LayoutParams(-1,-1));
-        covers.load(coverImage,book);
+        loadCover();
         LinearLayout.LayoutParams coverParams=new LinearLayout.LayoutParams(u.dp(120),u.dp(168));coverParams.bottomMargin=u.dp(18);content.addView(cover,coverParams);
 
         nameView=u.text(book.optString("title","未命名"),20,u.ink,true);nameView.setGravity(Gravity.CENTER);nameView.setMaxLines(2);nameView.setEllipsize(android.text.TextUtils.TruncateAt.END);content.addView(nameView,new LinearLayout.LayoutParams(-1,-2));
@@ -111,6 +111,7 @@ public final class BookInfoActivity extends Activity {
     }
     @Override protected void onResume(){super.onResume();if(predictiveBack!=null)predictiveBack.reinstall();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
+    private void loadCover(){if(book==null)return;String thumb=book.optString("thumbnail");if(thumb.startsWith("http"))RemoteCovers.load(coverImage,thumb,OnlineHistory.isJm(book)?0L:book.optLong("sourceId"));else covers.load(coverImage,book);}
     @Override protected void onDestroy(){if(backPreview&&isFinishing()&&!isChangingConfigurations())BackPreview.pop();if(predictiveBack!=null)predictiveBack.close();disk.shutdownNow();covers.close();super.onDestroy();}
 
     private static String plate(JSONObject b){
@@ -138,7 +139,7 @@ public final class BookInfoActivity extends Activity {
                 if(record!=null){
                     try{for(Iterator<String> keys=record.keys();keys.hasNext();){String field=keys.next();book.put(field,record.get(field));}}catch(Exception ignored){}
                     if(!book.optString("title").isEmpty())nameView.setText(book.optString("title"));
-                    if(!book.optString("thumbnail").isEmpty())covers.load(coverImage,book);
+                    loadCover();
                 }
                 pages.setText(OnlineHistory.readingLabel(book));
             });
@@ -241,7 +242,12 @@ public final class BookInfoActivity extends Activity {
     private void read(boolean fromStart){
         Intent intent=new Intent().setClassName(this,"com.joe.jmlite.MihonEntryActivity").putExtra("title",book.optString("title","未命名"));
         if(onlineJm){
-            intent.putExtra("online_id",onlineId(book));
+            JSONObject local=null;
+            if(getIntent().getBooleanExtra("prefer_local",false)){
+                try{local=new Library(this).findLocalDownload(onlineId(book));}catch(Exception ignored){}
+            }
+            if(local!=null){intent.putExtra("library_key",Library.key(local));}
+            else {intent.putExtra("source_jm_id",onlineId(book));intent.putExtra("start_over",fromStart);}
         }else if(book.has("key"))intent.putExtra("library_key",book.optString("key"));
         else if(book.has("uri"))intent.putExtra("tree",book.optString("uri"));
         else intent.putExtra("id",book.optString("id"));

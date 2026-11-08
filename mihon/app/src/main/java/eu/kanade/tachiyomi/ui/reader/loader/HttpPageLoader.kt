@@ -51,8 +51,9 @@ internal class HttpPageLoader(
                 it.chapter = chapter
             }
         }
-            .also {
-                it.loadByRollingChunked(0, 1, 1)
+            .also { pages ->
+                val anchor = chapter.chapter.lastPageRead.coerceIn(0, pages.lastIndex.coerceAtLeast(0))
+                pages.loadByRollingChunked(anchor, 3, 6)
             }
     }
 
@@ -78,7 +79,7 @@ internal class HttpPageLoader(
 
         val pages = page.chapter.pages.orEmpty()
         if (page.index !in pages.indices) return@withContext
-        pages.loadByRollingChunked(page.index, 3, 5) { chunks ->
+        pages.loadByRollingChunked(page.index, 6, 8) { chunks ->
             val continueLoading = chunks.take(2).flatten().map { it.index }.toSet()
             downloadJobs.keys.filter { it !in continueLoading }
                 .forEach { downloadJobs.remove(it)?.cancel() }
@@ -163,14 +164,12 @@ internal class HttpPageLoader(
         val window = if (canLoadAhead()) items.indices else (index - 1)..(index + LIMITED_PAGES_AHEAD)
         val chunks = buildList {
             items.getOrNull(index)?.let(::add)
-            items.getOrNull(index - 1)?.let(::add)
-            items.getOrNull(index + 1)?.let(::add)
-            // `items.lastIndex`, not the list being built, whose lastIndex is at most 2 here
-            if (index < items.lastIndex - 1) {
-                items.subList(index + 2, items.size).let(::addAll)
-            }
-            if (index > 1) {
-                items.subList(0, index - 1).reversed().let(::addAll)
+            // Current page first, then expand symmetrically up and down. This keeps both the
+            // previous and next pages warm instead of spending the first chunk only ahead.
+            val reach = maxOf(index, items.lastIndex - index)
+            for (distance in 1..reach) {
+                items.getOrNull(index - distance)?.let(::add)
+                items.getOrNull(index + distance)?.let(::add)
             }
         }
             .filter { it.index in window }
@@ -262,4 +261,4 @@ internal class HttpPageLoader(
     }
 }
 
-private const val LIMITED_PAGES_AHEAD = 4
+private const val LIMITED_PAGES_AHEAD = 8

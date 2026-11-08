@@ -270,7 +270,7 @@ object OnlineRepository {
     }
 
     /** Search the bundled 禁漫天堂 source by JM id and open its first chapter directly. */
-    suspend fun directJmRead(context: Context, query: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun directJmRead(context: Context, query: String, fromStart: Boolean = true): Boolean = withContext(Dispatchers.IO) {
         val sources = ensureChineseSources(context) {}
         val source = sources.firstOrNull {
             it.name.contains("禁漫") || it.name.contains("Jinman", ignoreCase = true) ||
@@ -282,8 +282,8 @@ object OnlineRepository {
         val manga = page.mangas.firstOrNull() ?: throw IllegalStateException("禁漫天堂未找到编号 $query")
         val details = loadDetails(context, source.id, manga.url, manga.title, manga.thumbnail_url)
         DirectJmHistory.mark(details.manga.id, query)
-        val chapter = details.chapters.lastOrNull() ?: throw IllegalStateException("该漫画暂无章节")
-        openChapter(context, details.manga.id, chapter.id, true)
+        val chapter = (if(fromStart) details.chapters.lastOrNull() else details.chapters.firstOrNull { it.lastPageRead > 0 && !it.read }) ?: details.chapters.lastOrNull() ?: throw IllegalStateException("该漫画暂无章节")
+        openChapter(context, details.manga.id, chapter.id, fromStart)
         true
     }
     suspend fun openChapter(

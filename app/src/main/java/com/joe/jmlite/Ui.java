@@ -40,6 +40,15 @@ final class Ui {
         tint = dark ? 0xff202f4a : 0xffeaf1ff;
     }
     int dp(float n) { return (int)(n * c.getResources().getDisplayMetrics().density + .5f); }
+    /** Caret exists only while the IME is visible and the field is focused. */
+    static void bindCursorToIme(EditText input){
+        input.setCursorVisible(false);
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(input,(v,insets)->{
+            boolean ime=insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime());
+            if(!ime)input.setCursorVisible(false);else if(input.isFocused())input.setCursorVisible(true);
+            return insets;
+        });
+    }
     static void magicWandHint(EditText input){
         final Drawable wand=input.getContext().getDrawable(eu.kanade.tachiyomi.R.drawable.magic_wand);
         final int size=Math.max(1,Math.round(input.getTextSize()));wand.setBounds(0,0,size,size);
@@ -58,7 +67,7 @@ final class Ui {
             @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
             @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
         };clear.setBounds(0,0,ui.dp(28),ui.dp(28));input.setCompoundDrawablePadding(ui.dp(5));
-        Runnable paint=()->input.setCompoundDrawablesRelative(original[0],original[1],input.length()>0?clear:original[2],original[3]);
+        final Boolean[] shown={null};Runnable paint=()->{boolean has=input.length()>0;if(shown[0]!=null&&shown[0]==has)return;shown[0]=has;input.setCompoundDrawablesRelative(original[0],original[1],has?clear:original[2],original[3]);};
         input.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void afterTextChanged(Editable s){paint.run();}public void onTextChanged(CharSequence s,int start,int before,int count){}});
         final boolean[] pressed={false};input.setOnTouchListener((v,event)->{
             boolean rtl=input.getLayoutDirection()==View.LAYOUT_DIRECTION_RTL;

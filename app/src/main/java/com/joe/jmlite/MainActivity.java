@@ -146,8 +146,7 @@ public final class MainActivity extends Activity {
         stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));content=u.column();stage.addView(content,new FrameLayout.LayoutParams(-1,-1));
         nav=new CapsuleNav();
         downloadNav=new NavItem(0,"browse","浏览");localNav=new NavItem(1,"shelf","书架");onlineNav=new NavItem(2,"history","历史");repositoryNav=new NavItem(3,"repository","仓库");
-        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(58),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);nav.setOnDragListener((v,e)->shelfCapsuleDrag(e));setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;int imeBottom=keyboard?insets.getInsets(WindowInsetsCompat.Type.ime()).bottom:0;v.setPadding(bars.left,bars.top,bars.right,imeBottom);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(shelfDropPill!=null){FrameLayout.LayoutParams pillParams=(FrameLayout.LayoutParams)shelfDropPill.getLayoutParams();if(pillParams.bottomMargin!=margin){pillParams.bottomMargin=margin;shelfDropPill.setLayoutParams(pillParams);}}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}keyboardVisible=keyboard;updateNavVisibility();return insets;});
-        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);boolean wasKeyboard=keyboardVisible;keyboardVisible=keyboard;if(wasKeyboard&&!keyboard)clearEditorCursor();updateNavVisibility();});
+        nav.addView(localNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(downloadNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(onlineNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));nav.addView(repositoryNav,new LinearLayout.LayoutParams(u.dp(60),u.dp(46)));FrameLayout.LayoutParams capsule=new FrameLayout.LayoutParams(-2,u.dp(58),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);capsule.bottomMargin=u.dp(4);stage.addView(nav,capsule);nav.setOnDragListener((v,e)->shelfCapsuleDrag(e));setContentView(root);ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());boolean keyboard=insets.isVisible(WindowInsetsCompat.Type.ime());navigationInset=insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;v.setPadding(bars.left,bars.top,bars.right,0);FrameLayout.LayoutParams navParams=(FrameLayout.LayoutParams)nav.getLayoutParams();int margin=u.dp(4)+navigationInset;if(navParams.bottomMargin!=margin){navParams.bottomMargin=margin;nav.setLayoutParams(navParams);}if(shelfDropPill!=null){FrameLayout.LayoutParams pillParams=(FrameLayout.LayoutParams)shelfDropPill.getLayoutParams();if(pillParams.bottomMargin!=margin){pillParams.bottomMargin=margin;shelfDropPill.setLayoutParams(pillParams);}}if(grid!=null&&tab!=0){int padding=u.dp(privateShelf?20:88)+navigationInset;if(grid.getPaddingBottom()!=padding)grid.setPadding(grid.getPaddingLeft(),grid.getPaddingTop(),grid.getPaddingRight(),padding);}if(list!=null&&tab==0){int padding=u.dp(88)+navigationInset;if(list.getPaddingBottom()!=padding)list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),padding);}boolean wasKeyboard=keyboardVisible;keyboardVisible=keyboard;if(wasKeyboard&&!keyboard)clearEditorCursor();updateNavVisibility();return insets;});
         buildTab();
         firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();ForegroundUpdates.checkAfterGuide();});
         predictiveBack=new PredictiveBack(this,root,()->firstRunGuide==null||!firstRunGuide.isShowing(),()->!shelfSearch.isExpanded()&&(tab!=1||(!privateShelf&&folderId.isEmpty())),()->!shelfSearch.isExpanded()&&tab==1&&(privateShelf||!folderId.isEmpty()),this::onBackPressed);predictiveBack.setPreview(()->BackPreview.install(this));
@@ -280,7 +279,7 @@ public final class MainActivity extends Activity {
         if(predictiveBack!=null)predictiveBack.refresh();
         updateNavVisibility();
     }
-    private boolean navAllowed(){return !keyboardVisible&&!privateShelf&&!(tab==1&&!folderId.isEmpty());}
+    private boolean navAllowed(){return !privateShelf&&!(tab==1&&!folderId.isEmpty());}
     private void clearEditorCursor(){
         View focus=getCurrentFocus();
         if(focus instanceof EditText){((EditText)focus).setCursorVisible(false);((EditText)focus).clearFocus();}
@@ -289,7 +288,6 @@ public final class MainActivity extends Activity {
         if(nav==null)return;
         // The stage is already inset above the keyboard; hide before the first keyboard frame
         // instead of animating the capsule up over the IME and then fading it out.
-        if(keyboardVisible){navVisibleTarget=false;nav.animate().cancel();nav.animate().withEndAction(null);nav.setVisibility(View.GONE);return;}
         boolean show=navAllowed();
         if(navVisibleTarget!=null&&navVisibleTarget==show)return;
         boolean initial=navVisibleTarget==null;navVisibleTarget=show;
@@ -309,12 +307,12 @@ public final class MainActivity extends Activity {
         LinearLayout header=new DownloadHeader(this),card=u.column();card.setPadding(u.dp(18),u.dp(20),u.dp(18),u.dp(18));u.round(card,u.card,22);card.addView(u.text("JM Comic",18,u.ink,true));u.space(card,16);
         input=new EditText(this);input.setId(1001);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(u.ink);input.setHintTextColor(u.muted);input.setHint("输入 JM 编号或链接");input.setText(draft);input.setPadding(u.dp(15),0,u.dp(15),0);input.setCursorVisible(false);input.setSelectAllOnFocus(false);u.round(input,u.bg,14);card.addView(input,new LinearLayout.LayoutParams(-1,u.dp(52)));u.space(card,14);
         actionSlot=new FrameLayout(this);downloadActions=u.row();start=u.button("开始下载",true);start.setTextSize(14);start.setMinHeight(u.dp(48));start.setId(1002);start.setOnClickListener(v->download());LinearLayout.LayoutParams d=new LinearLayout.LayoutParams(0,u.dp(48),1);d.setMargins(0,0,u.dp(10),0);downloadActions.addView(start,d);TextView online=u.button("在线阅读",false);online.setTextSize(14);online.setMinHeight(u.dp(48));online.setId(1003);online.setOnClickListener(v->online());downloadActions.addView(online,new LinearLayout.LayoutParams(0,u.dp(48),1));actionSlot.addView(downloadActions,new FrameLayout.LayoutParams(-1,u.dp(48)));card.addView(actionSlot,new LinearLayout.LayoutParams(-1,-2));header.addView(card);u.space(header,12);
-        Ui.clearable(input);
+        Ui.clearable(input);Ui.bindCursorToIme(input);
         input.setOnClickListener(v->{input.setCursorVisible(true);v.requestFocus();});
         LinearLayout searchCard=u.row();searchCard.setPadding(u.dp(10),0,u.dp(8),0);u.round(searchCard,u.card,18);
         Ui.Icon find=u.icon("search",u.muted);find.glyphScale=.8f;find.setMinimumWidth(0);find.setMinimumHeight(0);searchCard.addView(find,new LinearLayout.LayoutParams(u.dp(30),u.dp(54)));
         searchInput=new EditText(this);searchInput.setId(1006);searchInput.setSingleLine(true);searchInput.setTextSize(15);searchInput.setTextColor(u.ink);searchInput.setHintTextColor(u.muted);searchInput.setHint("搜索全网漫画");searchInput.setText(searchDraft);searchInput.setCursorVisible(false);searchInput.setBackgroundColor(Color.TRANSPARENT);searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);searchInput.setPadding(u.dp(6),0,u.dp(6),0);
-        Ui.magicWandHint(searchInput);Ui.clearable(searchInput);
+        Ui.magicWandHint(searchInput);Ui.clearable(searchInput);Ui.bindCursorToIme(searchInput);
         searchInput.setOnClickListener(v->{searchInput.setCursorVisible(true);v.requestFocus();});
         searchInput.setOnEditorActionListener((v,actionId,event)->{if(actionId==EditorInfo.IME_ACTION_SEARCH){searchOnline();return true;}return false;});
         searchCard.addView(searchInput,new LinearLayout.LayoutParams(0,u.dp(54),1));
@@ -487,7 +485,7 @@ public final class MainActivity extends Activity {
         final String id;try{id=JmApi.parseId(input.getText().toString());}catch(IllegalArgumentException e){input.setError("请输入有效编号或 JM 链接");return;}
         draft=input.getText().toString();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);
         starting=true;
-        withLocalDownload(id,true,()->{BackPreview.capture(getWindow().getDecorView());startActivity(new Intent().setClassName(this,"com.joe.jmlite.MihonEntryActivity").putExtra("source_jm_id",id).putExtra("title","JM"+id+" · 在线阅读"));});
+        withLocalDownload(id,true,()->{BackPreview.capture(getWindow().getDecorView());startActivity(new Intent().setClassName(this,"com.joe.jmlite.MihonEntryActivity").putExtra("source_jm_id",id).putExtra("start_over",true).putExtra("title","JM"+id+" · 在线阅读"));});
     }
     /** Both the download and online buttons share the same existing-shelf prompt. */
     private void withLocalDownload(String id,Runnable proceed){withLocalDownload(id,false,proceed);}
@@ -970,14 +968,14 @@ public final class MainActivity extends Activity {
             return;
         }
         final String target=parent;final String key=Library.key(item);final boolean unfavorite=isFavorite(item)&&!inFavoriteTree(target);
-        libraryBooks.removeIf(b->key.equals(Library.key(b)));folderCovers=FolderCoverIndex.from(libraryBooks,bookFolders);rowsSnapshot="";render();
-        mutate(()->{library.move(key,target);if(unfavorite)library.favorite(key,false);});
+        try{item.put("folder",target);if(unfavorite)item.put("favorite",false);}catch(Exception ignored){}folderCovers=FolderCoverIndex.from(libraryBooks,bookFolders);rowsSnapshot="";render();
+        mutate(()->library.moveWithFavorite(key,target,unfavorite));
     }
     private void moveLastBookOut(JSONObject item,String parent,String leaving){
         if(operation){toast("请等待当前操作完成");return;}
         operation=true;final String key=Library.key(item);
         disk.execute(()->{String error=null;boolean local=false;
-            try{library.move(key,parent);if(inFavoriteTree(leaving)&&!inFavoriteTree(parent))library.favorite(key,false);}catch(Library.LocalComicException e){local=true;}catch(Exception e){error=e.getMessage();}
+            try{library.moveWithFavorite(key,parent,inFavoriteTree(leaving)&&!inFavoriteTree(parent));}catch(Library.LocalComicException e){local=true;}catch(Exception e){error=e.getMessage();}
             String msg=error;boolean rejected=local;
             runOnUiThread(()->{operation=false;if(isDestroyed())return;
                 if(rejected)showLocalComicHint();else if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);
@@ -1088,7 +1086,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.3").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -1187,12 +1185,12 @@ public final class MainActivity extends Activity {
         }
         void bind(JSONObject book,boolean show){
             image.setTag(book);image.setVisibility(show?View.VISIBLE:View.INVISIBLE);
-            boolean next=show&&book.has("sourceId")&&!OnlineHistory.isJm(book)&&(!book.optBoolean("download_history")||book.optString("thumbnail").startsWith("https://"));
+            boolean next=show&&book.optString("thumbnail").startsWith("http");
             if(remote&&!next)RemoteCovers.load(image,"",0L);
             if(!remote&&next)covers.clear(image);
             remote=next;
             if(!show){covers.clear(image);return;}
-            if(remote)RemoteCovers.load(image,book.optString("thumbnail"),book.optLong("sourceId"));else covers.load(image,book);
+            if(remote)RemoteCovers.load(image,book.optString("thumbnail"),OnlineHistory.isJm(book)?0L:book.optLong("sourceId"));else covers.load(image,book);
         }
     }
     private FrameLayout cover(JSONObject book,boolean show){BookCover cover=new BookCover();cover.bind(book,show);return cover;}

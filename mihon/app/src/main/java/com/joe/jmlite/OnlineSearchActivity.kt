@@ -79,6 +79,7 @@ class OnlineSearchActivity : Activity() {
         }
         queryInput.setOnClickListener{queryInput.setCursorVisible(true)}
         Ui.clearable(queryInput)
+        Ui.bindCursorToIme(queryInput)
         val header=ui.header(if(sourceMode) intent.getStringExtra("sourceName").orEmpty() else "搜索全网漫画") {
             if(searchExpanded) toggleSearch?.invoke(false) else finish()
         }
