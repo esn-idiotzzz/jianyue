@@ -134,7 +134,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle b){
         if(b==null&&isTaskRoot())PrivacyVault.resetSession();
-        super.onCreate(b);clearReaderCacheOnce();getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
+        super.onCreate(b);SessionCovers.install(this);clearReaderCacheOnce();getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
         if(b!=null){tab=b.getInt("tab",1);draft=b.getString("draft","");searchDraft=b.getString("search","");folderId=b.getString("folder","");taskId=b.getString("task_id","");pendingShelfScroll=b.getInt("shelf_scroll",-1);}
         library.preserveFolder(folderId);
         LinearLayout root=u.column();root.setBackgroundColor(u.bg);Ui.insets(this,root,u.dark);
@@ -526,7 +526,7 @@ public final class MainActivity extends Activity {
     private void confirmRemoveOnline(JSONObject o){
         PredictiveBack.dialog(this).setTitle("移出在线记录？").setMessage(o.optString("title"))
                 .setNegativeButton("取消",null)
-                .setPositiveButton("移出",(d,n)->disk.execute(()->{try{new OnlineHistory(this,OnlineHistory.isJm(o)).remove(o.optString("sourceId"),o.optString("url"));}catch(Exception ignored){}runOnUiThread(this::refresh);}))
+                .setPositiveButton("移出",(d,n)->disk.execute(()->{try{new OnlineHistory(this,OnlineHistory.isJm(o)).remove(o.optString("sourceId"),o.optString("url"));HistoryCovers.delete(this,o);}catch(Exception ignored){}runOnUiThread(this::refresh);}))
                 .show();
     }
 
@@ -699,7 +699,7 @@ public final class MainActivity extends Activity {
         String action=shelf?"移除":"删除";
         PredictiveBack.dialog(this).setTitle(title).setMessage(message).setNegativeButton("取消",null).setPositiveButton(action,(x,y)->{
             operation=true;
-            disk.execute(()->{String error=null;try{if(shelf)library.delete(key);else new OnlineHistory(this,OnlineHistory.isJm(b)).remove(b.optString("sourceId"),b.optString("url"));}catch(Exception e){error=e.getMessage();}
+            disk.execute(()->{String error=null;try{if(shelf)library.delete(key);else {new OnlineHistory(this,OnlineHistory.isJm(b)).remove(b.optString("sourceId"),b.optString("url"));HistoryCovers.delete(this,b);}}catch(Exception e){error=e.getMessage();}
                 String msg=error;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(msg!=null)toast(msg.isEmpty()?"操作失败":msg);refresh(true);});
             });
         }).show();
@@ -757,14 +757,14 @@ public final class MainActivity extends Activity {
     }
     private void deleteHistoryRecords(ArrayList<JSONObject> records){
         if(operation)return;operation=true;
-        disk.execute(()->{String error=null;try{for(JSONObject b:records)new OnlineHistory(this,OnlineHistory.isJm(b)).remove(b.optString("sourceId"),b.optString("url"));}catch(Exception e){error=e.getMessage();}
+        disk.execute(()->{String error=null;try{for(JSONObject b:records){new OnlineHistory(this,OnlineHistory.isJm(b)).remove(b.optString("sourceId"),b.optString("url"));HistoryCovers.delete(this,b);}}catch(Exception e){error=e.getMessage();}
             String msg=error;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(msg!=null)toast(msg.isEmpty()?"删除失败":msg);setHistorySelection(false);refresh(true);});
         });
     }
     private void confirmClearHistory(){
         PredictiveBack.dialog(this).setTitle("删除全部在线历史？").setMessage("将删除 JM漫画和全网漫画的全部历史记录，不影响书架、隐私书架和收藏。").setNegativeButton("取消",null).setPositiveButton("全部删除",(d,n)->{
             if(operation)return;operation=true;
-            disk.execute(()->{String error=null;try{new OnlineHistory(this,true).clear();new OnlineHistory(this,false).clear();}catch(Exception e){error=e.getMessage();}
+            disk.execute(()->{String error=null;try{new OnlineHistory(this,true).clear();new OnlineHistory(this,false).clear();HistoryCovers.clear(this);}catch(Exception e){error=e.getMessage();}
                 String msg=error;runOnUiThread(()->{operation=false;if(isDestroyed())return;if(msg!=null)toast(msg.isEmpty()?"删除失败":msg);setHistorySelection(false);refresh(true);});
             });
         }).show();
@@ -1161,7 +1161,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -1265,7 +1265,7 @@ public final class MainActivity extends Activity {
             if(!remote&&next)covers.clear(image);
             remote=next;
             if(!show){covers.clear(image);return;}
-            if(remote)RemoteCovers.load(image,book.optString("thumbnail"),OnlineHistory.isJm(book)?0L:book.optLong("sourceId"));else covers.load(image,book);
+            if(remote){if(tab==2)HistoryCovers.load(image,MainActivity.this,book);else RemoteCovers.load(image,book.optString("thumbnail"),OnlineHistory.isJm(book)?0L:book.optLong("sourceId"));}else covers.load(image,book);
         }
     }
     private FrameLayout cover(JSONObject book,boolean show){BookCover cover=new BookCover();cover.bind(book,show);return cover;}

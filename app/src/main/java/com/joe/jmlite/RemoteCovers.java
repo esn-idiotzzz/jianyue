@@ -28,7 +28,7 @@ final class RemoteCovers {
         if (diskCache == null) diskCache = new CoverDiskCache(new File(context.getCacheDir(), "remote-covers"), 128L * 1024 * 1024);
         return diskCache;
     }
-    private static final LruCache<String, Bitmap> cache = new LruCache<String, Bitmap>(8 * 1024 * 1024) {
+    private static final LruCache<String, Bitmap> cache = new LruCache<String, Bitmap>(48 * 1024 * 1024) {
         @Override protected int sizeOf(String key, Bitmap value) { return value.getAllocationByteCount(); }
     };
     private static final OkHttpClient client = new OkHttpClient.Builder()
@@ -40,7 +40,17 @@ final class RemoteCovers {
 
     static void load(final ImageView view, final String url) { load(view, url, 0L); }
 
-    static void load(final ImageView view, final String url, final long sourceId) {
+    /** Warm a nearby tile without binding it; the same memory/disk cache is shared with load(). */
+    static void prefetch(final Context context, final String url, final long sourceId) {
+        if (context == null || url == null || url.isEmpty()) return;
+        final String key = sourceId + "|" + url;
+        if (cacheGet(key) != null) return;
+        requests.load(key, cancellation -> download(context, key, url, sourceId, cancellation), bitmap -> {
+            if (bitmap != null) cachePut(key, bitmap);
+        });
+    }
+    static void load(final ImageView view, final String url, final long sourceId) { load(view,url,sourceId,null); }
+    static void load(final ImageView view, final String url, final long sourceId, final Runnable onReady) {
         Object old = view.getTag(TAG);
         String key = sourceId + "|" + url;
         if (old instanceof Target) {
@@ -52,14 +62,16 @@ final class RemoteCovers {
         view.setImageDrawable(null);
         view.setTag(TAG, null);
         if (url == null || url.isEmpty()) return;
-        Target target = new Target(view, key, url, sourceId);
+        Target target = new Target(view, key, url, sourceId, onReady);
         view.setTag(TAG, target);
         view.addOnAttachStateChangeListener(target);
-        Bitmap ready = cache.get(key);
+        Bitmap ready = cacheGet(key);
         if (ready != null) view.setImageBitmap(ready);
         else if (view.isAttachedToWindow()) target.request();
     }
 
+    private static Bitmap cacheGet(String key){synchronized(cache){return cache.get(key);}}
+    private static void cachePut(String key,Bitmap value){synchronized(cache){cache.put(key,value);}}
     private static final class Target implements View.OnAttachStateChangeListener {
         final WeakReference<ImageView> image;
         final Context context;
@@ -67,23 +79,24 @@ final class RemoteCovers {
         final long sourceId;
         CoverRequests.Ticket ticket;
         long generation;
-        Target(ImageView view, String key, String url, long sourceId) {
+        final Runnable ready;
+        Target(ImageView view, String key, String url, long sourceId, Runnable ready) {
             image = new WeakReference<>(view);
             context = view.getContext().getApplicationContext();
-            this.key = key; this.url = url; this.sourceId = sourceId;
+            this.key = key; this.url = url; this.sourceId = sourceId; this.ready = ready;
         }
         void request() {
             ImageView view = image.get();
             if (view == null || view.getTag(TAG) != this || !view.isAttachedToWindow() || ticket != null) return;
             if (view.getDrawable() != null) return;
-            Bitmap ready = cache.get(key);
-            if (ready != null) { view.setImageBitmap(ready); return; }
+            Bitmap cached = cacheGet(key);
+            if (cached != null) { view.setImageBitmap(cached); if (ready != null) ready.run(); return; }
             long token = ++generation;
             ticket = requests.load(key, cancellation -> download(context, key, url, sourceId, cancellation), bitmap -> main.post(() -> {
                 if (token != generation) return;
                 ticket = null;
                 ImageView current = image.get();
-                if (bitmap != null && current != null && current.getTag(TAG) == this && current.isAttachedToWindow()) current.setImageBitmap(bitmap);
+                if (bitmap != null && current != null && current.getTag(TAG) == this && current.isAttachedToWindow()) { current.setImageBitmap(bitmap); if (ready != null) ready.run(); }
             }));
         }
         void cancel() { generation++; if (ticket != null) { ticket.cancel(); ticket = null; } }
@@ -100,13 +113,13 @@ final class RemoteCovers {
     private static Bitmap download(Context context, String key, String url, long sourceId,
             CoverRequests.Cancellation cancellation) throws Exception {
         if (cancellation.isCancelled()) return null;
-        Bitmap ready = cache.get(key);
+        Bitmap ready = cacheGet(key);
         if (ready != null) return ready;
         CoverDiskCache stored = disk(context);
         byte[] saved = stored.read(key);
         if (saved != null) {
             Bitmap bitmap = decode(saved);
-            if (bitmap != null) { cache.put(key, bitmap); return bitmap; }
+            if (bitmap != null) { cachePut(key, bitmap); return bitmap; }
             stored.remove(key);
         }
         if (cancellation.isCancelled()) return null;
@@ -135,7 +148,7 @@ final class RemoteCovers {
             data = bytes.toByteArray();
             bitmap = decode(data);
         }
-        if (bitmap != null && !cancellation.isCancelled()) { cache.put(key, bitmap); stored.write(key, data); }
+        if (bitmap != null && !cancellation.isCancelled()) { cachePut(key, bitmap); stored.write(key, data); }
         return bitmap;
     }
 

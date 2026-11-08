@@ -65,6 +65,7 @@ class OnlineSearchActivity : Activity() {
     private val sourceId by lazy { intent.getLongExtra("sourceId",0L) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SessionCovers.install(this)
         super.onCreate(savedInstanceState)
         PageMotion.enter(this)
         ui = OnlineUi(this)
@@ -186,6 +187,7 @@ class OnlineSearchActivity : Activity() {
             grid.setOnScrollListener(object:android.widget.AbsListView.OnScrollListener{
                 override fun onScrollStateChanged(view:android.widget.AbsListView?,state:Int){}
                 override fun onScroll(view:android.widget.AbsListView?,first:Int,count:Int,total:Int){
+                    scheduleCovers()
                     if(total>0&&first+count>=total&&hasNext&&!searching)grid.post{loadSource(false)}
                 }
             })
@@ -383,7 +385,25 @@ class OnlineSearchActivity : Activity() {
         status.movementMethod=LinkMovementMethod.getInstance()
         status.highlightColor=Color.TRANSPARENT
     }
-    private val refreshTask=Runnable { refreshScheduled=false;adapter.notifyDataSetChanged();completionSummary?.let{if(it.succeeded>0){status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}";appendFailedSourcesLink()}} }
+    private val refreshTask=Runnable { refreshScheduled=false;coverFirst=-1;coverLast=-1;adapter.notifyDataSetChanged();grid.post{scheduleCovers()};completionSummary?.let{if(it.succeeded>0){status.text="共找到 ${results.size} 部漫画 · 图源成功 ${it.succeeded}/${it.total}，失败 ${it.failed}";appendFailedSourcesLink()}} }
+    private var coverFirst = -1
+    private var coverLast = -1
+    private fun scheduleCovers(){
+        if(!::grid.isInitialized)return
+        val first=grid.firstVisiblePosition.coerceAtLeast(0)
+        val last=grid.lastVisiblePosition.coerceAtLeast(first)
+        if(first==coverFirst&&last==coverLast)return
+        coverFirst=first;coverLast=last
+        val anchor=(first+last)/2
+        for(position in first..last){if(position in results.indices){val item=results[position];SessionCovers.prefetch(this@OnlineSearchActivity,item.thumbnail,item.sourceId)}}
+        for(distance in 0..12){
+            for(position in intArrayOf(anchor-distance,anchor+distance)){
+                if(position !in results.indices)continue
+                val item=results[position]
+                SessionCovers.prefetch(this@OnlineSearchActivity,item.thumbnail,item.sourceId)
+            }
+        }
+    }
     private fun refreshResults(){ if(!refreshScheduled){refreshScheduled=true;grid.postDelayed(refreshTask,80)} }
     override fun onResume(){super.onResume();predictiveBack?.reinstall();if(::adapter.isInitialized){results.removeAll{ChapterAvailability.empty(this,it.sourceId,it.url)};adapter.notifyDataSetChanged()}}
     override fun onDestroy() {
@@ -412,15 +432,8 @@ class OnlineSearchActivity : Activity() {
             val holder=convertView as? ResultTile ?: ResultTile()
             holder.title.text=item.title
             holder.source.text=item.sourceName
-            RemoteCovers.load(holder.image,item.thumbnail,item.sourceId)
-            RemoteCovers.load(holder.image,item.thumbnail,item.sourceId)
-            for(offset in -4..4){
-                if(offset==0)continue
-                val nearby=position+offset
-                if(nearby !in results.indices)continue
-                val next=results[nearby]
-                RemoteCovers.prefetch(this@OnlineSearchActivity,next.thumbnail,next.sourceId)
-            }
+            SessionCovers.load(holder.image,item.thumbnail,item.sourceId)
+            scheduleCovers()
             return holder
         }
     }
@@ -459,8 +472,8 @@ class OnlineSearchActivity : Activity() {
                 }
             }
             coverFrame.addView(
-                ui.text("JM", 16, OnlineUi.BLUE, true).apply { gravity = Gravity.CENTER },
-                FrameLayout.LayoutParams(-1, -1),
+                Ui(this@OnlineSearchActivity).icon("book", OnlineUi.BLUE).apply { setMinimumWidth(0); setMinimumHeight(0); glyphScale = .72f },
+                FrameLayout.LayoutParams(ui.dp(22), ui.dp(22), Gravity.CENTER),
             )
             image = RoundedImageView(this@OnlineSearchActivity, ui.dp(12).toFloat()).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
