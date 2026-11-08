@@ -1,6 +1,7 @@
 package com.joe.jmlite;
 
 import android.app.Activity;
+import java.io.File;
 import android.app.AlertDialog;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -73,7 +74,7 @@ public final class MainActivity extends Activity {
     private ShelfAdapter shelfAdapter;
     private OnlineAdapter onlineAdapter;
     private int tab=1,refreshGeneration=0,pendingShelfScroll=-1;
-    private boolean resumed=false,reading=false,starting=false,operation=false,revealed=true,keyboardVisible;
+    private static boolean readerCacheCleared;private boolean resumed=false,reading=false,starting=false,operation=false,revealed=true,keyboardVisible;
     private String rowsSnapshot="",draft="",searchDraft="",taskId="",folderId="",highlightKey="";
     private boolean highlightScrollPending;
     private JSONObject pendingShare;
@@ -133,7 +134,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle b){
         if(b==null&&isTaskRoot())PrivacyVault.resetSession();
-        super.onCreate(b);getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
+        super.onCreate(b);clearReaderCacheOnce();getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
         if(b!=null){tab=b.getInt("tab",1);draft=b.getString("draft","");searchDraft=b.getString("search","");folderId=b.getString("folder","");taskId=b.getString("task_id","");pendingShelfScroll=b.getInt("shelf_scroll",-1);}
         library.preserveFolder(folderId);
         LinearLayout root=u.column();root.setBackgroundColor(u.bg);Ui.insets(this,root,u.dark);
@@ -1078,7 +1079,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.1").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.3.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -1100,7 +1101,25 @@ public final class MainActivity extends Activity {
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&predictiveBack!=null)predictiveBack.reinstall();}
     @Override protected void onPause(){cancelShelfMenu();hideShelfDropPill();super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);}
     @Override protected void onStop(){PageMotion.clearEntering(this);if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
-    @Override protected void onDestroy(){if(isFinishing()&&!isChangingConfigurations())SourceVisits.reset(this);resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
+    /** Online page files are session cache; a cold app launch starts with a clean reader cache. */
+    private void clearReaderCacheOnce(){
+        if(readerCacheCleared)return;readerCacheCleared=true;
+        clearReaderCacheNow();
+    }
+    private void clearReaderCacheNow(){
+        new Thread(()->{
+            deleteTree(new File(getCacheDir(),"chapter_cache"));
+            deleteTree(new File(getCacheDir(),"online"));
+            deleteTree(new File(getNoBackupFilesDir(),"chapter_cache"));
+        },"jm-clear-reader-cache").start();
+    }
+    private static void deleteTree(File file){
+        if(file==null||!file.exists())return;
+        File[] children=file.listFiles();
+        if(children!=null)for(File child:children)deleteTree(child);
+        file.delete();
+    }
+    @Override protected void onDestroy(){if(isFinishing()&&!isChangingConfigurations()){SourceVisits.reset(this);clearReaderCacheNow();}resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
     @Override public void onBackPressed(){if(firstRunGuide!=null&&firstRunGuide.isShowing())return;if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&(privateShelf||!folderId.isEmpty()))leaveFolder();else moveTaskToBack(true);}
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("draft",input==null?draft:input.getText().toString());b.putString("search",searchInput==null?searchDraft:searchInput.getText().toString());b.putString("folder",privateShelf?"":folderId);b.putString("task_id",taskId);b.putInt("shelf_scroll",grid==null?-1:grid.getFirstVisiblePosition());}
     private final class OnlineAdapter extends BaseAdapter {
