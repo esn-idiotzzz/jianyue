@@ -128,6 +128,11 @@ public final class OnlineHistory {
         }
     }
 
+    public void clear() throws Exception {
+        synchronized (LOCK) {
+            JSONObject root=state();root.put("items",new JSONArray());write(root);
+        }
+    }
     public void remove(String sourceId, String url) throws Exception {
         synchronized (LOCK) {
             JSONObject root = state();
