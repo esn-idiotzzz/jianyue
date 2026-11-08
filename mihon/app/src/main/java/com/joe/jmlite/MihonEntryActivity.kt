@@ -36,7 +36,7 @@ class MihonEntryActivity : Activity() {
             setBackgroundColor(ui.bg)
             addView(ProgressBar(this@MihonEntryActivity))
             addView(TextView(this@MihonEntryActivity).apply {
-                text = "正在打开阅读器…"
+                text = "正在加载callio~"
                 textSize = 14f
                 setTextColor(ui.muted)
                 setPadding(0, ui.dp(20f), 0, 0)
@@ -45,6 +45,12 @@ class MihonEntryActivity : Activity() {
         setContentView(box)
         scope.launch {
             try {
+                val directJmId = intent.getStringExtra("source_jm_id")
+                if (directJmId != null) {
+                    withContext(Dispatchers.IO) { OnlineRepository.directJmRead(this@MihonEntryActivity, directJmId) }
+                    if (!isFinishing) finish()
+                    return@launch
+                }
                 val target = withContext(Dispatchers.IO) { prepare(intent) }
                 if (!isFinishing) {
                     startActivity(target)

@@ -245,7 +245,6 @@ class OnlineMangaActivity : Activity() {
                 details = cached
                 sourceName = cached.sourceName
                 showDetails(cached)
-                showCacheNotice("已显示本地缓存，正在联网刷新…")
             }
             try {
                 val result = OnlineRepository.loadDetails(

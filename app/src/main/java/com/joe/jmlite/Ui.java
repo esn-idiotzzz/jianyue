@@ -102,6 +102,7 @@ final class Ui {
             else if("folder".equals(kind)){Path p=new Path();p.moveTo(-10,-5);p.lineTo(-10,8);p.lineTo(10,8);p.lineTo(10,-5);p.lineTo(0,-5);p.lineTo(-3,-8);p.lineTo(-10,-8);p.close();canvas.drawPath(p,pen);}
             else if("repository".equals(kind)){canvas.drawRoundRect(new RectF(-9,-7,9,9),2,2,pen);canvas.drawLine(-10,-3,10,-3,pen);canvas.drawLine(-3,2,3,2,pen);}
             else if("history".equals(kind)){canvas.drawCircle(0,0,9,pen);canvas.drawLine(0,-5,0,0,pen);canvas.drawLine(0,0,5,3,pen);}
+            else if("menu".equals(kind)){for(int y=-6;y<=6;y+=6)canvas.drawLine(-8,y,8,y,pen);}
             else if("search".equals(kind)){canvas.drawCircle(-2,-2,6.5f,pen);canvas.drawLine(3,3,9,9,pen);}
             else if("online".equals(kind)){canvas.drawCircle(0,0,9,pen);canvas.drawOval(new RectF(-4,-9,4,9),pen);canvas.drawLine(-9,0,9,0,pen);}
             else if("heart".equals(kind)||"heart-filled".equals(kind)){Path p=new Path();p.moveTo(0,9);p.cubicTo(-1.4f,7.6f,-10,2.4f,-10,-3.2f);p.cubicTo(-10,-7.8f,-6.4f,-10,-3.4f,-10);p.cubicTo(-1.4f,-10,-.2f,-8.9f,0,-7.7f);p.cubicTo(.2f,-8.9f,1.4f,-10,3.4f,-10);p.cubicTo(6.4f,-10,10,-7.8f,10,-3.2f);p.cubicTo(10,2.4f,1.4f,7.6f,0,9);p.close();if("heart-filled".equals(kind))pen.setStyle(Paint.Style.FILL);canvas.drawPath(p,pen);}

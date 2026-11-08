@@ -237,6 +237,26 @@ public final class PredictiveBack implements AutoCloseable {
             if(Build.VERSION.SDK_INT>=29)window.setNavigationBarContrastEnforced(false);
             View decor=window.getDecorView();androidx.core.view.WindowCompat.getInsetsController(window,decor).setAppearanceLightNavigationBars(androidx.core.view.WindowCompat.getInsetsController(activity.getWindow(),activity.getWindow().getDecorView()).isAppearanceLightNavigationBars());
             decor.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),ui.dp(16));}});decor.setClipToOutline(true);
+            dialog.setOnShowListener(shown->{
+                android.widget.ListView list=dialog.getListView();
+                if(list==null)return;
+                list.setDivider(null);list.setDividerHeight(ui.dp(5));
+                list.post(()->{
+                    int widest=ui.dp(220);
+                    for(int i=0;i<list.getChildCount();i++){
+                        View row=list.getChildAt(i);
+                        android.graphics.drawable.GradientDrawable edge=ui.shape(android.graphics.Color.TRANSPARENT,10);
+                        edge.setStroke(ui.dp(1),ui.dark?0x66ffffff:0x33000000);
+                        row.setBackground(edge);row.setPadding(ui.dp(16),ui.dp(11),ui.dp(16),ui.dp(11));
+                        if(row instanceof android.widget.TextView){
+                            android.widget.TextView text=(android.widget.TextView)row;
+                            widest=Math.max(widest,Math.round(text.getPaint().measureText(text.getText().toString()))+ui.dp(48));
+                        }
+                    }
+                    int screen=activity.getResources().getDisplayMetrics().widthPixels;
+                    dialog.getWindow().setLayout(Math.min(screen-ui.dp(40),widest),android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+                });
+            });
             if(!cancelable)return dialog;
             decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
                 private PredictiveBack back;private ValueAnimator scrim;private float scrimTarget;

@@ -47,7 +47,7 @@ public final class HeaderSearch {
         box=new FrameLayout(activity);slot.addView(box,new FrameLayout.LayoutParams(-1,ui.dp(44),Gravity.CENTER_VERTICAL));
         icon=ui.icon("search",ui.ink);icon.setContentDescription(hint);box.addView(icon,new FrameLayout.LayoutParams(ui.dp(44),-1,Gravity.END));
         editor=ui.row();editor.setVisibility(View.GONE);
-        input=new EditText(activity);input.setHint(hint);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(ui.ink);input.setHintTextColor(ui.muted);input.setBackgroundColor(Color.TRANSPARENT);input.setPadding(ui.dp(12),0,ui.dp(6),0);Ui.clearable(input);
+        input=new EditText(activity);input.setHint(hint);input.setSingleLine(true);input.setTextSize(15);input.setTextColor(ui.ink);input.setHintTextColor(ui.muted);input.setBackgroundColor(Color.TRANSPARENT);input.setPadding(ui.dp(12),0,ui.dp(6),0);input.setCursorVisible(false);input.setOnClickListener(v->input.setCursorVisible(true));Ui.clearable(input);
         editor.addView(input,new LinearLayout.LayoutParams(0,-1,1));
         TextView close=ui.text("×",25,ui.muted,false);close.setGravity(Gravity.CENTER);close.setContentDescription("关闭搜索");editor.addView(close,new LinearLayout.LayoutParams(ui.dp(40),-1));
         box.addView(editor,new FrameLayout.LayoutParams(-1,-1));
@@ -87,9 +87,9 @@ public final class HeaderSearch {
         int target=expand?width:ui.dp(44);
         animation=ValueAnimator.ofInt(current,target);animation.setDuration(220);animation.setInterpolator(new DecelerateInterpolator());
         animation.addUpdateListener(a->{int reveal=(int)a.getAnimatedValue();box.setClipBounds(new Rect(Math.max(0,box.getWidth()-reveal),0,box.getWidth(),box.getHeight()));float f=a.getAnimatedFraction(),progress=expand?f:1f-f;title.setAlpha(1f-progress);editor.setAlpha(progress);icon.setAlpha(1f-progress);});
-        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setAlpha(expand?0f:1f);editor.setAlpha(expand?1f:0f);icon.setAlpha(expand?0f:1f);title.setVisibility(expand?View.INVISIBLE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);box.setClipBounds(null);if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}notifyExpansionChanged();}});
+        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(token!=transition||!visible)return;animation=null;title.setAlpha(expand?0f:1f);editor.setAlpha(expand?1f:0f);icon.setAlpha(expand?0f:1f);title.setVisibility(expand?View.INVISIBLE:View.VISIBLE);editor.setVisibility(expand?View.VISIBLE:View.GONE);icon.setVisibility(expand?View.GONE:View.VISIBLE);box.setClipBounds(null);if(companion!=null&&!expand)companion.setVisibility(View.VISIBLE);if(expand&&box.isAttachedToWindow()&&!activity.isFinishing()&&!activity.isDestroyed()){input.setCursorVisible(true);input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);}notifyExpansionChanged();}});
         ui.round(box,expand?ui.tint:Color.TRANSPARENT,20);
-        if(!expand){input.setText("");input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);}
+        if(!expand){input.setText("");input.setCursorVisible(false);input.clearFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);}
         animation.start();
         notifyExpansionChanged();
     }

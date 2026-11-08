@@ -71,11 +71,13 @@ class OnlineSearchActivity : Activity() {
         val root = ui.column()
         root.setBackgroundColor(ui.bg)
         queryInput=EditText(this).apply {
+            setCursorVisible(false)
             hint=if(sourceMode) "搜索本图源漫画" else "搜索全网漫画"
             setSingleLine(true);textSize=15f;setTextColor(ui.ink);setHintTextColor(ui.muted)
             setBackgroundColor(Color.TRANSPARENT);inputType=InputType.TYPE_CLASS_TEXT;imeOptions=EditorInfo.IME_ACTION_SEARCH
             setPadding(ui.dp(12),0,ui.dp(6),0)
         }
+        queryInput.setOnClickListener{queryInput.setCursorVisible(true)}
         Ui.clearable(queryInput)
         val header=ui.header(if(sourceMode) intent.getStringExtra("sourceName").orEmpty() else "搜索全网漫画") {
             if(searchExpanded) toggleSearch?.invoke(false) else finish()
@@ -113,12 +115,12 @@ class OnlineSearchActivity : Activity() {
                             title.visibility=if(expand)View.GONE else View.VISIBLE
                             editor.visibility=if(expand)View.VISIBLE else View.GONE
                             icon.visibility=if(expand)View.GONE else View.VISIBLE
-                            if(expand){queryInput.requestFocus();(getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(queryInput,InputMethodManager.SHOW_IMPLICIT)}
+                            if(expand){queryInput.setCursorVisible(true);queryInput.requestFocus();(getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(queryInput,InputMethodManager.SHOW_IMPLICIT)}
                         }
                     });start()
                 }
                 ui.round(box,if(expand)ui.tint else Color.TRANSPARENT,20)
-                if(!expand){queryInput.setText("");queryInput.clearFocus();(getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(queryInput.windowToken,0)}
+                if(!expand){queryInput.setText("");queryInput.setCursorVisible(false);queryInput.clearFocus();(getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(queryInput.windowToken,0)}
             }
             icon.setOnClickListener { toggleSearch?.invoke(true) }
             close.setOnClickListener { toggleSearch?.invoke(false) }
@@ -171,12 +173,6 @@ class OnlineSearchActivity : Activity() {
             queryInput.post { startSearch() }
         } else if(sourceMode) {
             queryInput.post { startSearch() }
-        } else {
-            queryInput.post {
-                queryInput.requestFocus()
-                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                    .showSoftInput(queryInput, InputMethodManager.SHOW_IMPLICIT)
-            }
         }
 
         if(sourceMode){
@@ -416,6 +412,14 @@ class OnlineSearchActivity : Activity() {
             holder.title.text=item.title
             holder.source.text=item.sourceName
             RemoteCovers.load(holder.image,item.thumbnail,item.sourceId)
+            RemoteCovers.load(holder.image,item.thumbnail,item.sourceId)
+            for(offset in -4..4){
+                if(offset==0)continue
+                val nearby=position+offset
+                if(nearby !in results.indices)continue
+                val next=results[nearby]
+                RemoteCovers.prefetch(this@OnlineSearchActivity,next.thumbnail,next.sourceId)
+            }
             return holder
         }
     }
