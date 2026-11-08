@@ -94,12 +94,21 @@ public final class BookInfoActivity extends Activity {
         Ui.insets(this,root,u.dark);
         backPreview=BackPreview.install(this);
         setContentView(root);
-        predictiveBack=new PredictiveBack(this,root,()->true,()->true,this::finish);
+        predictiveBack=new PredictiveBack(this,root,()->true,()->true,this::finish);predictiveBack.setPreview(()->BackPreview.install(this));
         heartButton.setOnClickListener(v->toggleFavorite());
         if(onlineJm)refreshOnlineRecord();else loadPageCount();
         refreshFavorite();
     }
 
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event){if(predictiveBack!=null)predictiveBack.recordTouch(event);return super.dispatchTouchEvent(event);}
+    @Override public void finish(){
+        if(predictiveBack!=null&&predictiveBack.animateButtonBack(()->finishPage(true)))return;
+        finishPage(predictiveBack!=null&&predictiveBack.isLeavingByGesture());
+    }
+    private void finishPage(boolean gesture){
+        if(backPreview&&!isChangingConfigurations()){backPreview=false;BackPreview.pop();}
+        PageMotion.prepareExit(this,gesture);super.finish();PageMotion.exitLegacy(this,gesture);
+    }
     @Override protected void onResume(){super.onResume();if(predictiveBack!=null)predictiveBack.reinstall();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
     @Override protected void onDestroy(){if(backPreview&&isFinishing()&&!isChangingConfigurations())BackPreview.pop();if(predictiveBack!=null)predictiveBack.close();disk.shutdownNow();covers.close();super.onDestroy();}

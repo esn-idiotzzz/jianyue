@@ -113,6 +113,7 @@ public final class MainActivity extends Activity {
     private ValueAnimator actionAnimator;private View tabOutgoing;private int tab1Scroll,tab2Scroll;
     private FirstRunGuide firstRunGuide;
     private boolean privateShelf;
+    private Boolean navVisibleTarget;
     private int navigationInset;private boolean tabletDevice;private int folderPreviewDepth;
     private FolderCoverIndex folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());
     private PredictiveBack predictiveBack;
@@ -149,7 +150,7 @@ public final class MainActivity extends Activity {
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(isFinishing()||isDestroyed())return;Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);boolean keyboard=root.getRootView().getHeight()-visible.bottom>u.dp(120);keyboardVisible=keyboard;updateNavVisibility();});
         buildTab();
         firstRunGuide=new FirstRunGuide(this,prefs,()->{if(predictiveBack!=null)predictiveBack.refresh();ForegroundUpdates.checkAfterGuide();});
-        predictiveBack=new PredictiveBack(this,root,()->firstRunGuide==null||!firstRunGuide.isShowing(),()->!shelfSearch.isExpanded()&&(tab!=1||(!privateShelf&&folderId.isEmpty())),()->tab==1&&(privateShelf||!folderId.isEmpty()),this::onBackPressed);predictiveBack.setPreview(()->BackPreview.install(this));
+        predictiveBack=new PredictiveBack(this,root,()->firstRunGuide==null||!firstRunGuide.isShowing(),()->!shelfSearch.isExpanded()&&(tab!=1||(!privateShelf&&folderId.isEmpty())),()->!shelfSearch.isExpanded()&&tab==1&&(privateShelf||!folderId.isEmpty()),this::onBackPressed);predictiveBack.setPreview(()->BackPreview.install(this));
         handleShelfJump(getIntent());
         shelfSearch.setOnExpansionChanged(()->{if(privateShelf)plus.setVisibility(View.GONE);if(predictiveBack!=null)predictiveBack.refresh();});
     }
@@ -233,17 +234,25 @@ public final class MainActivity extends Activity {
     private int tabVisualOrder(int value){return value==1?0:value==0?1:value==2?2:3;}
     /** Shared page change: old page leaves, new page arrives; direction < 0 uses the back pop. */
     private void transitionContent(int direction,Runnable build){
+        PageMotion.clearEntering(this);
         finishTabTransition();
+        // The incoming view is the real destination; never leave its frozen snapshot behind it.
+        BackPreview.hide();
         final LinearLayout previous=content;
         final LinearLayout incoming=u.column();
-        stage.addView(incoming,Math.max(0,stage.indexOfChild(nav)),new FrameLayout.LayoutParams(-1,-1));
+        final FrameLayout.LayoutParams match=new FrameLayout.LayoutParams(-1,-1);
+        if(direction<0){
+            // Real target stays as the stable bottom layer; only the source moves out.
+            stage.addView(incoming,Math.max(0,stage.indexOfChild(previous)),match);
+        }else{
+            stage.addView(incoming,Math.max(0,stage.indexOfChild(nav)),match);
+        }
         content=incoming;
         build.run();
         tabOutgoing=previous;
         if(direction<0){
             incoming.setAlpha(1f);incoming.setTranslationX(0f);
-            PageMotion.back(previous,incoming);
-            previous.postDelayed(()->{if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}},330);
+            PageMotion.backOutgoing(previous,()->previous.post(()->{if(tabOutgoing==previous){stage.removeView(previous);tabOutgoing=null;}}));
         }else{
             final int distance=u.dp(24);
             incoming.setAlpha(0f);incoming.setTranslationX(distance);
@@ -255,7 +264,7 @@ public final class MainActivity extends Activity {
     }
     private void finishTabTransition(){
         if(tabOutgoing!=null){stage.removeView(tabOutgoing);tabOutgoing=null;}
-        if(content!=null){content.animate().cancel();content.setAlpha(1f);content.setTranslationX(0f);}
+        if(content!=null){content.clearAnimation();content.animate().cancel();content.setAlpha(1f);content.setTranslationX(0f);}
     }    private void buildTab(){
         finishTabTransition();
         if(tab==1&&!folderId.isEmpty())shelfSearch.collapse();
@@ -273,8 +282,12 @@ public final class MainActivity extends Activity {
     private void updateNavVisibility(){
         if(nav==null)return;
         boolean show=navAllowed();
+        if(navVisibleTarget!=null&&navVisibleTarget==show)return;
+        boolean initial=navVisibleTarget==null;navVisibleTarget=show;
+        nav.animate().cancel();nav.animate().withEndAction(null);
+        if(initial){nav.setAlpha(show?1f:0f);nav.setTranslationY(show?0f:u.dp(10));nav.setVisibility(show?View.VISIBLE:View.GONE);return;}
         if(show){
-            if(nav.getVisibility()!=View.VISIBLE){nav.setVisibility(View.VISIBLE);nav.setAlpha(0f);nav.setTranslationY(u.dp(10));}
+            if(nav.getVisibility()!=View.VISIBLE){nav.setAlpha(0f);nav.setTranslationY(u.dp(10));nav.setVisibility(View.VISIBLE);}
             nav.animate().alpha(1f).translationY(0f).setDuration(190).setInterpolator(new DecelerateInterpolator()).start();
         }else if(nav.getVisibility()==View.VISIBLE){
             nav.animate().alpha(0f).translationY(u.dp(10)).setDuration(170).setInterpolator(new DecelerateInterpolator()).withEndAction(()->{if(!navAllowed())nav.setVisibility(View.GONE);}).start();
@@ -359,6 +372,7 @@ public final class MainActivity extends Activity {
     }
     private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return privateShelf?"隐私书架":"书架";}
     private void leaveFolder(){
+        PageMotion.clearEntering(this);
         boolean gesture=predictiveBack!=null&&predictiveBack.isLeavingByGesture();
         if(folderId.isEmpty()&&privateShelf){if(gesture)setPrivateShelf(false);else transitionContent(-1,()->setPrivateShelf(false));return;}
         String leaving=folderId;String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");
@@ -617,7 +631,7 @@ public final class MainActivity extends Activity {
     private void text(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
 
     private void open(JSONObject b){
-        if(b.optBoolean("empty"))return;if(b.optBoolean("download_history")){DownloadRecordActions.open(this,b,disk);return;}if(b.has("sourceId")){openOnline(b);return;}if(b.optBoolean("book_folder")){BackPreview.capture(getWindow().getDecorView());folderPreviewDepth++;folderId=b.optString("id");library.preserveFolder(folderId);buildTab();PageMotion.folder(content);return;}
+        if(b.optBoolean("empty"))return;if(b.optBoolean("download_history")){DownloadRecordActions.open(this,b,disk);return;}if(b.has("sourceId")){openOnline(b);return;}if(b.optBoolean("book_folder")){BackPreview.capture(getWindow().getDecorView(),nav);folderPreviewDepth++;folderId=b.optString("id");library.preserveFolder(folderId);buildTab();PageMotion.folder(this,content);return;}
         BackPreview.capture(getWindow().getDecorView());startActivity(new Intent(this,BookInfoActivity.class).putExtra("book",b.toString()));
     }
     private void manage(JSONObject b){
@@ -1028,7 +1042,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.1.5").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.2.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -1040,15 +1054,16 @@ public final class MainActivity extends Activity {
     }
     private void clearLocalComicHint(){if(localComicHintDismiss!=null){handler.removeCallbacks(localComicHintDismiss);localComicHintDismiss=null;}if(localComicHint!=null){TextView hint=localComicHint;localComicHint=null;hint.animate().cancel();if(hint.getParent() instanceof ViewGroup)((ViewGroup)hint.getParent()).removeView(hint);}}
     @Override public boolean dispatchTouchEvent(MotionEvent ev){
+        if(predictiveBack!=null)predictiveBack.recordTouch(ev);
         int action=ev.getActionMasked();
         if((action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)&&!highlightKey.isEmpty())clearShelfHighlight();
         return super.dispatchTouchEvent(ev);
     }
-    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(firstRunGuide!=null)firstRunGuide.showIfNeeded();if(predictiveBack!=null){predictiveBack.reinstall();getWindow().getDecorView().postDelayed(()->{if(predictiveBack!=null)predictiveBack.reinstall();},350);}}
+    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(firstRunGuide!=null)firstRunGuide.showIfNeeded();if(predictiveBack!=null)predictiveBack.reinstall();}
     @Override protected void onStart(){super.onStart();if(predictiveBack!=null)predictiveBack.reinstall();}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&predictiveBack!=null)predictiveBack.reinstall();}
     @Override protected void onPause(){cancelShelfMenu();hideShelfDropPill();super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);}
-    @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
+    @Override protected void onStop(){PageMotion.clearEntering(this);if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
     @Override protected void onDestroy(){if(isFinishing()&&!isChangingConfigurations())SourceVisits.reset(this);resumed=false;clearLocalComicHint();if(firstRunGuide!=null)firstRunGuide.close();if(predictiveBack!=null)predictiveBack.close();handler.removeCallbacksAndMessages(null);covers.close();disk.shutdownNow();super.onDestroy();}
     @Override public void onBackPressed(){if(firstRunGuide!=null&&firstRunGuide.isShowing())return;if(shelfSearch!=null&&shelfSearch.isExpanded())shelfSearch.collapse();else if(tab==1&&(privateShelf||!folderId.isEmpty()))leaveFolder();else moveTaskToBack(true);}
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("draft",input==null?draft:input.getText().toString());b.putString("search",searchInput==null?searchDraft:searchInput.getText().toString());b.putString("folder",privateShelf?"":folderId);b.putString("task_id",taskId);b.putInt("shelf_scroll",grid==null?-1:grid.getFirstVisiblePosition());}

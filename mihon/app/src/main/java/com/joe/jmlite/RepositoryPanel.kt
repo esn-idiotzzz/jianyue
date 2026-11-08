@@ -218,7 +218,7 @@ object RepositoryPanel {
                     row.body.setOnClickListener(null)
                 }else{
                     row.body.isClickable=true
-                    row.body.setOnClickListener{activity.startActivity(Intent(activity,OnlineSearchActivity::class.java).putExtra("sourceId",item.getLong("id")).putExtra("sourceName",item.getString("name")).putExtra("sourceLang",item.getString("language")).putExtra("sourcePackage",item.getString("packageName")))}
+                    row.body.setOnClickListener{BackPreview.capture(activity.window.decorView);activity.startActivity(Intent(activity,OnlineSearchActivity::class.java).putExtra("sourceId",item.getLong("id")).putExtra("sourceName",item.getString("name")).putExtra("sourceLang",item.getString("language")).putExtra("sourcePackage",item.getString("packageName")))}
                 }
                 icons.load(row.icon,item.getString("packageName"))
                 return row.root

@@ -119,7 +119,7 @@ class OnlineMangaActivity : Activity() {
         applyOnlineInsets(this, root, ui.dark)
         backPreview = BackPreview.install(this)
         setContentView(root)
-        predictiveBack=PredictiveBack(this,root,{true},{true},{finish()})
+        predictiveBack=PredictiveBack(this,root,{true},{true},{finish()}).setPreview { BackPreview.install(this) }
 
         load()
         paintFavorite()
@@ -585,6 +585,15 @@ class OnlineMangaActivity : Activity() {
         super.onDestroy()
     }
 
+    override fun dispatchTouchEvent(event:android.view.MotionEvent):Boolean {predictiveBack?.recordTouch(event);return super.dispatchTouchEvent(event)}
+    override fun finish(){
+        if(predictiveBack?.animateButtonBack { finishPage(true) }==true)return
+        finishPage(predictiveBack?.isLeavingByGesture==true)
+    }
+    private fun finishPage(gesture:Boolean){
+        if(backPreview&&!isChangingConfigurations){backPreview=false;BackPreview.pop()}
+        PageMotion.prepareExit(this,gesture);super.finish();PageMotion.exitLegacy(this,gesture)
+    }
     override fun onStop(){predictiveBack?.onStop();super.onStop()}
 
     private suspend fun readHistory(){

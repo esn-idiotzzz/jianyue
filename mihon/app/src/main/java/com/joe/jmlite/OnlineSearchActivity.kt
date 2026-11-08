@@ -216,7 +216,7 @@ class OnlineSearchActivity : Activity() {
         applyOnlineInsets(this, root, ui.dark)
         backPreview=BackPreview.install(this)
         setContentView(root)
-        predictiveBack=PredictiveBack(this,root,{true},{!searchExpanded},{onBackPressed()})
+        predictiveBack=PredictiveBack(this,root,{true},{!searchExpanded},{!searchExpanded},{onBackPressed()}).setPreview { BackPreview.install(this) }
     }
 
     private fun startSearch() {
@@ -339,7 +339,7 @@ class OnlineSearchActivity : Activity() {
                     try {
                         val url=kotlinx.coroutines.withContext(Dispatchers.IO){source.getHomeUrl()}
                         startActivity(eu.kanade.tachiyomi.ui.webview.WebViewActivity.newIntent(this@OnlineSearchActivity,url,source.id,source.name))
-                        clearLoginHint();finish()
+                        clearLoginHint();finishForBrowser()
                     }catch(e:kotlinx.coroutines.CancellationException){throw e}
                     catch(e:Exception){Toast.makeText(this@OnlineSearchActivity,"无法打开图源网站：${e.message}",Toast.LENGTH_LONG).show()}
                 }
@@ -352,6 +352,24 @@ class OnlineSearchActivity : Activity() {
         hint.postDelayed({if(loginHint===hint)clearLoginHint()},5000)
     }
     private fun clearLoginHint(){loginHint?.let{it.animate().cancel();(it.parent as? ViewGroup)?.removeView(it)};loginHint=null}
+    override fun dispatchTouchEvent(event:android.view.MotionEvent):Boolean {predictiveBack?.recordTouch(event);return super.dispatchTouchEvent(event)}
+    override fun finish(){
+        if(predictiveBack?.animateButtonBack { finishPage(true) }==true)return
+        finishPage(predictiveBack?.isLeavingByGesture==true)
+    }
+    /** Browser opens above us; this is not a user back, must not animate or consume the preview. */
+    private fun finishForBrowser(){
+        clearLoginHint()
+        BackPreview.hide()
+        if(backPreview)backPreview=false
+        PageMotion.prepareExit(this,true)
+        super.finish()
+        PageMotion.exitLegacy(this,true)
+    }
+    private fun finishPage(gesture:Boolean){
+        if(backPreview&&!isChangingConfigurations){backPreview=false;BackPreview.pop()}
+        PageMotion.prepareExit(this,gesture);super.finish();PageMotion.exitLegacy(this,gesture)
+    }
     override fun onBackPressed(){if(searchExpanded)toggleSearch?.invoke(false) else super.onBackPressed()}
     override fun onStop(){predictiveBack?.onStop();super.onStop()}
     private fun appendFailedSourcesLink(){
@@ -406,6 +424,18 @@ class OnlineSearchActivity : Activity() {
      * One search result tile. On tablets the cover height follows the measured tile width so the
      * phone's 1.36 height/width ratio is kept; phones keep their original fixed 138dp cover.
      */
+    /** Clip the bitmap itself, not only the parent outline, so software snapshot capture shows round corners too. */
+    private class RoundedImageView(context: android.content.Context, private val radius: Float) : ImageView(context) {
+        private val clipPath = android.graphics.Path()
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            val save = canvas.save()
+            clipPath.reset()
+            clipPath.addRoundRect(0f, 0f, width.toFloat(), height.toFloat(), radius, radius, android.graphics.Path.Direction.CW)
+            canvas.clipPath(clipPath)
+            super.onDraw(canvas)
+            canvas.restoreToCount(save)
+        }
+    }
     private inner class ResultTile : LinearLayout(this@OnlineSearchActivity) {
         val image: ImageView
         val title: TextView
@@ -418,11 +448,16 @@ class OnlineSearchActivity : Activity() {
             coverFrame = FrameLayout(this@OnlineSearchActivity)
             coverFrame.background = ui.shape(ui.tint, 12)
             coverFrame.clipToOutline = true
+            coverFrame.outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, ui.dp(12).toFloat())
+                }
+            }
             coverFrame.addView(
                 ui.text("JM", 16, OnlineUi.BLUE, true).apply { gravity = Gravity.CENTER },
                 FrameLayout.LayoutParams(-1, -1),
             )
-            image = ImageView(this@OnlineSearchActivity).apply {
+            image = RoundedImageView(this@OnlineSearchActivity, ui.dp(12).toFloat()).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
             }
             coverFrame.addView(image, FrameLayout.LayoutParams(-1, -1))

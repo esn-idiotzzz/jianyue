@@ -7,6 +7,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.Outline;
 import android.os.Build;
+import android.os.SystemClock;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.view.ViewTreeObserver;
@@ -26,13 +28,18 @@ public final class PredictiveBack implements AutoCloseable {
     private final Runnable action;
     private Runnable unregister;private Runnable previewStart;
     private ValueAnimator settling;
-    private boolean closed,gesturing,left,committed;
+    private boolean closed,stopped,gesturing,left,committed,commitExits,buttonLeaving,directionLocked;
+    private int pointerEdge=-1;private boolean pointerEntering;
+    private long pointerTime;
+    private float gestureTouchX;
     private float progress;
     private float originalScaleX,originalScaleY,originalX,originalY;
-    private int originalLayer,width;private float gestureScale=.92f,targetOffsetY,radius,maxRadius,density;private float originalPivotX,originalPivotY,originalAlpha;private boolean gestureLeaving;
+    private int originalLayer,width;private float gestureScale=.92f,targetOffsetY,radius,maxRadius,density;private float originalPivotX,originalPivotY,originalAlpha;private boolean gestureLeaving,enterDirect;
     private boolean originalClip;
     private ViewOutlineProvider originalOutline;
     private final ViewTreeObserver.OnGlobalLayoutListener keyboardLayout=this::refresh;
+    private final Runnable rearm=this::rearm;
+    private void rearm(){if(!closed&&!stopped&&!gesturing&&!activity.isFinishing())committed=false;}
 
     public PredictiveBack(Activity activity,View surface,BooleanSupplier canHandle,Runnable action){
         this(activity,surface,canHandle,()->false,action);
@@ -53,46 +60,70 @@ public final class PredictiveBack implements AutoCloseable {
     }
     /** Installs the blurred destination preview when a gesture begins. */
     public PredictiveBack setPreview(Runnable preview){previewStart=preview;return this;}
-    /** True while the gesture is fading out before the target page is built. */
+    /** True while the gesture is sliding out before the target page is built. */
     public boolean isLeavingByGesture(){return gestureLeaving;}
-    /** Re-register after the Activity returns to the foreground; some launchers drop the callback. */
+    /** Capture the physical starting edge before SystemUI takes over the touch stream. */
+    public void recordTouch(MotionEvent event){
+        if(closed||event.getActionMasked()!=MotionEvent.ACTION_DOWN)return;
+        View decor=window.getDecorView();int[] location=new int[2];decor.getLocationOnScreen(location);
+        int windowWidth=decor.getWidth();if(windowWidth<=0)windowWidth=surface.getWidth();
+        float x=event.getRawX()-location[0],edge=Math.max(1f,surface.getResources().getDisplayMetrics().density)*48f;
+        pointerEdge=x>=0f&&x<=edge?0:x>=windowWidth-edge&&x<=windowWidth?1:-1;
+        pointerTime=event.getEventTime();
+        pointerEntering=pointerEdge>=0&&PageMotion.isEntering(activity);
+    }
+    /** Animate a toolbar pop in the same window as its destination, then finish without a second transition. */
+    public boolean animateButtonBack(Runnable finish){
+        if(buttonLeaving)return true;
+        if(closed||stopped||gestureLeaving||!surface.isAttachedToWindow()||!BackPreview.install(activity))return false;
+        reset();buttonLeaving=true;
+        BackPreview.buttonTarget(activity);
+        PageMotion.backOutgoing(surface,()->{if(buttonLeaving&&!closed&&!stopped)finish.run();});
+        return true;
+    }
+    /** Resume the owner without replacing a callback in the middle of a system gesture. */
     public void reinstall(){
-        if(Build.VERSION.SDK_INT<33||closed||gesturing||!canHandle.getAsBoolean())return;
-        // Always replace the callback on resume: a launcher may have dropped it while keeping
-        // our unregister token alive, and a stale token cannot tell us whether it still works.
-        unregisterSafely();
-        try{unregister=Api33.register(this);}catch(RuntimeException ignored){}
+        if(closed||buttonLeaving||activity.isFinishing())return;
+        stopped=false;
+        if(!gesturing)reset();
+        refresh();
     }
     private void registerIfPossible(){
-        if(unregister!=null||closed||!canHandle.getAsBoolean()||imeOwnsBack())return;
+        if(unregister!=null||closed||stopped||!canHandle.getAsBoolean()||imeOwnsBack())return;
         try{unregister=Api33.register(this);}catch(RuntimeException ignored){}
     }
     private void unregisterSafely(){
         Runnable old=unregister;unregister=null;
         if(old!=null){try{old.run();}catch(RuntimeException ignored){}}
     }
-    /** Only let the IME win while an editable field is actually focused; stale insets after resume are ignored. */
+    /** A focused editor can still accept text after the keyboard has been dismissed. */
     private boolean imeOwnsBack(){
-        View focus=surface.findFocus();
-        if(!(focus instanceof android.widget.EditText)||!focus.isShown())return false;
-        android.view.inputmethod.InputMethodManager imm=(android.view.inputmethod.InputMethodManager)surface.getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-        return imm!=null&&imm.isAcceptingText();
+        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(surface);
+        return insets!=null&&insets.isVisible(WindowInsetsCompat.Type.ime());
     }
     public void refresh(){
-        if(Build.VERSION.SDK_INT<33||closed)return;
+        if(Build.VERSION.SDK_INT<33||closed||stopped)return;
+        if(gesturing||buttonLeaving)return;
         if(!canHandle.getAsBoolean()||imeOwnsBack()){unregisterSafely();reset();}
         else registerIfPossible();
     }
-    private void start(boolean fromLeft,float touchX,float touchY){
-        if(committed||!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
-        reset();gesturing=true;progress=0;int gestureWidth=surface.getWidth();left=touchX>0f&&gestureWidth>0?touchX<gestureWidth/2f:fromLeft;
+    private void start(boolean fromLeft,float touchY,boolean direct){
+        if(closed||stopped||buttonLeaving||activity.isFinishing()||activity.isDestroyed())return;
+        // A fast next gesture completes an in-place pop before previewing its new destination.
+        // A finishing Activity keeps ownership until the system switches to the previous one.
+        if(committed&&gesturing){if(commitExits||settling==null)return;settling.end();}
+        reset();
+        if(!canHandle.getAsBoolean()||!preview.getAsBoolean())return;
+        gesturing=true;progress=0;left=fromLeft;enterDirect=direct;
+        width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();originalPivotX=surface.getPivotX();originalPivotY=surface.getPivotY();originalAlpha=surface.getAlpha();gestureLeaving=false;
+        density=surface.getResources().getDisplayMetrics().density;
+        originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
+        if(direct)return;
         if(previewStart!=null){try{previewStart.run();}catch(RuntimeException ignored){}}
         BackPreview.show();
-        width=surface.getWidth();originalScaleX=surface.getScaleX();originalScaleY=surface.getScaleY();originalX=surface.getTranslationX();originalY=surface.getTranslationY();originalLayer=surface.getLayerType();originalPivotX=surface.getPivotX();originalPivotY=surface.getPivotY();originalAlpha=surface.getAlpha();gestureLeaving=false;
         gestureScale=.92f;
         int surfaceHeight=surface.getHeight();
         originalClip=surface.getClipToOutline();originalOutline=surface.getOutlineProvider();
-        density=surface.getResources().getDisplayMetrics().density;
         float normalizedY=surfaceHeight>0?Math.max(-1f,Math.min(1f,(touchY-surfaceHeight/2f)/(surfaceHeight/2f))):0f;
         targetOffsetY=normalizedY*density*28f;
         maxRadius=density*32f;radius=0f;
@@ -102,7 +133,7 @@ public final class PredictiveBack implements AutoCloseable {
         if(surface.isHardwareAccelerated()&&originalLayer==View.LAYER_TYPE_NONE)surface.setLayerType(View.LAYER_TYPE_HARDWARE,null);
     }
     private void advance(float value){
-        if(!gesturing)return;
+        if(!gesturing||enterDirect)return;
         progress=Math.max(0f,Math.min(1f,value));
         float scale=1f-(1f-gestureScale)*progress;
         surface.setScaleX(originalScaleX*scale);surface.setScaleY(originalScaleY*scale);
@@ -112,49 +143,82 @@ public final class PredictiveBack implements AutoCloseable {
         BackPreview.setScrimAlpha(progress);
         BackPreview.setPreviewShift((left?-1f:1f)*density*12f*progress);
     }
+    private void startEvent(boolean fromLeft,float touchX,float touchY){
+        long age=SystemClock.uptimeMillis()-pointerTime;
+        boolean physical=pointerEdge>=0&&age>=0&&age<=1500;
+        boolean fromPhysical=pointerEdge==0;pointerEdge=-1;
+        boolean entering=pointerEntering||PageMotion.isEntering(activity);
+        pointerEntering=false;
+        start(physical?fromPhysical:fromLeft,touchY,entering);
+        if(gesturing&&!committed){gestureTouchX=touchX;directionLocked=physical;}
+    }
+    private void progressEvent(float value,float touchX){
+        if(!gesturing||committed)return;
+        // Some dispatchers reuse the previous swipeEdge on a fast opposite gesture. If the
+        // initial DOWN was consumed by SystemUI, resolve once from actual finger movement.
+        float delta=touchX-gestureTouchX;
+        if(!directionLocked&&Math.abs(delta)>=Math.max(1f,density)*8f){left=delta>0f;directionLocked=true;}
+        advance(value);
+    }
     private void invoke(){
-        if(closed||committed)return;
+        if(closed||stopped||buttonLeaving||committed)return;
         if(activity.isFinishing()||activity.isDestroyed()){reset();return;}
         if(!canHandle.getAsBoolean()){reset();refresh();return;}
-        if(!gesturing){committed=exits.getAsBoolean();action.run();surface.postDelayed(this::reinstall,120);return;}
-        committed=true;gestureLeaving=true;
-        if(!surface.isAttachedToWindow()){reset();committed=true;gestureLeaving=false;action.run();surface.post(this::reinstall);return;}
-        boolean leaving=exits.getAsBoolean();
-        boolean taskRoot=activity.isTaskRoot();
-        if(leaving&&taskRoot&&Build.VERSION.SDK_INT>=34&&window==activity.getWindow())Api34.suppressExitAnimation(activity);
-        // Keep the scaled page at its gesture size and let it slide out to the edge while fading.
-        // The destination preview simultaneously returns from its small parallax offset.
-        float exit=(left?1f:-1f)*width*1.05f;
-        BackPreview.setScrimAlpha(0f);
-        BackPreview.settlePreview(220);
-        surface.animate().translationXBy(exit).setDuration(260).setInterpolator(new android.view.animation.DecelerateInterpolator()).withEndAction(()->{
-            if(closed)return;
+        if(!gesturing&&(pointerEntering||PageMotion.isEntering(activity))){pointerEntering=false;reset();return;}
+        committed=true;commitExits=exits.getAsBoolean();
+        if(!gesturing){pointerEdge=-1;directionLocked=false;action.run();surface.post(rearm);return;}
+        gestureLeaving=true;
+        if(!surface.isAttachedToWindow()){reset();committed=true;action.run();surface.post(rearm);return;}
+        if(enterDirect){
+            // An unfinished enter transition deliberately consumes the gesture: no shrink,
+            // no preview, no navigation, so the page can never white-screen mid-entry.
+            reset();committed=true;surface.post(rearm);return;
+        }
+        // without its finish callback must not suddenly start shrinking when the finger is lifted.
+        float from=surface.getTranslationX(),to=originalX+(left?1f:-1f)*width*1.05f;
+        BackPreview.fadeScrim(160);BackPreview.settlePreview(220);
+        ValueAnimator animation=ValueAnimator.ofFloat(0f,1f);settling=animation;
+        animation.setDuration(220);animation.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        animation.addUpdateListener(a->{if(settling==animation&&!closed)surface.setTranslationX(from+(to-from)*(float)a.getAnimatedValue());});
+        animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){
+            if(settling!=animation||closed||stopped)return;
+            settling=null;
+            if(commitExits){
+                // Keep gestureLeaving/committed alive until finishPage()/onStop(). The async
+                // framework close must see this as the same gesture, never as a toolbar back.
+                action.run();
+                return;
+            }
+            BackPreview.hide();
             action.run();
-            if(activity.isFinishing()||activity.isDestroyed()){gestureLeaving=false;return;}
-            reset();committed=true;gestureLeaving=false;
-            surface.postDelayed(this::reinstall,120);
-        }).start();
+            if(closed||activity.isFinishing()||activity.isDestroyed())return;
+            reset();committed=true;
+            surface.post(rearm);refresh();
+        }});animation.start();
     }
     private void settle(){
         if(!gesturing)return;
+        if(enterDirect){reset();refresh();return;}
         if(settling!=null){settling.removeAllListeners();settling.cancel();}
         ValueAnimator animation=ValueAnimator.ofFloat(progress,0f);settling=animation;
         animation.setDuration(220);animation.setInterpolator(new android.view.animation.DecelerateInterpolator());
         animation.addUpdateListener(a->{if(settling==animation&&!closed)advance((float)a.getAnimatedValue());});
         animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){
             if(settling!=animation||closed)return;settling=null;reset();
-            surface.postDelayed(PredictiveBack.this::reinstall,120);
+            refresh();
         }});animation.start();
     }
     private void reset(){
+        surface.removeCallbacks(rearm);
         if(settling!=null){ValueAnimator old=settling;settling=null;old.removeAllListeners();old.cancel();}
         committed=false;
+        if(buttonLeaving){buttonLeaving=false;surface.clearAnimation();BackPreview.hide();}
         surface.animate().cancel();
         if(!gesturing)return;
-        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setPivotX(originalPivotX);surface.setPivotY(originalPivotY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);surface.setAlpha(originalAlpha);radius=0;gestureLeaving=false;BackPreview.setScrimAlpha(0f);BackPreview.setPreviewShift(0f);BackPreview.hide();
+        gesturing=false;progress=0;surface.setScaleX(originalScaleX);surface.setScaleY(originalScaleY);surface.setTranslationX(originalX);surface.setTranslationY(originalY);surface.setPivotX(originalPivotX);surface.setPivotY(originalPivotY);surface.setOutlineProvider(originalOutline);surface.setClipToOutline(originalClip);surface.setLayerType(originalLayer,null);surface.setAlpha(originalAlpha);radius=0;gestureLeaving=false;enterDirect=false;pointerEntering=false;BackPreview.setScrimAlpha(0f);BackPreview.setPreviewShift(0f);BackPreview.hide();
     }
     /** Release the temporary layer once a departing Activity is no longer visible. */
-    public void onStop(){reset();}
+    public void onStop(){stopped=true;pointerEdge=-1;unregisterSafely();reset();}
     @Override public void close(){closed=true;if(Build.VERSION.SDK_INT>=33&&surface.getViewTreeObserver().isAlive())surface.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardLayout);unregisterSafely();reset();}
     static float previewScale(float progress){return 1f-.08f*Math.max(0f,Math.min(1f,progress));}
     static float previewShift(int width,float progress,boolean left){return Math.max(0,width)*.02f*Math.max(0f,Math.min(1f,progress))*(left?1f:-1f);}
@@ -210,10 +274,9 @@ public final class PredictiveBack implements AutoCloseable {
     }
     @androidx.annotation.RequiresApi(34)
     private static final class Api34 {
-        static void suppressExitAnimation(Activity activity){activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE,0,0);}
         static android.window.OnBackAnimationCallback callback(PredictiveBack owner){return new android.window.OnBackAnimationCallback(){
-            @Override public void onBackStarted(android.window.BackEvent event){if(owner.closed)return;float touchY=0f,touchX=0f;try{touchY=event.getTouchY();}catch(RuntimeException ignored){}try{touchX=event.getTouchX();}catch(RuntimeException ignored){}owner.start(event.getSwipeEdge()==android.window.BackEvent.EDGE_LEFT,touchX,touchY);}
-            @Override public void onBackProgressed(android.window.BackEvent event){if(!owner.closed&&!owner.committed)owner.advance(event.getProgress());}
+            @Override public void onBackStarted(android.window.BackEvent event){if(!owner.closed)owner.startEvent(event.getSwipeEdge()==android.window.BackEvent.EDGE_LEFT,event.getTouchX(),event.getTouchY());}
+            @Override public void onBackProgressed(android.window.BackEvent event){if(!owner.closed&&!owner.committed)owner.progressEvent(event.getProgress(),event.getTouchX());}
             @Override public void onBackCancelled(){if(!owner.closed&&!owner.committed)owner.settle();}
             @Override public void onBackInvoked(){owner.invoke();}
         };}

@@ -44,7 +44,7 @@ public final class AllDownloadsActivity extends Activity {
         Ui.Icon back=ui.icon("back",ui.ink);back.setContentDescription("返回下载");back.setOnClickListener(v->{if(search.isExpanded())search.collapse();else finish();});header.addView(back,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
         TextView title=ui.text("全部下载记录",21,ui.ink,true);title.setGravity(Gravity.CENTER_VERTICAL);title.setMaxLines(1);title.setEllipsize(android.text.TextUtils.TruncateAt.END);header.addView(title,new LinearLayout.LayoutParams(0,ui.dp(44),1));
         search=new HeaderSearch(this,header,title,null,"搜索下载编号或名称",value->{query=value;filter();});root.addView(header);
-        predictiveBack=new PredictiveBack(this,root,()->true,()->!search.isExpanded(),this::onBackPressed);search.setOnExpansionChanged(predictiveBack::refresh);
+        predictiveBack=new PredictiveBack(this,root,()->true,()->!search.isExpanded(),()->!search.isExpanded(),this::onBackPressed);predictiveBack.setPreview(()->BackPreview.install(this));search.setOnExpansionChanged(predictiveBack::refresh);
         FrameLayout frame=new FrameLayout(this);ListView list=new ListView(this);list.setDivider(null);list.setSelector(android.R.color.transparent);list.setClipToPadding(false);list.setPadding(ui.dp(20),0,ui.dp(20),ui.dp(20));AdaptiveLayout.capContentWidth(list,20,AdaptiveLayout.RECORDS_LIST_MAX_WIDTH_DP);adapter=new RecordsAdapter();list.setAdapter(adapter);frame.addView(list,new FrameLayout.LayoutParams(-1,-1));
         empty=ui.text("正在读取下载记录…",15,ui.muted,false);empty.setGravity(Gravity.CENTER);frame.addView(empty,new FrameLayout.LayoutParams(-1,-1));root.addView(frame,new LinearLayout.LayoutParams(-1,0,1));backPreview=BackPreview.install(this);setContentView(root);
         list.setOnItemClickListener((p,v,index,id)->DownloadRecordActions.open(this,shown.get(index),disk));
@@ -59,6 +59,15 @@ public final class AllDownloadsActivity extends Activity {
     @Override protected void onPause(){active=false;generation++;if(receiverRegistered){unregisterReceiver(changes);receiverRegistered=false;}super.onPause();}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
     @Override protected void onDestroy(){if(backPreview&&isFinishing()&&!isChangingConfigurations())BackPreview.pop();active=false;generation++;if(predictiveBack!=null)predictiveBack.close();covers.close();disk.shutdownNow();super.onDestroy();}
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event){if(predictiveBack!=null)predictiveBack.recordTouch(event);return super.dispatchTouchEvent(event);}
+    @Override public void finish(){
+        if(predictiveBack!=null&&predictiveBack.animateButtonBack(()->finishPage(true)))return;
+        finishPage(predictiveBack!=null&&predictiveBack.isLeavingByGesture());
+    }
+    private void finishPage(boolean gesture){
+        if(backPreview&&!isChangingConfigurations()){backPreview=false;BackPreview.pop();}
+        PageMotion.prepareExit(this,gesture);super.finish();PageMotion.exitLegacy(this,gesture);
+    }
     @Override public void onBackPressed(){if(search.isExpanded())search.collapse();else super.onBackPressed();}
     private final class RecordsAdapter extends BaseAdapter {
         public int getCount(){return shown.size();}public Object getItem(int p){return shown.get(p);}public long getItemId(int p){return p;}

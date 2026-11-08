@@ -47,6 +47,11 @@ class WebViewActivity : BaseActivity() {
                 R.anim.shared_axis_x_push_enter,
                 R.anim.shared_axis_x_push_exit,
             )
+            overrideActivityTransition(
+                OVERRIDE_TRANSITION_CLOSE,
+                R.anim.shared_axis_x_pop_enter,
+                R.anim.shared_axis_x_pop_exit,
+            )
         } else {
             @Suppress("DEPRECATION")
             overridePendingTransition(R.anim.shared_axis_x_push_enter, R.anim.shared_axis_x_push_exit)
@@ -99,16 +104,14 @@ class WebViewActivity : BaseActivity() {
     }
 
     override fun finish() {
-        super.finish()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            overrideActivityTransition(
-                OVERRIDE_TRANSITION_CLOSE,
-                R.anim.shared_axis_x_pop_enter,
-                R.anim.shared_axis_x_pop_exit,
-            )
-        } else {
+        // API 34+ needs the close override before super.finish(); a pending transition is only
+        // valid after finish() on older versions.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            super.finish()
             @Suppress("DEPRECATION")
             overridePendingTransition(R.anim.shared_axis_x_pop_enter, R.anim.shared_axis_x_pop_exit)
+        } else {
+            super.finish()
         }
     }
 
