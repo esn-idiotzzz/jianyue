@@ -40,7 +40,7 @@ android {
             abiFilters += "arm64-v8a"
         }
 
-        versionCode = 43
+        versionCode = 44
         versionName = "1.1.0"
 
         buildConfigField("boolean", "TELEMETRY_INCLUDED", "${Config.includeTelemetry}")

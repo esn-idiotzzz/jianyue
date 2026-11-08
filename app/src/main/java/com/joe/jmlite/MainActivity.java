@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
         }
         void select(int index){
             if(index<0||index==activeIndex)return;
-            activeIndex=index;View child=getChildAt(index);
+            activeIndex=index;View child=childFor(index);
             if(child==null||getWidth()==0){post(this::snapPill);return;}
             float targetLeft=child.getLeft(),targetWidth=child.getWidth();
             if(pillWidth<=0){pillLeft=targetLeft;pillWidth=targetWidth;invalidate();return;}
@@ -193,8 +193,9 @@ public final class MainActivity extends Activity {
             animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(pillAnimator==animation)pillAnimator=null;}});
             animation.start();
         }
+        private View childFor(int index){for(int i=0;i<getChildCount();i++){View child=getChildAt(i);if(child instanceof NavItem&&((NavItem)child).index==index)return child;}return null;}
         private void snapPill(){
-            if(activeIndex<0)return;View child=getChildAt(activeIndex);if(child==null)return;
+            if(activeIndex<0)return;View child=childFor(activeIndex);if(child==null)return;
             pillLeft=child.getLeft();pillWidth=child.getWidth();invalidate();
         }
         @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
@@ -203,7 +204,7 @@ public final class MainActivity extends Activity {
         }
         @Override protected void dispatchDraw(Canvas canvas){
             if(pillWidth>0){
-                View child=getChildAt(activeIndex);
+                View child=childFor(activeIndex);
                 float top=child!=null?child.getTop()+u.dp(3):u.dp(3);
                 float bottom=child!=null?child.getBottom()-u.dp(3):getHeight()-u.dp(3);
                 canvas.drawRoundRect(pillLeft,top,pillLeft+pillWidth,bottom,u.dp(23),u.dp(23),pillPaint);
@@ -1150,8 +1151,8 @@ public final class MainActivity extends Activity {
             if(shelfCapsuleActive())showShelfDropPill(book.optBoolean("book_folder")?"拖动到此拆除书籍夹":"拖动到此移出书籍夹");
             return true;
         }
-        private JSONObject book;private final FrameLayout face;private final TextView name,info;private String faceKey="";private int width=1,height=1;private final boolean tabletTile=AdaptiveLayout.isTabletDevice(MainActivity.this);private int touchX,touchY;private View folderPreview;private BookCover bookCover;private boolean dropTarget;private float slideTargetX,slideTargetY;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
-        ShelfTile(){super(MainActivity.this);setOrientation(VERTICAL);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,6);name=u.text("",12,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setPadding(u.dp(2),0,u.dp(2),0);addView(name,new LinearLayout.LayoutParams(-1,-2));info=u.text("",10,u.muted,false);info.setMaxLines(1);info.setMinLines(1);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setPadding(u.dp(2),u.dp(2),u.dp(2),0);info.setVisibility(View.INVISIBLE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);cancelShelfMenu();touchX=(int)e.getX();touchY=(int)e.getY();removeCallbacks(pressFeedback);postDelayed(pressFeedback,Math.max(0,(tab==1?Math.min(SHELF_HOLD_MILLIS,ViewConfiguration.getLongPressTimeout()):ViewConfiguration.getLongPressTimeout())-110));}else if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){removeCallbacks(pressFeedback);animate().cancel();if(getScaleX()!=1f||getScaleY()!=1f)animate().scaleX(1).scaleY(1).setDuration(150).start();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{
+        private JSONObject book;private final FrameLayout face;private final GridView ownerGrid;private final TextView name,info;private String faceKey="";private int width=1,height=1;private final boolean tabletTile=AdaptiveLayout.isTabletDevice(MainActivity.this);private int touchX,touchY;private View folderPreview;private BookCover bookCover;private boolean dropTarget;private float slideTargetX,slideTargetY;private final Runnable pressFeedback=()->{if(isPressed())animate().scaleX(.97f).scaleY(.97f).setDuration(110).start();};
+        ShelfTile(){super(MainActivity.this);ownerGrid=grid;setOrientation(VERTICAL);face=new FrameLayout(MainActivity.this);addView(face,new LinearLayout.LayoutParams(-1,height));u.space(this,6);name=u.text("",12,u.ink,true);name.setMaxLines(2);name.setMinLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setPadding(u.dp(2),0,u.dp(2),0);addView(name,new LinearLayout.LayoutParams(-1,-2));info=u.text("",10,u.muted,false);info.setMaxLines(1);info.setMinLines(1);info.setEllipsize(android.text.TextUtils.TruncateAt.END);info.setPadding(u.dp(2),u.dp(2),u.dp(2),0);info.setVisibility(View.INVISIBLE);addView(info,new LinearLayout.LayoutParams(-1,-2));setOnTouchListener((v,e)->{if(e.getActionMasked()==MotionEvent.ACTION_DOWN){if(holdReady)endShelfHold();removeCallbacks(shelfLongPress);cancelShelfMenu();touchX=(int)e.getX();touchY=(int)e.getY();removeCallbacks(pressFeedback);postDelayed(pressFeedback,Math.max(0,(tab==1?Math.min(SHELF_HOLD_MILLIS,ViewConfiguration.getLongPressTimeout()):ViewConfiguration.getLongPressTimeout())-110));}else if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){removeCallbacks(pressFeedback);animate().cancel();if(getScaleX()!=1f||getScaleY()!=1f)animate().scaleX(1).scaleY(1).setDuration(150).start();}return false;});setOnClickListener(v->open(book));setOnLongClickListener(v->{
             if(holdReady)return true;
             if(book==null)return false;
             if(operation){toast("请等待当前操作完成");return true;}
@@ -1168,8 +1169,8 @@ public final class MainActivity extends Activity {
             int coverWidth;
             if(tabletTile){
                 int measured=MeasureSpec.getSize(widthSpec);
-                int columns=Math.max(1,grid.getNumColumns());
-                int content=grid.getWidth()-grid.getPaddingLeft()-grid.getPaddingRight();
+                int columns=Math.max(1,ownerGrid==null?3:ownerGrid.getNumColumns());
+                int content=ownerGrid==null?0:ownerGrid.getWidth()-ownerGrid.getPaddingLeft()-ownerGrid.getPaddingRight();
                 int expected;
                 if(content>0)expected=(content-u.dp(10)*(columns-1))/columns;
                 else{
@@ -1182,7 +1183,7 @@ public final class MainActivity extends Activity {
                 if(measured<=0)measured=u.dp(120);
                 coverWidth=measured;
             }else{
-                int columns=Math.max(1,grid.getNumColumns());
+                int columns=Math.max(1,ownerGrid==null?3:ownerGrid.getNumColumns());
                 coverWidth=(getResources().getDisplayMetrics().widthPixels-u.dp(36)-u.dp(10)*(columns-1))/columns;
             }
             int coverHeight=AdaptiveLayout.shelfCoverHeightPx(coverWidth);

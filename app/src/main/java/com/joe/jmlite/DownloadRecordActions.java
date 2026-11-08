@@ -20,13 +20,13 @@ final class DownloadRecordActions {
     }
     static void open(Activity activity,JSONObject record,ExecutorService disk){
         if(record.has("sourceId")&&!OnlineHistory.isJm(record)){
-            activity.startActivity(new Intent(activity,OnlineMangaActivity.class).putExtra("sourceId",record.optLong("sourceId")).putExtra("url",record.optString("url")).putExtra("title",record.optString("title")).putExtra("thumbnail",record.optString("thumbnail")).putExtra("author",record.optString("author")).putExtra("description",record.optString("description")).putExtra("sourceName",record.optString("sourceName")));return;
+            BackPreview.capture(activity.getWindow().getDecorView());activity.startActivity(new Intent(activity,OnlineMangaActivity.class).putExtra("sourceId",record.optLong("sourceId")).putExtra("url",record.optString("url")).putExtra("title",record.optString("title")).putExtra("thumbnail",record.optString("thumbnail")).putExtra("author",record.optString("author")).putExtra("description",record.optString("description")).putExtra("sourceName",record.optString("sourceName")));return;
         }
         disk.execute(()->{try{
             String id=record.optString("id");JSONObject local=new Store(activity).read(id),book;
             if(local!=null&&"complete".equals(local.optString("status")))book=local.put("key","download:"+id).put("type","download");
             else book=new JSONObject(record.toString()).put("jm",true).put("sourceId",-1).put("url",id).put("key","-1|"+id).put("type","online");
-            activity.runOnUiThread(()->{if(!activity.isFinishing()&&!activity.isDestroyed())activity.startActivity(new Intent(activity,BookInfoActivity.class).putExtra("book",book.toString()));});
+            activity.runOnUiThread(()->{if(!activity.isFinishing()&&!activity.isDestroyed()){BackPreview.capture(activity.getWindow().getDecorView());activity.startActivity(new Intent(activity,BookInfoActivity.class).putExtra("book",book.toString()));}});
         }catch(Exception e){activity.runOnUiThread(()->{if(!activity.isDestroyed())Toast.makeText(activity,"无法打开下载记录",Toast.LENGTH_SHORT).show();});}});
     }
     static void confirmRemove(Activity activity,JSONObject record,ExecutorService disk,Runnable changed){
