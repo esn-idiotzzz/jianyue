@@ -101,15 +101,25 @@ class AppUpdate(private var activity: Activity) {
             setTextIsSelectable(true)
         }
         val scroll = ScrollView(activity).apply { addView(notes) }
+        @Suppress("DEPRECATION")
+        val installedCode = if (Build.VERSION.SDK_INT >= 28) {
+            activity.packageManager.getPackageInfo(activity.packageName, 0).longVersionCode
+        } else {
+            activity.packageManager.getPackageInfo(activity.packageName, 0).versionCode.toLong()
+        }
+        // Old builds keep the historical GitHub page behaviour; builds that ship this direct
+        // downloader (code 56 / 1.2.2+) open the release APK asset directly.
+        val directApk = installedCode >= 56L && release.downloadUrl != null
+        val targetUrl = if (directApk) release.downloadUrl!! else release.url
         dialog = PredictiveBack.dialog(activity)
             .setTitle("发现新版本")
             .setView(scroll)
             .setNegativeButton("取消更新", null)
-            .setPositiveButton("下载 APK") { _, _ ->
+            .setPositiveButton(if (directApk) "下载 APK" else "Github") { _, _ ->
                 try {
-                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.downloadUrl ?: release.url)))
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
                 } catch (_: ActivityNotFoundException) {
-                    Toast.makeText(activity, "没有可打开下载链接的浏览器", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, if (directApk) "没有可打开下载链接的浏览器" else "没有可打开 GitHub 的浏览器", Toast.LENGTH_SHORT).show()
                 }
             }
             .create().also { update ->
