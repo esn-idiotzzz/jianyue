@@ -1045,6 +1045,7 @@ public final class MainActivity extends Activity {
         return super.dispatchTouchEvent(ev);
     }
     @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);if(firstRunGuide!=null)firstRunGuide.showIfNeeded();if(predictiveBack!=null){predictiveBack.reinstall();getWindow().getDecorView().postDelayed(()->{if(predictiveBack!=null)predictiveBack.reinstall();},350);}}
+    @Override protected void onStart(){super.onStart();if(predictiveBack!=null)predictiveBack.reinstall();}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&predictiveBack!=null)predictiveBack.reinstall();}
     @Override protected void onPause(){cancelShelfMenu();hideShelfDropPill();super.onPause();resumed=false;if(downloadReceiverRegistered){unregisterReceiver(downloadChanges);downloadReceiverRegistered=false;}handler.removeCallbacks(poll);handler.removeCallbacks(downloadRefresh);}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}

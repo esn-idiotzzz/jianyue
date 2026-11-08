@@ -57,7 +57,7 @@ public final class PredictiveBack implements AutoCloseable {
     public boolean isLeavingByGesture(){return gestureLeaving;}
     /** Re-register after the Activity returns to the foreground; some launchers drop the callback. */
     public void reinstall(){
-        if(Build.VERSION.SDK_INT<33||closed||!canHandle.getAsBoolean())return;
+        if(Build.VERSION.SDK_INT<33||closed||gesturing||!canHandle.getAsBoolean())return;
         // Always replace the callback on resume: a launcher may have dropped it while keeping
         // our unregister token alive, and a stale token cannot tell us whether it still works.
         unregisterSafely();
