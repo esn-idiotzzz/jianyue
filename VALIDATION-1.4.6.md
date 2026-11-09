@@ -29,7 +29,7 @@
 - 点击“跳转”进入书架/书籍夹并定位到本地书籍；封面显示主题蓝框，触摸屏幕后蓝框消失（截图：`jump.png`）。
 - 本地书在书籍夹时，跳转后进入对应书籍夹；点击左上角返回回到导航栏“浏览”页，不新增页面（UI XML：`uifold.xml`、`uiback.xml`）。
 - 普通书架根目录跳转直接切换书架页并定位，不新增 Activity。
-- 升级路径：先安装 1.4.5（versionCode 67），再覆盖安装 1.4.6（versionCode 68）成功，书架、书籍夹与本地书籍数据保留（截图：`upgrade.png`）。
+- 升级路径：先安装 1.4.5（versionCode 67），启动后更新弹窗显示“最新版本：1.4.6”并提供“下载 APK”；随后覆盖安装 1.4.6（versionCode 68）成功，书架、书籍夹与本地书籍数据保留（截图：`update146.png`、`upgrade.png`）。
 - 手势导航模式设置为 gestural 后运行系统返回测试，12 项仪器测试全部通过。
 
 ## 代码改动
@@ -48,3 +48,9 @@
 - 真实 JM 站点与真实第三方图源的网络连通性、限速和长时间阅读未做端到端压力测试。
 - 隐私书架跳转在模拟器上验证了无密码定位代码路径；不同 OEM 的返回手势仍以 Android 15 gestural 为准。
 - 在线图片预取遵循阅读器“仅 WiFi 预加载”设置；关闭该限制时才在移动网络执行完整预取。
+
+## GitHub 发布
+
+- `v1.4.4` 的正式 release 和 tag 已删除；`v1.4.5` 在 GitHub 不存在（仅本地废弃构建）。
+- `v1.4.6` 已发布为 latest，target commit `2c42cca954c292c6b3afe552642d88ff705402ef`，body 含 `jianyue-version-code:68`。
+- `releases/latest/download/update.json` 返回 1.4.6 / versionCode 68 / APK SHA-256 `22a70c...4fbb`。
