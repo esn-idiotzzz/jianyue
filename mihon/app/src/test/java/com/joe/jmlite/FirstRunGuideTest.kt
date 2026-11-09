@@ -23,6 +23,9 @@ class FirstRunGuideTest {
             every { editor.apply() } answers { persisted=true }
         }
         fun guide()=FirstRunGuide(activity,preferences) { callbacks.incrementAndGet() }
+        fun ready(guide:FirstRunGuide){
+            FirstRunGuide::class.java.getDeclaredField("confirmReady").apply{isAccessible=true}.setBoolean(guide,true)
+        }
     }
 
     @Test fun `first use requires the guide without marking it as read`() {
@@ -43,6 +46,10 @@ class FirstRunGuideTest {
 
     @Test fun `the explicit acknowledgment persists once and releases the launch slot`() {
         val fixture=Fixture();val guide=fixture.guide()
+        guide.acknowledge()
+        assertFalse(fixture.persisted)
+        assertEquals(0,fixture.callbacks.get())
+        fixture.ready(guide)
         guide.acknowledge();guide.acknowledge()
         assertTrue(fixture.persisted)
         assertFalse(guide.needsAcknowledgment())

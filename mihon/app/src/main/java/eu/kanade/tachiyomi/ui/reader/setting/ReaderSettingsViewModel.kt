@@ -292,34 +292,13 @@ class ReaderSettingsViewModel(
     fun setOrientation(orientation: ReaderOrientation) = readerViewModel.setMangaOrientationType(orientation)
 
     /**
-     * Restores every setting shown in the 阅读模式 / 常规 / 滤镜 tabs to its default value.
+     * Restores every setting shown in the 常规 / 滤镜 tabs to its default value.
+     *
+     * The 阅读模式 tab is intentionally untouched: its current reading direction, orientation and
+     * viewer-specific toggles remain exactly as the user set them for this book.
      */
     fun resetReaderSettings() {
         listOf<Preference<*>>(
-            // 阅读模式
-            preferences.defaultReadingMode,
-            preferences.defaultOrientationType,
-            preferences.imageScaleType,
-            preferences.zoomStart,
-            preferences.cropBorders,
-            preferences.landscapeZoom,
-            preferences.navigateToPan,
-            preferences.dualPageSplitPaged,
-            preferences.dualPageInvertPaged,
-            preferences.dualPageRotateToFit,
-            preferences.dualPageRotateToFitInvert,
-            preferences.cropBordersWebtoon,
-            preferences.dualPageSplitWebtoon,
-            preferences.dualPageInvertWebtoon,
-            preferences.dualPageRotateToFitWebtoon,
-            preferences.dualPageRotateToFitInvertWebtoon,
-            preferences.webtoonSidePadding,
-            preferences.webtoonDoubleTapZoomEnabled,
-            preferences.webtoonDisableZoomOut,
-            preferences.navigationModePager,
-            preferences.pagerNavInverted,
-            preferences.navigationModeWebtoon,
-            preferences.webtoonNavInverted,
             // 常规
             preferences.readerTheme,
             preferences.showPageNumber,
@@ -345,10 +324,6 @@ class ReaderSettingsViewModel(
             preferences.grayscale,
             preferences.invertedColors,
         ).forEach { it.delete() }
-        // This app opens books as long strip by default, like a fresh install does.
-        preferences.defaultReadingMode.set(ReadingMode.WEBTOON.flagValue)
-        setReadingMode(ReadingMode.DEFAULT)
-        setOrientation(ReaderOrientation.DEFAULT)
     }
 
     /**

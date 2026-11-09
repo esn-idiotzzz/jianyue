@@ -270,6 +270,29 @@ object OnlineRepository {
         )
     }
 
+    /**
+     * Warms up the bundled 禁漫天堂 source on a fresh install. The first real search is what makes the
+     * extension initialize its filters/HTTP client, so run the same query silently while the first
+     * run manual is visible. Progress and results stay internal and no notification is posted.
+     */
+    suspend fun warmUpJmSearch(context: Context): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val source = ensureChineseSources(context) {}.firstOrNull { candidate ->
+                candidate.name.contains("禁漫") ||
+                    candidate.name.contains("Jinman", ignoreCase = true) ||
+                    candidate.javaClass.name.contains("jinmantiantang", ignoreCase = true)
+            } ?: return@withContext false
+            withTimeout(20_000) {
+                source.getSearchManga(1, "1", source.getFilterList())
+            }
+            true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     /** Search the bundled 禁漫天堂 source by JM id and open its first chapter directly. */
     suspend fun directJmRead(context: Context, query: String, fromStart: Boolean = true): Boolean = withContext(Dispatchers.IO) {
         val graph = context.applicationContext.appGraph

@@ -3,6 +3,10 @@ package com.joe.jmlite;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.os.Handler;
+import android.os.Looper;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -10,11 +14,14 @@ import android.widget.TextView;
 /** The manual is acknowledged only by its explicit confirmation button. */
 public final class FirstRunGuide implements AutoCloseable {
     static final String ACKNOWLEDGED="first_run_guide_acknowledged";
+    private static final long CONFIRM_DELAY_MS=5000L;
     private final Activity activity;
     private final SharedPreferences preferences;
     private final Runnable onAcknowledged;
+    private Handler handler;
     private AlertDialog dialog;
-    private boolean acknowledged,closed;
+    private boolean acknowledged,closed,confirmReady;
+    private Runnable enableConfirm;
 
     public FirstRunGuide(Activity activity,SharedPreferences preferences,Runnable onAcknowledged){
         this.activity=activity;this.preferences=preferences;this.onAcknowledged=onAcknowledged;
@@ -28,6 +35,7 @@ public final class FirstRunGuide implements AutoCloseable {
     public boolean showIfNeeded(){
         if(!needsAcknowledgment())return false;
         if(isShowing())return true;
+        if(handler==null)handler=new Handler(Looper.getMainLooper());
         Ui ui=new Ui(activity);
         LinearLayout body=ui.column();body.setPadding(ui.dp(22),ui.dp(6),ui.dp(22),ui.dp(10));
         String[] sections={
@@ -48,17 +56,37 @@ public final class FirstRunGuide implements AutoCloseable {
         content.addView(scroll,new LinearLayout.LayoutParams(-1,height));
         final AlertDialog shown=PredictiveBack.dialog(activity).setTitle("首次使用 · 使用手册").setView(content)
                 .setCancelable(false).setPositiveButton("我已知晓",(d,which)->acknowledge()).create();
-        dialog=shown;shown.setCanceledOnTouchOutside(false);shown.setOnShowListener(d->shown.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Ui.BLUE));shown.show();
+        dialog=shown;shown.setCanceledOnTouchOutside(false);
+        confirmReady=false;
+        shown.setOnShowListener(d->{
+            Button confirm=shown.getButton(AlertDialog.BUTTON_POSITIVE);
+            int disabled=ui.dark?0xff8c8c8c:0xff757575;
+            confirm.setTextColor(new ColorStateList(
+                    new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},
+                    new int[]{disabled,Ui.BLUE}));
+            confirm.setAlpha(1f);
+            confirm.setEnabled(false);
+            if(enableConfirm!=null)handler.removeCallbacks(enableConfirm);
+            enableConfirm=()->{
+                if(dialog!=shown||!shown.isShowing()||closed)return;
+                confirmReady=true;
+                confirm.setEnabled(true);
+                enableConfirm=null;
+            };
+            handler.postDelayed(enableConfirm,CONFIRM_DELAY_MS);
+        });
+        shown.show();
         return true;
     }
 
     void acknowledge(){
-        if(!needsAcknowledgment())return;
+        if(!needsAcknowledgment()||!confirmReady)return;
         acknowledged=true;preferences.edit().putBoolean(ACKNOWLEDGED,true).apply();
-        AlertDialog shown=dialog;dialog=null;if(shown!=null)shown.dismiss();
+        AlertDialog shown=dialog;dialog=null;if(enableConfirm!=null){handler.removeCallbacks(enableConfirm);enableConfirm=null;}
+        if(shown!=null)shown.dismiss();
         onAcknowledged.run();
     }
 
     /** Activity destruction must not count as having read the manual. */
-    @Override public void close(){closed=true;AlertDialog shown=dialog;dialog=null;if(shown!=null)shown.dismiss();}
+    @Override public void close(){closed=true;confirmReady=false;if(enableConfirm!=null){handler.removeCallbacks(enableConfirm);enableConfirm=null;}AlertDialog shown=dialog;dialog=null;if(shown!=null)shown.dismiss();}
 }
