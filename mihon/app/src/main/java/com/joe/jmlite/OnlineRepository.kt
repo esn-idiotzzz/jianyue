@@ -13,6 +13,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import mihon.app.di.appGraph
 import org.json.JSONObject
@@ -271,15 +272,16 @@ object OnlineRepository {
 
     /** Search the bundled 禁漫天堂 source by JM id and open its first chapter directly. */
     suspend fun directJmRead(context: Context, query: String, fromStart: Boolean = true): Boolean = withContext(Dispatchers.IO) {
-        val sources = ensureChineseSources(context) {}
-        val source = sources.firstOrNull {
-            it.name.contains("禁漫") || it.name.contains("Jinman", ignoreCase = true) ||
-                it.javaClass.name.contains("jinmantiantang", ignoreCase = true)
-        } ?: throw IllegalStateException("未找到禁漫天堂图源")
+        val graph = context.applicationContext.appGraph
+        val loaded = runCatching { graph.sourceManager.sources.first() }.getOrDefault(emptyList()).filterIsInstance<HttpSource>()
+        fun isJm(source: HttpSource) = source.name.contains("禁漫") || source.name.contains("Jinman", ignoreCase = true) || source.javaClass.name.contains("jinmantiantang", ignoreCase = true)
+        val source = loaded.firstOrNull(::isJm)
+            ?: ensureChineseSources(context) {}.firstOrNull(::isJm)
+            ?: throw IllegalStateException("未找到禁漫天堂图源")
         val page = withTimeout(45_000) {
             source.getSearchManga(1, query, source.getFilterList())
         }
-        val manga = page.mangas.firstOrNull() ?: throw IllegalStateException("禁漫天堂未找到编号 $query")
+        val manga = page.mangas.firstOrNull { it.title.contains(query) || it.url.contains(query) } ?: page.mangas.firstOrNull() ?: throw IllegalStateException("禁漫天堂未找到编号 $query")
         val details = loadDetails(context, source.id, manga.url, manga.title, manga.thumbnail_url)
         DirectJmHistory.mark(details.manga.id, query)
         val chapter = (if(fromStart) details.chapters.lastOrNull() else details.chapters.firstOrNull { it.lastPageRead > 0 && !it.read }) ?: details.chapters.lastOrNull() ?: throw IllegalStateException("该漫画暂无章节")

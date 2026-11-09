@@ -113,7 +113,7 @@ public final class MainActivity extends Activity {
     private static final float DRAG_TARGET_SCALE=.96f,DRAG_PREVIEW_SCALE=.93f;
     private ValueAnimator actionAnimator;private View tabOutgoing;private int tab1Scroll,tab2Scroll;private List<JSONObject> normalBooksCache,normalFoldersCache;private FolderCoverIndex normalCoversCache;
     private FirstRunGuide firstRunGuide;
-    private boolean privateShelf;
+    private boolean privateShelf;private boolean parentListDirty;
     private Boolean navVisibleTarget;
     private int navigationInset;private boolean tabletDevice;private int folderPreviewDepth;
     private FolderCoverIndex folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());
@@ -385,7 +385,7 @@ public final class MainActivity extends Activity {
         String leaving=folderId;String parent="";for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))parent=f.optString("parent");
         folderId=parent;library.preserveFolder(parent);
         boolean optimistic=collapseFolderInMemory(leaving);
-        if(gesture)buildTab();else transitionContent(-1,this::buildTab);releaseFolderInBackground(library,leaving,optimistic);if(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
+        boolean dirty=parentListDirty;parentListDirty=false;if(gesture){if(dirty)BackPreview.hide();buildTab();}else transitionContent(-1,this::buildTab);releaseFolderInBackground(library,leaving,optimistic);if(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
     }
     /** Apply the pending collapse before the parent shelf is drawn, so the folder never flashes. */
     private boolean collapseFolderInMemory(String folderId){
@@ -408,6 +408,7 @@ public final class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleShelfJump(intent);}
     private void handleShelfJump(Intent intent){String key=intent.getStringExtra("shelf_jump");if(key==null)return;intent.removeExtra("shelf_jump");String highlight=intent.getStringExtra("shelf_highlight");intent.removeExtra("shelf_highlight");if(highlight==null||highlight.isEmpty())clearShelfHighlight();Runnable jump=()->disk.execute(()->{try{JSONObject book=new Library(this).find(key);runOnUiThread(()->{if(book==null||isDestroyed())return;Runnable navigate=()->{tab=1;shelfSearch.collapse();shelfQuery="";setPrivateShelf(book.optBoolean("privacy"));folderId=book.optString("folder");library.preserveFolder(folderId);highlightKey=highlight==null?"":highlight;highlightScrollPending=!highlightKey.isEmpty();buildTab();refresh(true);};if(book.optBoolean("privacy"))PrivacyVault.enter(this,navigate);else navigate.run();});}catch(Exception e){runOnUiThread(()->toast("书籍已不存在"));}});if(intent.getBooleanExtra("shelf_private",false))PrivacyVault.enter(this,jump);else jump.run();}
     private void setPrivateShelf(boolean hidden){
+        if(!hidden&&parentListDirty){BackPreview.hide();parentListDirty=false;}
         while(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
         if(hidden&&!privateShelf){
             // Keep the real normal shelf as the return target; no empty rebuild while the disk read runs.
@@ -436,7 +437,7 @@ public final class MainActivity extends Activity {
         }
         rowsSnapshot="";buildTab();refresh(true);
     }
-    private void transferPrivacy(JSONObject book,boolean folder){Runnable move=()->mutate(()->library.transfer(folder?book.optString("id"):Library.key(book),folder,!privateShelf));if(privateShelf)move.run();else PrivacyVault.beforeFirstUse(this,move);}
+    private void transferPrivacy(JSONObject book,boolean folder){parentListDirty=true;Runnable move=()->mutate(()->library.transfer(folder?book.optString("id"):Library.key(book),folder,!privateShelf));if(privateShelf)move.run();else PrivacyVault.beforeFirstUse(this,move);}
     private void attachPrivacyPull(PrivacyPullHost frame){
         final GridView pullGrid=grid;final TextView pullEmpty=emptyShelf;
         final float[] start={-1},distance={0},startX={0};final boolean[] pulling={false};final float threshold=getResources().getDisplayMetrics().heightPixels/3f;
@@ -1032,7 +1033,7 @@ public final class MainActivity extends Activity {
         if(item.optBoolean("book_folder")){
             if(Library.isProtectedFolder(item)){toast("系统书籍夹不能拆除");return;}
             // Dismantle: its books and every nested folder's books return to the list it is dragged onto.
-            mutate(()->library.deleteFolder(item.optString("id")));
+            parentListDirty=true;mutate(()->library.deleteFolder(item.optString("id")));
             return;
         }
         String parent="";JSONObject current=null;
@@ -1042,11 +1043,11 @@ public final class MainActivity extends Activity {
             moveLastBookOut(item,parent,folderId);
             return;
         }
-        final String target=parent;final String key=Library.key(item);final boolean unfavorite=isFavorite(item)&&!inFavoriteTree(target);
+        parentListDirty=true;final String target=parent;final String key=Library.key(item);final boolean unfavorite=isFavorite(item)&&!inFavoriteTree(target);
         try{item.put("folder",target);if(unfavorite)item.put("favorite",false);}catch(Exception ignored){}folderCovers=FolderCoverIndex.from(libraryBooks,bookFolders);rowsSnapshot="";render();
         mutate(()->library.moveWithFavorite(key,target,unfavorite));
     }
-    private void moveLastBookOut(JSONObject item,String parent,String leaving){
+    private void moveLastBookOut(JSONObject item,String parent,String leaving){parentListDirty=true;
         if(operation){toast("请等待当前操作完成");return;}
         operation=true;final String key=Library.key(item);
         disk.execute(()->{String error=null;boolean local=false;
@@ -1161,7 +1162,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.2").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.3").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){

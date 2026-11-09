@@ -38,9 +38,10 @@ class MihonEntryActivity : Activity() {
             addView(TextView(this@MihonEntryActivity).apply {
                 text = "正在加载callio~"
                 textSize = 14f
+                gravity = Gravity.CENTER
                 setTextColor(ui.muted)
-                setPadding(0, ui.dp(20f), 0, 0)
-            })
+                setPadding(0, ui.dp(12f), 0, 0)
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
         setContentView(box)
         scope.launch {

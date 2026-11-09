@@ -1,4 +1,4 @@
-# 简阅 1.4.2
+# 简阅 1.4.3
 
 简阅是 Android 漫画阅读应用，提供本地书架、JM 漫画入口、中文图源搜索与浏览、下载和阅读历史。阅读器和图源运行框架基于 Mihon，JM 接口与图片还原参考 JMComic-Crawler-Python，内置扩展来自 Keiyoushi；各项目的来源、用途和许可证见下方说明。
 
@@ -6,6 +6,13 @@
 - 下载：[最新正式版](https://github.com/esn-idiotzzz/jianyue/releases/latest)
 - 系统：Android 8.0 及以上，`arm64-v8a`
 - 包名：`com.joe.jmlite`
+
+## 1.4.3 更新
+
+- 书籍夹排列变化后按钮/手势返回共用预渲染父目录，旧预览快照不覆盖新状态。
+- JM 在线阅读优先已加载禁漫天堂源，首个精确编号结果直接进入；加载文字居中于圆环下方。
+- 条漫保留黑色过渡信息板块但压缩高度，移除 transition 永久 force，避免卡住。
+- 版本提升到 1.4.3（versionCode 65），上传 GitHub。
 
 ## 1.4.2 更新
 
