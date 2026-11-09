@@ -75,7 +75,7 @@ public final class MainActivity extends Activity {
     private OnlineAdapter onlineAdapter;
     private int tab=1,refreshGeneration=0,pendingShelfScroll=-1;
     private static boolean readerCacheCleared;private boolean resumed=false,reading=false,starting=false,operation=false,revealed=true,keyboardVisible;
-    private String rowsSnapshot="",draft="",searchDraft="",taskId="",folderId="",highlightKey="";
+    private String rowsSnapshot="",draft="",searchDraft="",taskId="",folderId="",highlightKey="";private long localCoverStamp,historyCoverStamp;
     private boolean highlightScrollPending;
     private boolean jumpReturnBrowse;
     private JSONObject pendingShare;
@@ -135,7 +135,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle b){
         if(b==null&&isTaskRoot())PrivacyVault.resetSession();
-        super.onCreate(b);SessionCovers.install(this);clearReaderCacheOnce();getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
+        super.onCreate(b);SessionCovers.install(this);clearReaderCacheOnce();getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);tabletDevice=AdaptiveLayout.isTabletDevice(this);u=new Ui(this);store=new Store(this);library=new Library(this);covers=new CoverLoader(this);prefs=getSharedPreferences("settings",MODE_PRIVATE);revealed=prefs.getBoolean("history_revealed",true);localCoverStamp=prefs.getLong("local_cover_stamp",0);historyCoverStamp=prefs.getLong("history_cover_stamp",0);if(prefs.contains("tablet_download_shrink_dp"))prefs.edit().remove("tablet_download_shrink_dp").apply();
         if(b!=null){tab=b.getInt("tab",1);draft=b.getString("draft","");searchDraft=b.getString("search","");folderId=b.getString("folder","");taskId=b.getString("task_id","");pendingShelfScroll=b.getInt("shelf_scroll",-1);}
         library.preserveFolder(folderId);
         LinearLayout root=u.column();root.setBackgroundColor(u.bg);Ui.insets(this,root,u.dark);
@@ -600,7 +600,8 @@ public final class MainActivity extends Activity {
                     .append(b.optLong("completedAt")).append('\u0001').append(b.optInt("downloadedChapters")).append('\u0001')
                     .append(b.optString("thumbnail")).append('\u0001').append(b.optLong("sourceId")).append('\u0001')
                     .append(b.optString("url")).append('\u0001').append(b.optString("lastChapterName")).append('\u0001')
-                    .append(b.optInt("chapterCount")).append('\u0001').append(b.optString("sourceName")).append('\u0001');
+                    .append(b.optInt("chapterCount")).append('\u0001').append(b.optString("sourceName")).append('\u0001')
+                    .append(b.optString("cover")).append('\u0001').append(b.optLong("coverUpdated")).append('\u0001');
             if(b.optBoolean("book_folder"))out.append(folderCovers.signature(b.optString("id")));
             out.append('\u0002');
         }
@@ -1186,7 +1187,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.7").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.5.0").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){
@@ -1203,7 +1204,7 @@ public final class MainActivity extends Activity {
         if((action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)&&!highlightKey.isEmpty())clearShelfHighlight();
         return super.dispatchTouchEvent(ev);
     }
-    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);showFirstRunGuide();if(predictiveBack!=null)predictiveBack.reinstall();}
+    @Override protected void onResume(){super.onResume();preparingDownload=false;if(!downloadReceiverRegistered){androidx.core.content.ContextCompat.registerReceiver(this,downloadChanges,new IntentFilter(DownloadService.ACTION_CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);downloadReceiverRegistered=true;}resumed=true;handler.post(poll);showFirstRunGuide();long coverStamp=prefs==null?0:prefs.getLong("local_cover_stamp",0);if(coverStamp!=localCoverStamp){localCoverStamp=coverStamp;refresh(true);}long historyStamp=prefs==null?0:prefs.getLong("history_cover_stamp",0);if(historyStamp!=historyCoverStamp){historyCoverStamp=historyStamp;if(tab==2)refresh(true);}if(predictiveBack!=null)predictiveBack.reinstall();}
     /** The manual and its silent source warm-up are strictly first-install UI. */
     private void showFirstRunGuide(){
         if(firstRunGuide!=null&&firstRunGuide.showIfNeeded())FirstRunSearch.start(this);
@@ -1244,6 +1245,7 @@ public final class MainActivity extends Activity {
             super(MainActivity.this);setOrientation(VERTICAL);setPadding(0,0,0,u.dp(10));
             LinearLayout body=u.row();body.setPadding(u.dp(14),u.dp(12),u.dp(14),u.dp(12));u.round(body,u.card,20);addView(body,new LinearLayout.LayoutParams(-1,-2));
             FrameLayout coverFrame=new FrameLayout(MainActivity.this);coverFrame.setBackground(u.shape(u.tint,12));coverFrame.setClipToOutline(true);
+            Ui.Icon placeholder=u.icon("book",Ui.BLUE);placeholder.setMinimumWidth(0);placeholder.setMinimumHeight(0);placeholder.glyphScale=.72f;coverFrame.addView(placeholder,new FrameLayout.LayoutParams(u.dp(22),u.dp(22),Gravity.CENTER));
             cover=new ImageView(MainActivity.this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);coverFrame.addView(cover,new FrameLayout.LayoutParams(-1,-1));
             body.addView(coverFrame,new LinearLayout.LayoutParams(u.dp(52),u.dp(72)));
             LinearLayout details=u.column();LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-2,1);dp.setMargins(u.dp(14),0,u.dp(8),0);body.addView(details,dp);
@@ -1289,6 +1291,13 @@ public final class MainActivity extends Activity {
         }
         void bind(JSONObject book,boolean show){
             image.setTag(book);image.setVisibility(show?View.VISIBLE:View.INVISIBLE);
+            if(tab==2){
+                remote=false;
+                RemoteCovers.load(image,"",0L);
+                covers.clear(image);
+                if(show)HistoryCovers.load(image,MainActivity.this,book);
+                return;
+            }
             boolean next=show&&book.optString("thumbnail").startsWith("http");
             if(remote&&!next)RemoteCovers.load(image,"",0L);
             if(!remote&&next)covers.clear(image);

@@ -55,7 +55,7 @@ public final class BookInfoActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content=u.column();content.setGravity(Gravity.CENTER_HORIZONTAL);content.setPadding(u.dp(24),u.dp(20),u.dp(24),u.dp(30));
         FrameLayout cover=new FrameLayout(this);cover.setBackground(u.shape(u.tint,18));cover.setClipToOutline(true);cover.setElevation(u.dp(6));
-        TextView mark=u.text("JM",22,Ui.BLUE,true);mark.setGravity(Gravity.CENTER);cover.addView(mark,new FrameLayout.LayoutParams(-1,-1));
+        Ui.Icon mark=u.icon("book",Ui.BLUE);mark.setMinimumWidth(0);mark.setMinimumHeight(0);mark.glyphScale=.72f;cover.addView(mark,new FrameLayout.LayoutParams(u.dp(22),u.dp(22),Gravity.CENTER));
         coverImage=new ImageView(this);coverImage.setScaleType(ImageView.ScaleType.CENTER_CROP);coverImage.setTag(book);cover.addView(coverImage,new FrameLayout.LayoutParams(-1,-1));
         loadCover();
         LinearLayout.LayoutParams coverParams=new LinearLayout.LayoutParams(u.dp(120),u.dp(168));coverParams.bottomMargin=u.dp(18);content.addView(cover,coverParams);
@@ -109,9 +109,9 @@ public final class BookInfoActivity extends Activity {
         if(backPreview&&!isChangingConfigurations()){backPreview=false;BackPreview.pop();}
         PageMotion.prepareExit(this,gesture);super.finish();PageMotion.exitLegacy(this,gesture);
     }
-    @Override protected void onResume(){super.onResume();if(predictiveBack!=null)predictiveBack.reinstall();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}}
+    @Override protected void onResume(){super.onResume();if(predictiveBack!=null)predictiveBack.reinstall();refreshFavorite();if(onlineJm){refreshOnlineRecord();refreshDownloadButton();}else refreshLocalRecord();}
     @Override protected void onStop(){if(predictiveBack!=null)predictiveBack.onStop();super.onStop();}
-    private void loadCover(){if(book==null)return;String thumb=book.optString("thumbnail");if(thumb.startsWith("http"))RemoteCovers.load(coverImage,thumb,OnlineHistory.isJm(book)?0L:book.optLong("sourceId"));else covers.load(coverImage,book);}
+    private void loadCover(){if(book==null)return;if(onlineJm){HistoryCovers.load(coverImage,this,book);return;}covers.load(coverImage,book);}
     @Override protected void onDestroy(){if(backPreview&&isFinishing()&&!isChangingConfigurations())BackPreview.pop();if(predictiveBack!=null)predictiveBack.close();disk.shutdownNow();covers.close();super.onDestroy();}
 
     private static String plate(JSONObject b){
@@ -142,6 +142,24 @@ public final class BookInfoActivity extends Activity {
                     loadCover();
                 }
                 pages.setText(OnlineHistory.readingLabel(book));
+            });
+        });
+    }
+
+    /** Keep the local detail page in sync with a reader-chosen cover or updated page count. */
+    private void refreshLocalRecord(){
+        if(onlineJm||key==null||key.isEmpty())return;
+        disk.execute(()->{
+            JSONObject latest=null;
+            try{latest=library.find(key);}catch(Exception ignored){}
+            final JSONObject record=latest;
+            if(record==null)return;
+            runOnUiThread(()->{
+                if(isDestroyed())return;
+                try{for(Iterator<String> keys=record.keys();keys.hasNext();){String field=keys.next();book.put(field,record.get(field));}}catch(Exception ignored){}
+                if(!book.optString("title").isEmpty())nameView.setText(book.optString("title"));
+                pages.setText("共 "+Math.max(0,book.optInt("done"))+" 页");
+                loadCover();
             });
         });
     }

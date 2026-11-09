@@ -219,19 +219,28 @@ class JmPageLoader(context: Context, private val descriptor: String) : PageLoade
     private fun saveHistoryCover(file:java.io.File){
         runCatching {
             val id=source.lastPathSegment?:return
-            val folder=java.io.File(app.cacheDir,"jm-history-covers").apply{mkdirs()}
-            val target=java.io.File(folder,"${JmApi.parseId(id)}.jpg")
-            if(target.isFile)return
-            val options=android.graphics.BitmapFactory.Options().apply{inJustDecodeBounds=true}
-            android.graphics.BitmapFactory.decodeFile(file.path,options)
-            if(options.outWidth<=0||options.outHeight<=0)return
-            var sample=1;while(options.outWidth/sample>240||options.outHeight/sample>336)sample*=2
-            options.inJustDecodeBounds=false;options.inSampleSize=sample
-            val bitmap=android.graphics.BitmapFactory.decodeFile(file.path,options)?:return
-            try {target.outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,82,it)}}finally{bitmap.recycle()}
+            val numeric=JmApi.parseId(id)
+            val target=HistoryCovers.jmCoverFile(app,numeric)
+            val legacy=java.io.File(app.cacheDir,"jm-history-covers/$numeric.jpg")
+            if(!target.isFile&&legacy.isFile){
+                target.parentFile?.mkdirs()
+                if(!legacy.renameTo(target))legacy.copyTo(target,overwrite=true)
+            }
+            if(!target.isFile){
+                target.parentFile?.mkdirs()
+                val options=android.graphics.BitmapFactory.Options().apply{inJustDecodeBounds=true}
+                android.graphics.BitmapFactory.decodeFile(file.path,options)
+                if(options.outWidth<=0||options.outHeight<=0)return
+                var sample=1;while(options.outWidth/sample>240||options.outHeight/sample>336)sample*=2
+                options.inJustDecodeBounds=false;options.inSampleSize=sample
+                val bitmap=android.graphics.BitmapFactory.decodeFile(file.path,options)?:return
+                try {target.outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,82,it)}}finally{bitmap.recycle()}
+            }
             val history=OnlineHistory(app,true)
-            val record=history.find("-1",id)?:return
+            val record=history.find("-1",numeric)?:return
             history.save(record.put("thumbnail",Uri.fromFile(target).toString()))
+            app.getSharedPreferences("settings",0).edit()
+                .putLong("history_cover_stamp",System.currentTimeMillis()).apply()
         }
     }
 

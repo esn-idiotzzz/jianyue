@@ -1047,6 +1047,14 @@ class ReaderViewModel(
             val result = appScope.async {
                 try {
                     manga.editCover(coverManager, stream(), updateManga, coverCache)
+                    if (manga.isLocal()) {
+                        // Keep the app's downloaded shelf/detail cover in sync with Mihon's
+                        // local cover. Online catalog records intentionally never reach here.
+                        val saved = stream().use { input ->
+                            com.joe.jmlite.LocalCoverStore.save(context, manga.url, input)
+                        }
+                        check(saved) { "无法保存书架封面" }
+                    }
                     if (manga.isLocal() || manga.favorite) {
                         SetAsCoverResult.Success
                     } else {

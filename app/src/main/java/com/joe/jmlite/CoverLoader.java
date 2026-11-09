@@ -40,7 +40,7 @@ final class CoverLoader implements AutoCloseable {
     void clear(ImageView view){view.setTag(COVER_TAG,null);view.setImageDrawable(null);}
 
     void load(ImageView view,JSONObject book){
-        String key=Library.key(book);
+        String key=cacheKey(book);
         if(key.equals(view.getTag(COVER_TAG))&&view.getDrawable()!=null)return;
         view.setTag(COVER_TAG,key);view.setImageDrawable(null);
         if(closed||key.isEmpty())return;
@@ -54,6 +54,14 @@ final class CoverLoader implements AutoCloseable {
         enqueue(new WeakReference<>(view),book,key);
     }
 
+    /** The reader-set cover changes both the file and its version, so stale bitmaps are bypassed. */
+    private static String cacheKey(JSONObject book){
+        String key=Library.key(book);
+        String cover=book.optString("cover");
+        if(cover.isEmpty())return key;
+        return key+"|"+book.optLong("coverUpdated")+"|"+cover;
+    }
+
     private void enqueue(WeakReference<ImageView> target,JSONObject book,String key){
         if(closed)return;
         try{workers.execute(()->{
@@ -61,9 +69,14 @@ final class CoverLoader implements AutoCloseable {
             try{
                 Bitmap image=cache.get(key);
                 if(image==null){
-                    List<LocalImages.Page> pages=(book.optBoolean("download_history")||OnlineHistory.isJm(book))&&!book.optString("thumbnail").isEmpty()?java.util.Collections.singletonList(new LocalImages.Page(book.optString("thumbnail"),"cover.jpg")):library.pages(book);
-                    if(pages.isEmpty()||closed||Thread.currentThread().isInterrupted())return;
-                    image=decode(pages.get(0).uri);
+                    String source=book.optString("cover");
+                    if(source.isEmpty()){
+                        List<LocalImages.Page> pages=(book.optBoolean("download_history")||OnlineHistory.isJm(book))&&!book.optString("thumbnail").isEmpty()?java.util.Collections.singletonList(new LocalImages.Page(book.optString("thumbnail"),"cover.jpg")):library.pages(book);
+                        if(pages.isEmpty())return;
+                        source=pages.get(0).uri;
+                    }
+                    if(source.isEmpty()||closed||Thread.currentThread().isInterrupted())return;
+                    image=decode(source);
                     if(image==null)return;
                     synchronized(cache){
                         if(closed){image.recycle();return;}

@@ -40,11 +40,26 @@ public final class Store {
     }
 
     public void write(String id, JSONObject meta) throws Exception {
+        write(id, meta, true);
+    }
+
+    /** Persist a reader-chosen cover without changing the download's sort timestamp. */
+    public void setCover(String id, String cover, long stamp) throws Exception {
+        synchronized (LOCK) {
+            JSONObject meta = read(id);
+            if (meta == null) return;
+            meta.put("cover", cover);
+            meta.put("coverUpdated", stamp);
+            write(id, meta, false);
+        }
+    }
+
+    private void write(String id, JSONObject meta, boolean touchUpdated) throws Exception {
         synchronized (LOCK) {
             File folder = dir(id);
             if (!folder.isDirectory() && !folder.mkdirs()) throw new java.io.IOException("无法创建保存目录");
             meta.put("id", id);
-            meta.put("updated", System.currentTimeMillis());
+            if (touchUpdated) meta.put("updated", System.currentTimeMillis());
             AtomicFile file = new AtomicFile(new File(folder, "meta.json"));
             FileOutputStream out = null;
             try {
