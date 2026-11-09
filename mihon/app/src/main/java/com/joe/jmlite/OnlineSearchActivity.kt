@@ -204,7 +204,8 @@ class OnlineSearchActivity : Activity() {
                     .putExtra("thumbnail", item.thumbnail)
                     .putExtra("author", item.author)
                     .putExtra("description", item.description)
-                    .putExtra("sourceName", item.sourceName),
+                    .putExtra("sourceName", item.sourceName)
+                    .putExtra("promote_history", true),
             )
         }
         grid.setOnItemLongClickListener { _,_,position,_ ->

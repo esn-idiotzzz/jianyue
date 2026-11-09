@@ -392,7 +392,7 @@ class ReaderViewModel(
             chapterList.getOrNull(chapterPos - 1),
             chapterList.getOrNull(chapterPos + 1),
         )
-        preloadNextChapterAfter(newChapters)
+        preloadChapterWindowAfter(newChapters)
 
         try {
             withContext(Dispatchers.Main) {
@@ -463,25 +463,36 @@ class ReaderViewModel(
         }
     }
 
-    private var nextChapterPreloadJob: Job? = null
+    private var chapterWindowJob: Job? = null
 
     /**
-     * Preloads the next chapter of [chapters] once the current one has loaded, so it doesn't take bandwidth from the
-     * pages being read. Skipped when loading ahead isn't allowed on this network.
+     * Keeps the current online chapter and two chapters on either side warm. The current chapter
+     * is always loaded first; the window only expands once every page of it has finished (or
+     * failed), so a reader jumping to a page never competes with neighbor-chapter downloads.
+     *
+     * The order after the current chapter is previous-two, previous, next, next-two. Chapters are
+     * taken from [chapterList], i.e. the same order shown in the online details page.
      */
-    private fun preloadNextChapterAfter(chapters: ViewerChapters) {
-        val nextChapter = chapters.nextChapter ?: return
-        nextChapterPreloadJob?.cancel()
-        nextChapterPreloadJob = viewModelScope.launch(Dispatchers.IO) {
-            if (!canLoadAhead()) return@launch
+    private fun preloadChapterWindowAfter(chapters: ViewerChapters) {
+        chapterWindowJob?.cancel()
+        chapterWindowJob = viewModelScope.launch(Dispatchers.IO) {
+            if (!canLoadAhead() || !::chapterList.isInitialized) return@launch
             val current = chapters.currChapter
-            // Only online pages load in the background; other loaders load a page once it's shown
+            // Only online chapters are preloaded; local/downloaded chapters load on demand.
+            if (current.pageLoader?.isLocal != false) return@launch
+
             if (current.pageLoader is HttpPageLoader) {
                 current.pages.orEmpty().forEach { page ->
                     page.statusFlow.first { it == Page.State.Ready || it is Page.State.Error }
                 }
             }
-            preload(nextChapter)
+
+            val index = chapterList.indexOf(current)
+            if (index < 0) return@launch
+            for (offset in intArrayOf(-2, -1, 1, 2)) {
+                val chapter = chapterList.getOrNull(index + offset) ?: continue
+                preload(chapter)
+            }
         }
     }
 

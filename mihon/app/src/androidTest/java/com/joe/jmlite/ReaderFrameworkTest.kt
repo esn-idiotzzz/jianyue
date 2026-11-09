@@ -174,7 +174,7 @@ class ReaderFrameworkTest {
         }
     }
 
-    @Test fun onlineLoaderUsesBoundedTemporaryCacheAndReleasesWorkers() = runBlocking {
+    @Test fun onlineLoaderLoadsSingleChapterCompletelyAndReleasesWorkers() = runBlocking {
         val transport = ReaderSyntheticHttps()
         URL.setURLStreamHandlerFactory(transport)
         val settings = context.getSharedPreferences("settings", 0)
@@ -186,14 +186,19 @@ class ReaderFrameworkTest {
             val pages = loader.getPages()
             assertEquals(20, pages.size)
             val session = field(loader, "session") as OnlineSession
+            // One reader chapter is the "whole book": the first visible page starts a full,
+            // position-first prefetch of every page in the chapter.
+            loader.setVisiblePage(0, pages[0])
             loader.loadPage(pages[0])
             loader.loadPage(pages[1])
             loader.loadPage(pages[2])
-            until { pages[0].status == Page.State.Ready && transport.active.get() == 0 && transport.imageRequests.size == 12 }
-            until { pages[1].status == Page.State.Ready && pages[2].status == Page.State.Ready }
+            until { (0 until 20).all { session.cachedFile(it) != null } && transport.active.get() == 0 }
             assertTrue("online image workers remain bounded by six", transport.peak.get() in 1..6)
             val counts = transport.imageRequests.mapValues { it.value.get() }
-            assertTrue("forward window has twelve distinct images", counts.keys.all { it.substringAfterLast('/').substringBefore('.').toInt() in 1..12 })
+            assertTrue(
+                "single-chapter load eventually requests every page",
+                counts.keys.all { it.substringAfterLast('/').substringBefore('.').toInt() in 1..20 },
+            )
             pages[0].stream!!.invoke().use { assertTrue(it.read() >= 0) }
             loader.loadPage(pages[0]); Thread.sleep(150)
             assertEquals("rebind and back-reading reuse session files", counts, transport.imageRequests.mapValues { it.value.get() })
@@ -236,7 +241,7 @@ class ReaderFrameworkTest {
                 seeking.setVisiblePage(80)
                 until { shortImages.all { it.status == Page.State.Ready } }
                 assertTrue("all sixteen actually visible short images survive job trimming", shortImages.all { it.status == Page.State.Ready })
-                assertTrue("bounded demand queue remains at or below twelve", (field(field(seeking, "session")!!, "queue") as java.util.concurrent.BlockingDeque<*>).size <= 12)
+                assertTrue("bounded demand queue remains at or below sixteen", (field(field(seeking, "session")!!, "queue") as java.util.concurrent.BlockingDeque<*>).size <= 16)
                 seeking.setVisiblePages(listOf(many[5])); seeking.setVisiblePage(5, many[5])
                 until { many[5].status == Page.State.Ready }
                 Thread.sleep(120)

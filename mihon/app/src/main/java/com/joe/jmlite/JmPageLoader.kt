@@ -41,6 +41,7 @@ class JmPageLoader(context: Context, private val descriptor: String) : PageLoade
     @Volatile private var anchor = 0
     @Volatile private var visibleFirst = 0
     @Volatile private var visibleLast = 0
+    @Volatile private var allStarted = false
     @Volatile var displayTitle: String? = null
         private set
 
@@ -118,6 +119,9 @@ class JmPageLoader(context: Context, private val descriptor: String) : PageLoade
             if (closed) { cache.close(); throw InterruptedIOException("阅读已关闭") }
             session = cache
         }
+        // JM direct reading publishes one "全书" chapter, even when the album has multiple
+        // volumes/series. There is no cross-chapter window in the reader, so the whole chapter is
+        // loaded once the reader reports its starting page (see setVisiblePage()).
         return records.mapIndexed { index, record -> ReaderPage(index, "online:${record.chapterId}/${record.filename}") }
     }
 
@@ -134,7 +138,20 @@ class JmPageLoader(context: Context, private val descriptor: String) : PageLoade
             anchor = index
             trimDisplayJobs()
         }
-        session?.prefetch(index)
+        session?.let { cache ->
+            val firstVisible = synchronized(lock) {
+                if (allStarted) false else {
+                    allStarted = true
+                    true
+                }
+            }
+            if (firstVisible) {
+                // Current image first, then both directions until this one-chapter book is full.
+                cache.prefetchAll(index)
+            } else {
+                cache.prefetch(index)
+            }
+        }
         if (page != null) launchLoad(page)
     }
 
@@ -150,7 +167,7 @@ class JmPageLoader(context: Context, private val descriptor: String) : PageLoade
         pages.forEach(::launchLoad)
     }
 
-    private fun wanted(index: Int): Boolean = index in (anchor - 2)..(anchor + 11) || index in visibleFirst..visibleLast
+    private fun wanted(index: Int): Boolean = index in (anchor - 4)..(anchor + 12) || index in visibleFirst..visibleLast
 
     private fun trimDisplayJobs() {
         jobs.entries.filter { !wanted(it.key) }.forEach { (index, display) ->

@@ -15,17 +15,21 @@ final class OnlineSession implements AutoCloseable {
         Page(String chapterId,String filename,int scrambleId){this.chapterId=chapterId;this.filename=filename;this.scrambleId=scrambleId;}
     }
     private static final Set<String> ACTIVE=new HashSet<>();
-    private static final int AHEAD=12;
+    private static final int AHEAD=12;private static final int BACK=4;
+    private static final int MAX_JOBS=22;
+    private static final int FAR_RADIUS=14;
     private final File directory;
     private final List<Page> pages;
     private final JmApi source;
     private final List<JmApi> clients=new ArrayList<>();
     private final Map<Integer,Job> jobs=new HashMap<>();
+    private final Set<Integer> failed=new HashSet<>();
     private final Map<Integer,Integer> readerDemands=new HashMap<>();
-    private final LinkedBlockingDeque<Runnable> queue=new LinkedBlockingDeque<>(AHEAD);
+    private final LinkedBlockingDeque<Runnable> queue=new LinkedBlockingDeque<>(AHEAD+BACK);
     private final ThreadPoolExecutor workers=new ThreadPoolExecutor(6,6,0,TimeUnit.MILLISECONDS,queue,r->new Thread(r,"jm-online-cache"));
     private boolean closed;
-    private int start=0,end=0;
+    private boolean all;
+    private int start=0,end=0,focus=0;
 
     OnlineSession(Context context,JmApi source,List<Page> pages)throws Exception{
         this.source=source;this.pages=new ArrayList<>(pages);
@@ -38,7 +42,6 @@ final class OnlineSession implements AutoCloseable {
             if(!directory.mkdirs())throw new IOException("无法创建在线缓存");
             ACTIVE.add(directory.getCanonicalPath());
         }
-        prefetch(0);
     }
     File directory(){return directory;}
     synchronized File cachedFile(int index){
@@ -48,8 +51,15 @@ final class OnlineSession implements AutoCloseable {
 
     synchronized void prefetch(int index){
         if(closed||pages.isEmpty())return;
-        int next=Math.max(0,Math.min(index,pages.size()-1));if(next==start&&end>0)return;
-        start=next;end=Math.min(pages.size(),start+AHEAD);
+        int next=Math.max(0,Math.min(index,pages.size()-1));focus=next;
+        if(all){
+            // A single-chapter reader keeps the full chapter queued. Moving the focus only
+            // re-prioritizes work; it must not throw away images that are still being fetched.
+            cancelFarQueued();
+            fillWindow();
+            return;
+        }
+        start=Math.max(0,next-BACK);end=Math.min(pages.size(),start+BACK+AHEAD);
         ArrayList<Job> removed=new ArrayList<>();
         for(Map.Entry<Integer,Job> entry:jobs.entrySet())if((entry.getKey()<start||entry.getKey()>=end)&&!readerDemands.containsKey(entry.getKey())){
             Job job=entry.getValue();if(workers.remove(job)||job.isDone())removed.add(job);
@@ -57,14 +67,43 @@ final class OnlineSession implements AutoCloseable {
         for(Job job:removed){jobs.remove(job.index);job.cancel(false);}
         fillWindow();
     }
+
+    /** Loads the whole chapter, starting at the current position and spreading outwards. */
+    synchronized void prefetchAll(){prefetchAll(focus);}
+    synchronized void prefetchAll(int index){
+        if(closed||pages.isEmpty())return;
+        all=true;start=0;end=pages.size();
+        focus=Math.max(0,Math.min(index,pages.size()-1));
+        cancelFarQueued();
+        fillWindow();
+    }
+
+    /** Drops queued prefetches far from the current page so the visible neighborhood stays first. */
+    private void cancelFarQueued(){
+        for(Iterator<Map.Entry<Integer,Job>> it=jobs.entrySet().iterator();it.hasNext();){
+            Map.Entry<Integer,Job> entry=it.next();int index=entry.getKey();
+            if(Math.abs(index-focus)<=FAR_RADIUS||readerDemands.containsKey(index))continue;
+            Job job=entry.getValue();
+            if(workers.remove(job)){it.remove();job.cancel(false);}
+        }
+    }
+
     private void fillWindow(){
         if(closed)return;
-        // Make the first displayed image available before spending the other slots on lookahead.
-        if(start==0&&cachedFile(0)==null){enqueue(0,false);return;}
-        for(int index=start;index<end;index++)enqueue(index,false);
+        // Current position first, then both directions. In full-chapter mode this keeps at most
+        // MAX_JOBS queued and lets completed jobs expose the next-nearest pages, so a very large
+        // album never creates one thread/task per image.
+        if(!all&&start==0&&cachedFile(0)==null){enqueue(0,true);return;}
+        int center=Math.max(start,Math.min(focus,end-1));
+        enqueue(center,true);
+        int reach=Math.max(center-start,end-1-center);
+        for(int distance=1;distance<=reach&&jobs.size()<MAX_JOBS;distance++){
+            if(center-distance>=start)enqueue(center-distance,false);
+            if(center+distance<end&&jobs.size()<MAX_JOBS)enqueue(center+distance,false);
+        }
     }
     private Job enqueue(int index,boolean priority){
-        if(closed||index<0||index>=pages.size()||cachedFile(index)!=null)return null;
+        if(closed||failed.contains(index)||index<0||index>=pages.size()||cachedFile(index)!=null)return null;
         Job job=jobs.get(index);
         if(job!=null){if(priority&&workers.remove(job))queue.offerFirst(job);return job;}
         job=new Job(index);jobs.put(index,job);
@@ -77,7 +116,7 @@ final class OnlineSession implements AutoCloseable {
         synchronized(this){
             if(closed)throw new InterruptedIOException("阅读已关闭");
             File cached=cachedFile(index);if(cached!=null)return cached;
-            first=index>0&&start==0&&cachedFile(0)==null?enqueue(0,true):null;
+            first=!all&&index>0&&start==0&&cachedFile(0)==null?enqueue(0,true):null;
         }
         if(first!=null)await(first);
         Job job;
@@ -95,7 +134,7 @@ final class OnlineSession implements AutoCloseable {
         Job first;
         synchronized(this){
             if(closed)throw new InterruptedIOException("阅读已关闭");
-            first=index>0&&start==0&&cachedFile(0)==null?enqueue(0,true):null;
+            first=!all&&index>0&&start==0&&cachedFile(0)==null?enqueue(0,true):null;
         }
         if(first!=null)await(first);
         Job job=null;boolean demanded=false;
@@ -135,8 +174,9 @@ final class OnlineSession implements AutoCloseable {
         catch(ExecutionException e){Throwable cause=e.getCause();if(cause instanceof Exception)throw (Exception)cause;throw new IOException("图片加载失败",cause);}
     }
     synchronized void retry(int index){
+        failed.remove(index);
         Job job=jobs.get(index);if(job!=null&&job.isDone()){jobs.remove(index);job.cancel(false);}
-        if(!closed){start=index;end=Math.min(pages.size(),index+AHEAD);enqueue(index,true);fillWindow();}
+        if(!closed){if(all){focus=index;}else{start=index;end=Math.min(pages.size(),index+AHEAD);}enqueue(index,true);fillWindow();}
     }
     private File download(int index)throws Exception{
         JmApi client=source.fork();
@@ -149,7 +189,12 @@ final class OnlineSession implements AutoCloseable {
         Job(int index){super(()->download(index));this.index=index;}
         @Override protected void done(){
             boolean saved=false;try{saved=!isCancelled()&&get().isFile();}catch(Exception ignored){}
-            synchronized(OnlineSession.this){if(saved)jobs.remove(index,this);if(saved&&!closed)fillWindow();OnlineSession.this.notifyAll();}
+            synchronized(OnlineSession.this){
+                jobs.remove(index,this);
+                if(!saved&&!isCancelled()&&!closed)failed.add(index);
+                if(saved&&!closed)fillWindow();
+                OnlineSession.this.notifyAll();
+            }
         }
     }
     @Override public void close(){
@@ -157,7 +202,7 @@ final class OnlineSession implements AutoCloseable {
         synchronized(this){
             if(closed)return;closed=true;
             cancel=new ArrayList<>(clients);
-            ArrayList<Job> pending=new ArrayList<>(jobs.values());jobs.clear();readerDemands.clear();queue.clear();
+            ArrayList<Job> pending=new ArrayList<>(jobs.values());jobs.clear();readerDemands.clear();queue.clear();failed.clear();
             for(Job job:pending)job.cancel(true);
             workers.shutdownNow();
             notifyAll();

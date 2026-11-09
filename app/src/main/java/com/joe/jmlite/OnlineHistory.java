@@ -83,7 +83,8 @@ public final class OnlineHistory {
                 JSONObject item = items.optJSONObject(i);
                 if (item != null) result.add(item);
             }
-            result.sort((a, b) -> Long.compare(b.optLong("updated"), a.optLong("updated")));
+            // The stored order is the user-visible order. Reading a record or saving its
+            // progress must not move it; only promote() does that.
             return result;
         }
     }
@@ -101,6 +102,14 @@ public final class OnlineHistory {
     }
 
     public void save(JSONObject record) throws Exception {
+        save(record, false);
+    }
+
+    /**
+     * Replaces an existing record in place (or puts a new record at the top). Opening a history
+     * item must not change the list order, so this method never moves an existing record.
+     */
+    private void save(JSONObject record, boolean promote) throws Exception {
         synchronized (LOCK) {
             JSONObject root = state();
             JSONArray items = root.optJSONArray("items");
@@ -109,23 +118,38 @@ public final class OnlineHistory {
             if (key.isEmpty()) key = key(record.optString("sourceId"), record.optString("url"));
             record.put("key", key).put("updated", System.currentTimeMillis());
             JSONArray next = new JSONArray();
-            if (items.length() > 0) {
-                // Keep the entry order stable, but replace the matching record in place.
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject old = items.optJSONObject(i);
-                    if (old != null && key.equals(old.optString("key"))) continue;
-                    if (old != null) next.put(old);
+            boolean found = false;
+            if (promote) next.put(record);
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject old = items.optJSONObject(i);
+                if (old == null) continue;
+                if (key.equals(old.optString("key"))) {
+                    found = true;
+                    if (!promote) next.put(record);
+                    continue;
                 }
+                next.put(old);
             }
-            next.put(record);
+            if (!found && !promote) {
+                // A brand-new history entry naturally belongs at the top.
+                JSONArray shifted = new JSONArray();
+                shifted.put(record);
+                for (int i = 0; i < next.length(); i++) shifted.put(next.getJSONObject(i));
+                next = shifted;
+            }
             if (next.length() > LIMIT) {
                 JSONArray trimmed = new JSONArray();
-                for (int i = next.length()-LIMIT; i < next.length(); i++) trimmed.put(next.getJSONObject(i));
+                for (int i = 0; i < LIMIT; i++) trimmed.put(next.getJSONObject(i));
                 next = trimmed;
             }
             root.put("items", next);
             write(root);
         }
+    }
+
+    /** Moves [record] to the front. Used only by search/warehouse entry points. */
+    public void promote(JSONObject record) throws Exception {
+        save(record, true);
     }
 
     public void clear() throws Exception {
@@ -151,8 +175,23 @@ public final class OnlineHistory {
 
     private JSONObject state() throws Exception {
         File base = file.getBaseFile();
-        if (!base.exists() && !new File(base + ".bak").exists()) return new JSONObject();
-        return new JSONObject(new String(file.readFully(), StandardCharsets.UTF_8));
+        if (!base.exists() && !new File(base + ".bak").exists()) return new JSONObject().put("orderVersion", 1);
+        JSONObject root = new JSONObject(new String(file.readFully(), StandardCharsets.UTF_8));
+        if (root.optInt("orderVersion", 0) < 1) {
+            // Older builds stored oldest-first and sorted by timestamp for display. Convert once
+            // to an explicit newest-first order that is no longer affected by progress saves.
+            JSONArray items = root.optJSONArray("items");
+            JSONArray ordered = new JSONArray();
+            if (items != null) {
+                for (int i = items.length() - 1; i >= 0; i--) {
+                    JSONObject item = items.optJSONObject(i);
+                    if (item != null) ordered.put(item);
+                }
+            }
+            root.put("items", ordered).put("orderVersion", 1);
+            write(root);
+        }
+        return root;
     }
 
     private void write(JSONObject root) throws Exception {

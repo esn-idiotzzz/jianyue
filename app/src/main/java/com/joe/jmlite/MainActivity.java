@@ -77,6 +77,7 @@ public final class MainActivity extends Activity {
     private static boolean readerCacheCleared;private boolean resumed=false,reading=false,starting=false,operation=false,revealed=true,keyboardVisible;
     private String rowsSnapshot="",draft="",searchDraft="",taskId="",folderId="",highlightKey="";
     private boolean highlightScrollPending;
+    private boolean jumpReturnBrowse;
     private JSONObject pendingShare;
     private JSONObject draggingBook;
     private boolean shelfHoldActive;
@@ -211,7 +212,7 @@ public final class MainActivity extends Activity {
             }
             super.dispatchDraw(canvas);
         }
-    }    private void switchTab(int next){
+    }    private void switchTab(int next){jumpReturnBrowse=false;
         if(tab==next&&!privateShelf)return;
         final int from=tab;
         if(historySelecting&&next!=2)setHistorySelection(false);
@@ -379,6 +380,11 @@ public final class MainActivity extends Activity {
     }
     private String folderTitle(){for(JSONObject f:bookFolders)if(folderId.equals(f.optString("id")))return f.optString("title","书籍夹");return privateShelf?"隐私书架":"书架";}
     private void leaveFolder(){
+        if(jumpReturnBrowse){
+            jumpReturnBrowse=false;
+            if(privateShelf)setPrivateShelf(false,false);
+            folderId="";tab=0;buildTab();return;
+        }
         PageMotion.clearEntering(this);
         boolean gesture=predictiveBack!=null&&predictiveBack.isLeavingByGesture();
         if(folderId.isEmpty()&&privateShelf){if(gesture)setPrivateShelf(false);else transitionContent(-1,()->setPrivateShelf(false));return;}
@@ -407,7 +413,8 @@ public final class MainActivity extends Activity {
 
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleShelfJump(intent);}
     private void handleShelfJump(Intent intent){String key=intent.getStringExtra("shelf_jump");if(key==null)return;intent.removeExtra("shelf_jump");String highlight=intent.getStringExtra("shelf_highlight");intent.removeExtra("shelf_highlight");if(highlight==null||highlight.isEmpty())clearShelfHighlight();Runnable jump=()->disk.execute(()->{try{JSONObject book=new Library(this).find(key);runOnUiThread(()->{if(book==null||isDestroyed())return;Runnable navigate=()->{tab=1;shelfSearch.collapse();shelfQuery="";setPrivateShelf(book.optBoolean("privacy"));folderId=book.optString("folder");library.preserveFolder(folderId);highlightKey=highlight==null?"":highlight;highlightScrollPending=!highlightKey.isEmpty();buildTab();refresh(true);};if(book.optBoolean("privacy"))PrivacyVault.enter(this,navigate);else navigate.run();});}catch(Exception e){runOnUiThread(()->toast("书籍已不存在"));}});if(intent.getBooleanExtra("shelf_private",false))PrivacyVault.enter(this,jump);else jump.run();}
-    private void setPrivateShelf(boolean hidden){
+    private void setPrivateShelf(boolean hidden){setPrivateShelf(hidden,true);}
+    private void setPrivateShelf(boolean hidden,boolean rebuild){
         if(!hidden&&parentListDirty){BackPreview.hide();parentListDirty=false;}
         while(folderPreviewDepth>0){folderPreviewDepth--;BackPreview.pop();}
         if(hidden&&!privateShelf){
@@ -435,7 +442,7 @@ public final class MainActivity extends Activity {
                 folderCovers=FolderCoverIndex.from(books,folders);
             }catch(Exception ignored){libraryBooks.clear();bookFolders.clear();folderCovers=FolderCoverIndex.from(java.util.Collections.emptyList());}
         }
-        rowsSnapshot="";buildTab();refresh(true);
+        rowsSnapshot="";if(rebuild){buildTab();refresh(true);}
     }
     private void transferPrivacy(JSONObject book,boolean folder){parentListDirty=true;Runnable move=()->mutate(()->library.transfer(folder?book.optString("id"):Library.key(book),folder,!privateShelf));if(privateShelf)move.run();else PrivacyVault.beforeFirstUse(this,move);}
     private void attachPrivacyPull(PrivacyPullHost frame){
@@ -492,7 +499,24 @@ public final class MainActivity extends Activity {
     /** Both the download and online buttons share the same existing-shelf prompt. */
     private void withLocalDownload(String id,Runnable proceed){withLocalDownload(id,false,proceed);}
     private void withLocalDownload(String id,boolean openLocal,Runnable proceed){
-        disk.execute(()->{try{JSONObject b=new Library(this).findLocalDownload(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null){if(openLocal)DownloadCollision.openLocal(this,b);else DownloadCollision.show(this,b);return;}proceed.run();});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
+        disk.execute(()->{try{JSONObject b=new Library(this).findLocalDownload(id);runOnUiThread(()->{starting=false;if(isFinishing()||isDestroyed()||!resumed)return;if(b!=null){if(openLocal)confirmLocalJump(b);else DownloadCollision.show(this,b);return;}proceed.run();});}catch(Exception e){runOnUiThread(()->{starting=false;if(!isDestroyed())toast("无法读取下载记录");});}});
+    }
+    private void confirmLocalJump(JSONObject b){
+        PredictiveBack.dialog(this).setTitle("本地已有漫画，是否跳转")
+            .setNegativeButton("取消",null)
+            .setPositiveButton("跳转",(d,n)->jumpToLocalBook(b)).show();
+    }
+    private void jumpToLocalBook(JSONObject b){
+        boolean privacy=b.optBoolean("privacy");
+        boolean inFolder=!b.optString("folder").isEmpty();
+        tab=1;shelfSearch.collapse();shelfQuery="";
+        highlightKey=Library.key(b);highlightScrollPending=true;
+        jumpReturnBrowse=privacy||inFolder;
+        // Prepare the private/normal shelf state once, then set the target folder and build the
+        // shelf page exactly once. No new Activity is involved.
+        if(privacy!=privateShelf)setPrivateShelf(privacy,false);
+        folderId=b.optString("folder");library.preserveFolder(folderId);
+        buildTab();refresh(true);
     }
     private void searchOnline(){
         if(searchInput==null)return;
@@ -1162,7 +1186,7 @@ public final class MainActivity extends Activity {
         if(zone==ShelfOrder.MERGE){String parent=folderId;mutate(()->library.mergeBooks(Library.key(source),Library.key(target),parent));return;}
         mutate(()->library.reorderBook(Library.key(source),Library.key(target),zone==ShelfOrder.AFTER));
     }
-    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.4").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
+    private void license(){PredictiveBack.dialog(this).setTitle("JM 简阅 1.4.6").setItems(new String[]{"Mihon 阅读器 · Apache 2.0","内置中文图源 · Keiyoushi","JMComic · MIT","压缩格式支持库","源码与修改说明","GitHub 项目："+AppUpdate.PROJECT_URL,"隐私密码设置"},(d,n)->{if(n==6){PrivacyVault.settings(this);return;}if(n==5){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(AppUpdate.PROJECT_URL)));}catch(android.content.ActivityNotFoundException e){toast("未找到可打开链接的浏览器");}return;}String[] files={"LICENSE-Mihon.txt","LICENSES-extensions.txt","LICENSE-JMComic.txt","LICENSE-archives.txt","NOTICE-JM.txt"};showLicense(files[n]);}).setPositiveButton("完成",null).show();}
     private void showLicense(String file){try(java.io.InputStream in=getAssets().open(file);java.io.ByteArrayOutputStream b=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[4096];for(int n;(n=in.read(buf))!=-1;)b.write(buf,0,n);PredictiveBack.dialog(this).setTitle("开源许可").setMessage(b.toString("UTF-8")).setPositiveButton("知道了",null).show();}catch(Exception e){toast("无法读取许可");}}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
     private void showLocalComicHint(){

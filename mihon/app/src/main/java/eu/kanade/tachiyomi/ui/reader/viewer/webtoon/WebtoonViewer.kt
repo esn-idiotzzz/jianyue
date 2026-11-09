@@ -64,7 +64,6 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
      * Layout manager of the recycler view.
      */
     private val layoutManager = WebtoonLayoutManager(activity, scrollDistance)
-    private var pendingChapters: ViewerChapters? = null
 
     private val settingsViewModel = activity.settingsViewModel
 
@@ -127,13 +126,6 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
                 }
             },
         )
-        recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    pendingChapters?.let { pending -> pendingChapters = null; applyChapters(pending) }
-                }
-            }
-        })
         recycler.tapListener = { event ->
             val viewPosition = IntArray(2)
             recycler.getLocationOnScreen(viewPosition)
@@ -222,17 +214,9 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
      * Tells this viewer to set the given [chapters] as active.
      */
     override fun setChapters(chapters: ViewerChapters) {
-        // Never replace a chapter list in the middle of a drag/fling: DiffUtil would move the
-        // scroll position while the user is crossing the black transition item.
-        if (!recycler.isGone && recycler.scrollState != RecyclerView.SCROLL_STATE_IDLE) {
-            pendingChapters = chapters
-            return
-        }
-        applyChapters(chapters)
-    }
-    private fun applyChapters(chapters: ViewerChapters) {
-        val forceTransition = general.alwaysShowChapterTransition
+        val forceTransition = general.alwaysShowChapterTransition || tracker.currentPage is ChapterTransition
         adapter.setChapters(chapters, forceTransition)
+
         if (recycler.isGone) {
             logcat { "Recycler first layout" }
             val pages = chapters.currChapter.pages ?: return

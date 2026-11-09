@@ -62,6 +62,7 @@ class OnlineMangaActivity : Activity() {
     private var mangaAuthor: String? = null
     private var mangaDescription: String? = null
     private var sourceName = ""
+    private var promoteHistory = false
     private var lastChapterUrl = ""
     private var lastChapterName = ""
     private var predictiveBack: PredictiveBack? = null
@@ -78,6 +79,7 @@ class OnlineMangaActivity : Activity() {
         mangaAuthor = intent.getStringExtra("author")
         mangaDescription = intent.getStringExtra("description")
         sourceName = intent.getStringExtra("sourceName").orEmpty()
+        promoteHistory = intent.getBooleanExtra("promote_history", false)
         if (sourceId == 0L || mangaUrl.isBlank()) {
             finish()
             return
@@ -136,8 +138,12 @@ class OnlineMangaActivity : Activity() {
         coverFrame.background = ui.shape(ui.tint, 16)
         coverFrame.clipToOutline = true
         coverFrame.addView(
-            ui.text("JM", 22, OnlineUi.BLUE, true).apply { gravity = Gravity.CENTER },
-            FrameLayout.LayoutParams(-1, -1),
+            Ui(this).icon("book", OnlineUi.BLUE).apply {
+                setMinimumWidth(0)
+                setMinimumHeight(0)
+                glyphScale = .72f
+            },
+            FrameLayout.LayoutParams(ui.dp(22), ui.dp(22), Gravity.CENTER),
         )
         coverView = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         coverFrame.addView(coverView, FrameLayout.LayoutParams(-1, -1))
@@ -219,6 +225,26 @@ class OnlineMangaActivity : Activity() {
         if (!mangaThumbnail.isNullOrBlank()) RemoteCovers.load(coverView, mangaThumbnail, sourceId)
         if (sourceName.isNotBlank()) subtitleView.text = sourceName
         scope.launch {
+            if (promoteHistory) {
+                // Opening from search results or a warehouse source owns the history order.
+                // Do it before any network request so a failed refresh still leaves the entry on top.
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        OnlineHistory(this@OnlineMangaActivity).promote(
+                            org.json.JSONObject()
+                                .put("key", "${sourceId}|$mangaUrl")
+                                .put("sourceId", sourceId)
+                                .put("url", mangaUrl)
+                                .put("title", mangaTitle)
+                                .put("thumbnail", mangaThumbnail.orEmpty())
+                                .put("sourceName", sourceName)
+                                .put("author", mangaAuthor.orEmpty())
+                                .put("description", mangaDescription.orEmpty())
+                                .put("type", "online"),
+                        )
+                    }
+                }
+            }
             // Read the local database first so cached titles, chapters and the blue
             // last-read marker appear immediately, even when the network is unavailable.
             val cached = try {
